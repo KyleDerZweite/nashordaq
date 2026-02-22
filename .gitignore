@@ -19,6 +19,7 @@ pnpm-debug.log*
 # Environment
 .env
 .env.*
+!.env.example
 
 # Editors
 .vscode/*
@@ -29,6 +30,3 @@ pnpm-debug.log*
 
 # Data
 data/
-
-# Project-specific
-docs/ECONOMY_MECHANICS.md

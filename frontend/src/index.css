@@ -1,1 +1,97 @@
 @import "tailwindcss";
+
+@theme {
+  /* -- Hextech Brutalist Palette -- */
+  --color-hex-bg: #091428;
+  --color-hex-bg-alt: #0a1a32;
+  --color-hex-panel: #0d1f3c;
+  --color-hex-gold: #c8aa6e;
+  --color-hex-gold-dim: #785a28;
+  --color-hex-bronze: #a09b8c;
+  --color-hex-magic: #0ac8b9;
+  --color-hex-zaun: #e84057;
+  --color-hex-white: #f0e6d2;
+  --color-hex-border: #1e2d3d;
+
+  /* -- Typography -- */
+  --font-serif: "Playfair Display", "Georgia", serif;
+  --font-mono: "JetBrains Mono", "Courier New", monospace;
+
+  /* -- Hard shadows (brutalist) -- */
+  --shadow-brutal-sm: 2px 2px 0 var(--color-hex-gold-dim);
+  --shadow-brutal: 4px 4px 0 var(--color-hex-gold-dim);
+  --shadow-brutal-lg: 6px 6px 0 var(--color-hex-gold-dim);
+  --shadow-brutal-magic: 4px 4px 0 #0a6e65;
+  --shadow-brutal-zaun: 4px 4px 0 #8b1a2a;
+
+  /* -- Border radius override: zero everywhere -- */
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --radius-2xl: 0px;
+  --radius-3xl: 0px;
+  --radius-4xl: 0px;
+  --radius-full: 0px;
+}
+
+/* -- Base -- */
+html {
+  background-color: var(--color-hex-bg);
+  color: var(--color-hex-gold);
+  font-family: var(--font-mono);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+/* -- Scrollbar -- */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-hex-bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-hex-gold-dim);
+  border: 1px solid var(--color-hex-bg);
+}
+
+/* -- Selection -- */
+::selection {
+  background: var(--color-hex-gold);
+  color: var(--color-hex-bg);
+}
+
+/* -- Noise texture overlay -- */
+#root::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 256px 256px;
+}
+
+/* -- Scanline effect -- */
+#root::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.05) 2px,
+    rgba(0, 0, 0, 0.05) 4px
+  );
+}

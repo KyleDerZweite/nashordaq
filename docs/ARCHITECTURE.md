@@ -81,6 +81,18 @@ All endpoints are prefixed with `/api` except the health check.
 
 Authentication is handled by an external Identity-Aware Proxy (e.g., Zitadel/Pangolin) that injects an `X-Remote-User` HTTP header. The backend reads this header and auto-provisions new users with a starting balance of 10,000. No passwords, JWTs, or login forms exist in the application.
 
+## Security Boundary and Hardening
+
+- **Primary trust boundary:** The backend is intended to be reachable only through Pangolin/Newt + IAP.
+- **Identity source:** The application identifies users only from the configured auth header (`NASHORDAQ_AUTH_HEADER`, default `X-Remote-User`).
+- **Trusted proxy enforcement (defense-in-depth):**
+  - `NASHORDAQ_ENFORCE_TRUSTED_PROXY=true` rejects auth requests from non-trusted source IPs.
+  - `NASHORDAQ_TRUSTED_PROXY_CIDRS` defines allowed proxy/tunnel CIDR ranges.
+- **Outbound resiliency:** Riot API requests use configurable timeouts:
+  - `NASHORDAQ_HTTP_TIMEOUT_SECONDS`
+  - `NASHORDAQ_HTTP_CONNECT_TIMEOUT_SECONDS`
+- **CORS posture:** Origins are explicitly configured via `NASHORDAQ_CORS_ORIGINS`, with only required methods/headers enabled.
+
 ## Scheduler Pipeline
 
 The market update job runs as a single atomic operation:

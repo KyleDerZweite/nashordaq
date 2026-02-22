@@ -1,50 +1,56 @@
 # AI Agent Instructions
 
-This document defines the strict tooling and workflow rules for contributing to the Nashordaq project. Adhere strictly to these constraints.
+This is the primary instruction file for contributors and coding agents. Follow it strictly.
 
-## Tech Stack and Tooling
+## 1) Hard Constraints
 
 ### Backend (Python/FastAPI)
-* Package Manager: `uv`
-* Linter and Formatter: `ruff`
-* Do not use `pip`, `poetry`, or `conda`. Use `uv` for all dependency management and environment execution.
+- Package manager: `uv` only.
+- Lint/format: `ruff` only.
+- Never use `pip`, `poetry`, or `conda`.
 
 ### Frontend (Vite/TypeScript)
-* Package Manager: `pnpm`
-* Linter: ESLint
-* Formatter: Prettier
-* Do not use `npm` or `yarn`. Use `pnpm` for all dependency management.
+- Package manager: `pnpm` only.
+- Lint: ESLint.
+- Format: Prettier.
+- Never use `npm` or `yarn`.
 
-### Authentication Strategy
-* The application relies on an Identity-Aware Proxy (IAP) for authentication. 
-* Do not implement JWT generation, password hashing, or login forms.
-* The backend must identify users strictly by reading the `X-Remote-User` HTTP header injected by the reverse proxy.
+### Authentication / Security Model
+- Authentication is external (IAP + reverse proxy).
+- Never implement JWT issuance, password hashing, sessions, or login forms.
+- Backend identity source is the configured proxy header (`X-Remote-User` by default).
+- Keep security assumptions aligned with `docs/ARCHITECTURE.md` (trust boundary and hardening settings).
 
-## Workflow Rules
+## 2) Canonical References
 
-### 1. Dependency Management
-* Backend: Add packages using `uv add <package>`.
-* Frontend: Add packages using `pnpm add <package>`.
+- Architecture and security boundary: `docs/ARCHITECTURE.md`
+- Pricing model and formulas: `docs/ECONOMY_MECHANICS.md`
+- Product scope and behavior: `docs/PRD.md`
 
-### 2. Validation and Linting
-After making any major changes, refactoring code, or completing a feature, you must run the appropriate linting and formatting tools to verify the codebase before concluding the task.
+Do not duplicate complex formula or architecture details in multiple places; reference canonical docs instead.
 
-**Backend Checks:**
-* Run `uv run ruff check .` to catch linting errors. Fix any issues found.
-* Run `uv run ruff format .` to ensure consistent code styling.
+## 3) Required Workflow
 
-**Frontend Checks:**
-* Run `pnpm run lint` to check for TypeScript and syntax errors.
-* Run `pnpm run format` to format the code.
+### Dependency changes
+- Backend: `uv add <package>`
+- Frontend: `pnpm add <package>`
 
-### 3. Execution
-* Ensure all code runs without errors before presenting it as a final solution. If a linter throws an error, fix it autonomously without asking for permission.
+### Validation before finishing
+- Backend (run from `backend/`):
+  - `uv run ruff check .`
+  - `uv run ruff format .`
+  - `uv run pytest -v` (when backend behavior changed)
+- Frontend (run from frontend folder):
+  - `pnpm run lint`
+  - `pnpm run format`
+  - `pnpm run build` (when frontend behavior changed)
 
-### 4. Style
-* Write clean, modular, and typed code (TypeScript for frontend, Python type hints for backend).
-* Keep documentation and comments minimalistic. No emojis.
-* Adhere to core software engineering principles:
-  * KISS (Keep It Simple, Stupid): Avoid unnecessary complexity.
-  * YAGNI (You Aren't Gonna Need It): Do not implement features before they are strictly required.
-  * DRY (Don't Repeat Yourself): Consolidate logic to prevent code duplication.
-  * SOLID: Ensure scalable and maintainable object-oriented design.
+If checks fail, fix issues autonomously before concluding.
+
+## 4) Coding Principles
+
+- Keep code typed, modular, and minimal.
+- Prefer small, targeted edits over large rewrites.
+- Follow: KISS, YAGNI, DRY, SOLID.
+- Keep comments and docs concise. No emojis.
+- Do not add features beyond the requested scope.

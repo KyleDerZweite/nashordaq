@@ -1,0 +1,45 @@
+version: "3"
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Containerfile
+    container_name: nashordaq-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - NASHORDAQ_DATABASE_URL=sqlite+aiosqlite:///data/nashordaq.db
+      - NASHORDAQ_CORS_ORIGINS=http://localhost,https://${NASHORDAQ_DOMAIN:-localhost}
+    volumes:
+      - nashordaq-data:/app/data
+    expose:
+      - "8000"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Containerfile
+    container_name: nashordaq-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+  newt:
+    image: fosrl/newt
+    container_name: nashordaq-newt
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - PANGOLIN_ENDPOINT=${PANGOLIN_ENDPOINT}
+      - NEWT_ID=${NEWT_ID}
+      - NEWT_SECRET=${NEWT_SECRET}
+    depends_on:
+      - frontend
+
+volumes:
+  nashordaq-data:
