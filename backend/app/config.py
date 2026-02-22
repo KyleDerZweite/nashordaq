@@ -35,6 +35,11 @@ class Settings(BaseSettings):
 
     # Economy
     starting_balance: float = 10000.0
+    short_hold_fee_rate: float = 0.02
+    short_hold_fee_window_hours: float = 6.0
+    long_hold_bonus_rate: float = 0.02
+    long_hold_bonus_start_hours: float = 12.0
+    buy_revert_grace_seconds: int = 60
 
     # Player config
     players_file: str = "players.json"

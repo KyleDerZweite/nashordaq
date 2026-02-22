@@ -4,6 +4,7 @@ from app.pricing import (
     calculate_ipo_price,
     calculate_lp_abs,
     calculate_new_price,
+    calculate_sell_multiplier,
     generate_gamma_base,
     update_streak,
 )
@@ -93,3 +94,36 @@ def test_streak_direction_change():
 def test_streak_no_change():
     assert update_streak(5, 0) == 0
     assert update_streak(-3, 0) == 0
+
+
+def test_sell_multiplier_short_hold_penalty():
+    multiplier = calculate_sell_multiplier(
+        held_hours=0,
+        short_hold_fee_rate=0.02,
+        short_hold_fee_window_hours=6,
+        long_hold_bonus_rate=0.02,
+        long_hold_bonus_start_hours=12,
+    )
+    assert multiplier == 0.98
+
+
+def test_sell_multiplier_no_adjustment_mid_window():
+    multiplier = calculate_sell_multiplier(
+        held_hours=8,
+        short_hold_fee_rate=0.02,
+        short_hold_fee_window_hours=6,
+        long_hold_bonus_rate=0.02,
+        long_hold_bonus_start_hours=12,
+    )
+    assert multiplier == 1.0
+
+
+def test_sell_multiplier_long_hold_bonus():
+    multiplier = calculate_sell_multiplier(
+        held_hours=12,
+        short_hold_fee_rate=0.02,
+        short_hold_fee_window_hours=6,
+        long_hold_bonus_rate=0.02,
+        long_hold_bonus_start_hours=12,
+    )
+    assert multiplier == 1.02

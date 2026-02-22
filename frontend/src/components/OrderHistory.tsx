@@ -1,5 +1,6 @@
 import type { OrderResponse } from "../types";
 import { useCancelOrder } from "../api";
+import { formatAmount } from "../utils/format";
 
 interface Props {
   orders: OrderResponse[];
@@ -61,7 +62,9 @@ export default function OrderHistory({ orders }: Props) {
                   {o.quantity}
                 </td>
                 <td className="px-4 py-2.5 text-right font-mono text-sm text-hex-gold">
-                  {o.execution_price?.toFixed(2) ?? "--"}
+                  {o.execution_price != null
+                    ? formatAmount(o.execution_price)
+                    : "--"}
                 </td>
                 <td className="px-4 py-2.5">
                   <span

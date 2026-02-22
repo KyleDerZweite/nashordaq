@@ -13,7 +13,7 @@ services:
       - NASHORDAQ_DATABASE_URL=sqlite+aiosqlite:///data/nashordaq.db
       - NASHORDAQ_CORS_ORIGINS=http://localhost,https://${NASHORDAQ_DOMAIN:-localhost}
     volumes:
-      - ./data:/app/data
+      - nashordaq-data:/app/data
     expose:
       - "8000"
     healthcheck:
@@ -53,3 +53,6 @@ services:
       - NEWT_SECRET=${NEWT_SECRET}
     depends_on:
       - frontend
+
+volumes:
+  nashordaq-data:

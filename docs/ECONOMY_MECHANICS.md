@@ -60,26 +60,34 @@ epsilon = random.uniform(-0.03, 0.03)
 
 Implementation: `app/pricing.py::calculate_new_price()`, `update_streak()`
 
-## 4. Forward Pricing
+## 4. Immediate Execution + Holding Adjustment
 
-Prevents front-running by decoupling order placement from execution.
+Orders execute immediately at the currently visible market price.
 
 1. User submits a buy or sell order via the API.
-2. Order is saved to the database with status `PENDING`.
-3. The scheduler job runs at the configured interval (default: 30 minutes).
-4. The job fetches current LP data from the Riot API and calculates `P_new` for all tracked players.
-5. The job processes all `PENDING` orders in FIFO order (`created_at` ascending) using the newly calculated prices.
-6. For each order:
-   - **BUY:** If `user.balance >= price * quantity`, deduct balance and add shares. Otherwise, cancel.
-   - **SELL:** If `holding.quantity >= order.quantity`, remove shares and credit balance. Otherwise, cancel.
-7. Executed orders are marked `EXECUTED` with the fill price recorded. A `Transaction` record is created.
-8. All price updates, order executions, and balance changes are committed in a single atomic database transaction.
+2. Order is executed immediately and stored with status `EXECUTED`.
+3. **BUY:** User balance is deducted at execution and shares are added instantly.
+4. **SELL:** Shares are removed instantly and proceeds are calculated with a holding-duration multiplier per consumed lot (FIFO lots).
+5. Every execution writes a `Transaction` row.
 
-Implementation: `app/scheduler.py::market_update_job()`
+### Buy Revert Grace Period
+
+- Executed BUY orders can be reverted via order cancellation during a short grace window (default: 60 seconds).
+- Revert refunds exactly `execution_price * quantity`.
+- Revert is only allowed if shares from that BUY lot were not sold yet.
+- Reverted orders are marked with status `REVERTED`.
+
+Sell multiplier defaults:
+
+- Hold `< 6h`: short-hold fee ramps from `-2%` (at 0h) to `0%` (at 6h).
+- Hold `6h` to `< 12h`: no adjustment.
+- Hold `>= 12h`: `+2%` long-hold bonus.
+
+Implementation: `app/routers/orders.py::place_order()`, `app/pricing.py::calculate_sell_multiplier()`
 
 ## 5. Order Validation at Placement
 
-Orders are validated at placement time as a sanity check, but the binding validation occurs at execution.
+Orders are validated and executed in the same request.
 
-- **BUY:** Estimated cost (`current_price * quantity`) must not exceed user balance. This is advisory; the actual execution price may differ.
-- **SELL:** Available shares (`owned - sum(pending_sell_quantities)`) must be sufficient. Pending sell orders reduce available shares to prevent overselling.
+- **BUY:** `current_price * quantity` must not exceed user balance.
+- **SELL:** Available shares must be sufficient.

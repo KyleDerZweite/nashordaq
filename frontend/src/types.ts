@@ -4,7 +4,7 @@
  * ------------------------------------------------------- */
 
 export type OrderSide = "BUY" | "SELL";
-export type OrderStatus = "PENDING" | "EXECUTED" | "CANCELLED";
+export type OrderStatus = "PENDING" | "EXECUTED" | "CANCELLED" | "REVERTED";
 
 export interface UserResponse {
   id: number;

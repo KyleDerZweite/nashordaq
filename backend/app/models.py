@@ -18,6 +18,7 @@ class OrderStatus(enum.StrEnum):
     PENDING = "PENDING"
     EXECUTED = "EXECUTED"
     CANCELLED = "CANCELLED"
+    REVERTED = "REVERTED"
 
 
 class User(Base):
@@ -29,6 +30,7 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(insert_default=func.now())
 
     holdings: Mapped[list["Holding"]] = relationship(back_populates="user")
+    holding_lots: Mapped[list["HoldingLot"]] = relationship(back_populates="user")
     orders: Mapped[list["Order"]] = relationship(back_populates="user")
 
 
@@ -53,6 +55,7 @@ class TrackedPlayer(Base):
     )
 
     holdings: Mapped[list["Holding"]] = relationship(back_populates="player")
+    holding_lots: Mapped[list["HoldingLot"]] = relationship(back_populates="player")
     orders: Mapped[list["Order"]] = relationship(back_populates="player")
     price_history: Mapped[list["PriceHistory"]] = relationship(back_populates="player")
 
@@ -69,6 +72,22 @@ class Holding(Base):
 
     user: Mapped["User"] = relationship(back_populates="holdings")
     player: Mapped["TrackedPlayer"] = relationship(back_populates="holdings")
+
+
+class HoldingLot(Base):
+    __tablename__ = "holding_lots"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    player_id: Mapped[int] = mapped_column(ForeignKey("tracked_players.id"), index=True)
+    buy_order_id: Mapped[int | None] = mapped_column(
+        ForeignKey("orders.id"), index=True, default=None
+    )
+    quantity: Mapped[int] = mapped_column(Integer)
+    acquired_at: Mapped[datetime] = mapped_column(insert_default=func.now(), index=True)
+
+    user: Mapped["User"] = relationship(back_populates="holding_lots")
+    player: Mapped["TrackedPlayer"] = relationship(back_populates="holding_lots")
 
 
 class Order(Base):

@@ -6,7 +6,7 @@ async def test_auto_provision_new_user(auth_client):
     assert resp.status_code == 200
     data = resp.json()
     assert data["username"] == "testuser"
-    assert data["balance"] == 10000.0
+    assert data["balance"] == settings.starting_balance
 
 
 async def test_existing_user_returned(auth_client):

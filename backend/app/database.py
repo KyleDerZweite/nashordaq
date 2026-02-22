@@ -1,7 +1,7 @@
 from collections.abc import AsyncGenerator
 from typing import Any
 
-from sqlalchemy import event
+from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -28,6 +28,13 @@ async def init_db() -> None:
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+        result = await conn.execute(text("PRAGMA table_info(holding_lots)"))
+        columns = {row[1] for row in result.fetchall()}
+        if "buy_order_id" not in columns:
+            await conn.execute(
+                text("ALTER TABLE holding_lots ADD COLUMN buy_order_id INTEGER")
+            )
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:

@@ -1,3 +1,5 @@
+import { formatAmount } from "../utils/format";
+
 export default function Header({
   balance,
   username,
@@ -27,10 +29,7 @@ export default function Header({
               Balance
             </span>
             <p className="font-mono text-lg font-bold text-hex-gold">
-              {balance.toLocaleString("en-US", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
+              {formatAmount(balance)}
               <span className="ml-1 text-xs text-hex-bronze">G</span>
             </p>
           </div>

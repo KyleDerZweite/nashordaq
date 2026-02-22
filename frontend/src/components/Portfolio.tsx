@@ -1,4 +1,5 @@
 import type { HoldingResponse } from "../types";
+import { formatAmount } from "../utils/format";
 
 interface Props {
   holdings: HoldingResponse[];
@@ -29,10 +30,7 @@ export default function Portfolio({ holdings, balance }: Props) {
               {item.label}
             </span>
             <span className="font-mono text-lg font-bold text-hex-gold">
-              {item.value.toLocaleString("en-US", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
+              {formatAmount(item.value)}
             </span>
           </div>
         ))}
@@ -70,10 +68,10 @@ export default function Portfolio({ holdings, balance }: Props) {
                   {h.quantity}
                 </td>
                 <td className="px-4 py-2.5 text-right font-mono text-sm text-hex-gold">
-                  {h.current_price.toFixed(2)}
+                  {formatAmount(h.current_price)}
                 </td>
                 <td className="px-4 py-2.5 text-right font-mono text-sm font-bold text-hex-magic">
-                  {h.market_value.toFixed(2)}
+                  {formatAmount(h.market_value)}
                 </td>
               </tr>
             ))}

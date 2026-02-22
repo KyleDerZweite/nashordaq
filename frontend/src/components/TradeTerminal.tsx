@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { PlayerSummary, OrderSide } from "../types";
 import { usePlaceOrder } from "../api";
+import { formatAmount } from "../utils/format";
 
 interface Props {
   player: PlayerSummary;
@@ -64,7 +65,7 @@ export default function TradeTerminal({
             {player.game_name}#{player.tag_line}
           </span>
           <span className="font-mono text-lg font-bold text-hex-gold">
-            {player.current_price.toFixed(2)}
+            {formatAmount(player.current_price)}
             <span className="ml-1 text-xs text-hex-bronze">G / share</span>
           </span>
         </div>
@@ -93,7 +94,7 @@ export default function TradeTerminal({
             <span
               className={`font-mono text-lg font-bold ${canAfford ? "text-hex-gold" : "text-hex-zaun"}`}
             >
-              {estimatedTotal.toFixed(2)}
+              {formatAmount(estimatedTotal)}
               <span className="ml-1 text-xs text-hex-bronze">G</span>
             </span>
           </div>

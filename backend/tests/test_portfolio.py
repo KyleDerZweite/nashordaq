@@ -1,3 +1,4 @@
+from app.config import settings
 from app.models import Holding
 
 
@@ -5,9 +6,9 @@ async def test_empty_portfolio(auth_client):
     resp = await auth_client.get("/api/portfolio")
     assert resp.status_code == 200
     data = resp.json()
-    assert data["balance"] == 10000.0
+    assert data["balance"] == settings.starting_balance
     assert data["holdings"] == []
-    assert data["total_value"] == 10000.0
+    assert data["total_value"] == settings.starting_balance
 
 
 async def test_portfolio_with_holdings(auth_client, seeded_player, db_session):
@@ -27,4 +28,4 @@ async def test_portfolio_with_holdings(auth_client, seeded_player, db_session):
     assert data["holdings"][0]["quantity"] == 10
     assert data["holdings"][0]["current_price"] == 25.0
     assert data["holdings"][0]["market_value"] == 250.0
-    assert data["total_value"] == 10250.0
+    assert data["total_value"] == settings.starting_balance + 250.0

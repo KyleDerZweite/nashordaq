@@ -14,7 +14,7 @@ A closed, trusted friend group. Public registration and email verification are o
 
 2. **Market Overview:** Users can view a dashboard listing all tracked LoL accounts with their current share price and last update time.
 
-3. **Trading:** Users can place buy or sell market orders for whole shares of tracked players. Orders are saved as PENDING and executed at the next price update (forward pricing). Users can cancel pending orders before execution.
+3. **Trading:** Users can place buy or sell market orders for whole shares of tracked players. Orders execute immediately at the currently visible market price. Sell proceeds are adjusted by holding time (short-hold reduction and long-hold bonus). Executed buy orders can be reverted for full refund within a short grace period (configurable, default 60 seconds), as long as none of those shares were sold.
 
 4. **Portfolio Management:** Users can view their cash balance, owned shares with current market values, and total net worth.
 
@@ -33,6 +33,6 @@ A closed, trusted friend group. Public registration and email verification are o
 
 2. **Pricing Engine:** Share prices are computed from Absolute LP using a formula that incorporates base volatility, momentum streaks, per-player obfuscation, and random noise. See [Economy Mechanics](ECONOMY_MECHANICS.md) for details.
 
-3. **Forward Pricing:** Orders execute at the price calculated during the next scheduler cycle, not at the price visible when the order was placed. This prevents front-running based on live match viewing.
+3. **Immediate Execution + Hold Adjustment:** Orders execute at the visible market price at submission time. Sell proceeds are adjusted by holding duration to discourage rapid flips and reward longer holds.
 
 4. **Transaction Ledger:** Every executed order produces an immutable transaction record. Balances and holdings are updated atomically within the same database transaction as price updates.

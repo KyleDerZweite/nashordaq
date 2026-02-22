@@ -6,6 +6,8 @@ import Leaderboard from "./components/Leaderboard";
 import OrderHistory from "./components/OrderHistory";
 import TradeTerminal from "./components/TradeTerminal";
 import type { OrderSide } from "./types";
+import { formatAmount } from "./utils/format";
+
 import {
   useUser,
   usePlayers,
@@ -48,7 +50,7 @@ export default function App() {
                     {p.display_name}
                   </span>
                   <span className="font-mono text-sm font-bold text-hex-gold">
-                    {p.current_price.toFixed(2)}
+                    {formatAmount(p.current_price)}
                   </span>
                 </div>
               ))}

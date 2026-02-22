@@ -1,17 +1,56 @@
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
+from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import CurrentUser
+from app.config import settings
 from app.database import get_session
-from app.models import Holding, Order, OrderSide, OrderStatus, TrackedPlayer
+from app.models import (
+    Holding,
+    HoldingLot,
+    Order,
+    OrderSide,
+    OrderStatus,
+    TrackedPlayer,
+    Transaction,
+)
+from app.pricing import calculate_sell_multiplier
 from app.schemas import OrderCreate, OrderResponse
 
 router = APIRouter(tags=["orders"])
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
+
+
+async def _get_or_create_holding(
+    session: AsyncSession,
+    user_id: int,
+    player_id: int,
+) -> Holding:
+    result = await session.execute(
+        select(Holding).where(
+            Holding.user_id == user_id,
+            Holding.player_id == player_id,
+        )
+    )
+    holding = result.scalar_one_or_none()
+    if holding is None:
+        holding = Holding(user_id=user_id, player_id=player_id, quantity=0)
+        session.add(holding)
+        await session.flush()
+    return holding
+
+
+def _pending_sells_query(user_id: int, player_id: int) -> Select[tuple[Order]]:
+    return select(Order).where(
+        Order.user_id == user_id,
+        Order.player_id == player_id,
+        Order.side == OrderSide.SELL,
+        Order.status == OrderStatus.PENDING,
+    )
 
 
 def _order_response(order: Order, player_name: str) -> OrderResponse:
@@ -41,10 +80,51 @@ async def place_order(
     if player is None:
         raise HTTPException(status_code=404, detail="Player not found")
 
+    now = datetime.now(UTC)
+
     if body.side == OrderSide.BUY:
-        estimated_cost = player.current_price * body.quantity
-        if user.balance < estimated_cost:
+        execution_price = player.current_price
+        total_cost = execution_price * body.quantity
+        if user.balance < total_cost:
             raise HTTPException(status_code=400, detail="Insufficient balance")
+        user.balance -= total_cost
+
+        holding = await _get_or_create_holding(session, user.id, body.player_id)
+        holding.quantity += body.quantity
+
+        order = Order(
+            user_id=user.id,
+            player_id=body.player_id,
+            side=body.side,
+            quantity=body.quantity,
+            status=OrderStatus.EXECUTED,
+            execution_price=execution_price,
+            executed_at=now,
+        )
+        session.add(order)
+        await session.flush()
+
+        session.add(
+            HoldingLot(
+                user_id=user.id,
+                player_id=body.player_id,
+                buy_order_id=order.id,
+                quantity=body.quantity,
+                acquired_at=now,
+            )
+        )
+
+        session.add(
+            Transaction(
+                user_id=user.id,
+                player_id=body.player_id,
+                order_id=order.id,
+                side=body.side,
+                quantity=body.quantity,
+                price=execution_price,
+                total=total_cost,
+            )
+        )
     else:
         result = await session.execute(
             select(Holding).where(
@@ -56,12 +136,7 @@ async def place_order(
         owned = holding.quantity if holding else 0
 
         pending_sells = await session.execute(
-            select(Order).where(
-                Order.user_id == user.id,
-                Order.player_id == body.player_id,
-                Order.side == OrderSide.SELL,
-                Order.status == OrderStatus.PENDING,
-            )
+            _pending_sells_query(user.id, body.player_id)
         )
         reserved = sum(o.quantity for o in pending_sells.scalars())
         available = owned - reserved
@@ -69,13 +144,76 @@ async def place_order(
         if body.quantity > available:
             raise HTTPException(status_code=400, detail="Insufficient shares")
 
-    order = Order(
-        user_id=user.id,
-        player_id=body.player_id,
-        side=body.side,
-        quantity=body.quantity,
-    )
-    session.add(order)
+        lots_result = await session.execute(
+            select(HoldingLot)
+            .where(
+                HoldingLot.user_id == user.id,
+                HoldingLot.player_id == body.player_id,
+                HoldingLot.quantity > 0,
+            )
+            .order_by(HoldingLot.acquired_at.asc(), HoldingLot.id.asc())
+        )
+        lots = lots_result.scalars().all()
+
+        remaining = body.quantity
+        gross_price = player.current_price
+        adjusted_total = 0.0
+
+        for lot in lots:
+            if remaining <= 0:
+                break
+
+            consumed = min(remaining, lot.quantity)
+            acquired_at = (
+                lot.acquired_at
+                if lot.acquired_at.tzinfo is not None
+                else lot.acquired_at.replace(tzinfo=UTC)
+            )
+            held_duration = now - acquired_at
+            held_hours = held_duration.total_seconds() / 3600
+            multiplier = calculate_sell_multiplier(
+                held_hours=held_hours,
+                short_hold_fee_rate=settings.short_hold_fee_rate,
+                short_hold_fee_window_hours=settings.short_hold_fee_window_hours,
+                long_hold_bonus_rate=settings.long_hold_bonus_rate,
+                long_hold_bonus_start_hours=settings.long_hold_bonus_start_hours,
+            )
+
+            adjusted_total += consumed * gross_price * multiplier
+            lot.quantity -= consumed
+            remaining -= consumed
+
+        if remaining > 0:
+            raise HTTPException(status_code=400, detail="Insufficient shares")
+
+        effective_execution_price = adjusted_total / body.quantity
+        holding.quantity -= body.quantity
+        user.balance += adjusted_total
+
+        order = Order(
+            user_id=user.id,
+            player_id=body.player_id,
+            side=body.side,
+            quantity=body.quantity,
+            status=OrderStatus.EXECUTED,
+            execution_price=effective_execution_price,
+            executed_at=now,
+        )
+        session.add(order)
+        await session.flush()
+
+        session.add(
+            Transaction(
+                user_id=user.id,
+                player_id=body.player_id,
+                order_id=order.id,
+                side=body.side,
+                quantity=body.quantity,
+                price=effective_execution_price,
+                total=adjusted_total,
+            )
+        )
+
     await session.commit()
     await session.refresh(order)
 
@@ -119,16 +257,65 @@ async def cancel_order(
     if order.user_id != user.id:
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    if order.status != OrderStatus.PENDING:
-        raise HTTPException(status_code=400, detail="Order cannot be cancelled")
-
-    order.status = OrderStatus.CANCELLED
-    await session.commit()
-    await session.refresh(order)
-
     player_result = await session.execute(
         select(TrackedPlayer).where(TrackedPlayer.id == order.player_id)
     )
     player = player_result.scalar_one()
+
+    if order.status == OrderStatus.PENDING:
+        order.status = OrderStatus.CANCELLED
+        await session.commit()
+        await session.refresh(order)
+        return _order_response(order, player.display_name)
+
+    if order.status != OrderStatus.EXECUTED or order.side != OrderSide.BUY:
+        raise HTTPException(status_code=400, detail="Order cannot be cancelled")
+
+    if order.executed_at is None:
+        raise HTTPException(status_code=400, detail="Order cannot be cancelled")
+
+    now = datetime.now(UTC)
+    executed_at = (
+        order.executed_at
+        if order.executed_at.tzinfo is not None
+        else order.executed_at.replace(tzinfo=UTC)
+    )
+    grace_deadline = executed_at + timedelta(seconds=settings.buy_revert_grace_seconds)
+    if now > grace_deadline:
+        raise HTTPException(status_code=400, detail="Revert window expired")
+
+    holding = await _get_or_create_holding(session, user.id, order.player_id)
+    if holding.quantity < order.quantity:
+        raise HTTPException(
+            status_code=400,
+            detail="Order cannot be reverted after shares were sold",
+        )
+
+    lot_result = await session.execute(
+        select(HoldingLot).where(
+            HoldingLot.buy_order_id == order.id,
+            HoldingLot.user_id == user.id,
+            HoldingLot.player_id == order.player_id,
+        )
+    )
+    lot = lot_result.scalar_one_or_none()
+    if lot is None or lot.quantity < order.quantity:
+        raise HTTPException(
+            status_code=400,
+            detail="Order cannot be reverted after shares were sold",
+        )
+
+    execution_price = order.execution_price
+    if execution_price is None:
+        raise HTTPException(status_code=400, detail="Order cannot be cancelled")
+
+    refund_total = execution_price * order.quantity
+    lot.quantity -= order.quantity
+    holding.quantity -= order.quantity
+    user.balance += refund_total
+    order.status = OrderStatus.REVERTED
+
+    await session.commit()
+    await session.refresh(order)
 
     return _order_response(order, player.display_name)

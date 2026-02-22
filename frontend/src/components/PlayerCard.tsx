@@ -1,4 +1,5 @@
 import type { PlayerSummary, OrderSide } from "../types";
+import { formatAmount } from "../utils/format";
 
 interface Props {
   player: PlayerSummary;
@@ -28,7 +29,7 @@ export default function PlayerCard({ player, onTrade }: Props) {
             Price
           </span>
           <span className="font-mono text-2xl font-bold text-hex-gold">
-            {player.current_price.toFixed(2)}
+            {formatAmount(player.current_price)}
           </span>
         </div>
         {player.last_updated && (

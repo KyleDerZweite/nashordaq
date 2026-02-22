@@ -1,4 +1,5 @@
 import type { LeaderboardEntry } from "../types";
+import { formatAmount } from "../utils/format";
 
 interface Props {
   entries: LeaderboardEntry[];
@@ -53,10 +54,7 @@ export default function Leaderboard({ entries }: Props) {
                   {e.username}
                 </td>
                 <td className="px-4 py-2.5 text-right font-mono text-sm font-bold text-hex-gold">
-                  {e.total_value.toLocaleString("en-US", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
+                  {formatAmount(e.total_value)}
                 </td>
               </tr>
             ))}
