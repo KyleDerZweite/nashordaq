@@ -38,7 +38,7 @@ nashordaq/
       database.py        # Async SQLAlchemy engine + session factory
       models.py          # ORM models (6 tables)
       schemas.py         # Pydantic request/response schemas
-      auth.py            # X-Remote-User auth dependency
+      auth.py            # Remote-User auth dependency
       pricing.py         # Pure pricing functions
       riot.py            # Riot Games API client
       seed.py            # Player seeding from players.json

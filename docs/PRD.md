@@ -10,7 +10,7 @@ A closed, trusted friend group. Public registration and email verification are o
 
 ## Core User Flows
 
-1. **Authentication:** User access is gated by an external Identity-Aware Proxy (e.g., Zitadel/Pangolin). Upon successful proxy authentication, the user is seamlessly passed to the Nashordaq interface. The backend automatically provisions a starting balance of 10,000 virtual currency the first time it detects a new `X-Remote-User` header.
+1. **Authentication:** User access is gated by an external Identity-Aware Proxy (e.g., Zitadel/Pangolin). Upon successful proxy authentication, the user is seamlessly passed to the Nashordaq interface. The backend automatically provisions a starting balance of 10,000 virtual currency the first time it detects a new `Remote-User` header.
 
 2. **Market Overview:** Users can view a dashboard listing all tracked LoL accounts with their current share price and last update time.
 

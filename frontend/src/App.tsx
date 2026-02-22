@@ -7,13 +7,12 @@ import OrderHistory from "./components/OrderHistory";
 import TradeTerminal from "./components/TradeTerminal";
 import type { OrderSide } from "./types";
 import {
-  MOCK_PLAYERS,
-  MOCK_DELTAS,
-  MOCK_LEADERBOARD,
-  MOCK_HOLDINGS,
-  MOCK_ORDERS,
-  MOCK_BALANCE,
-} from "./mock/data";
+  useUser,
+  usePlayers,
+  usePortfolio,
+  useOrders,
+  useLeaderboard,
+} from "./api";
 
 interface TradeTarget {
   playerId: number;
@@ -23,22 +22,27 @@ interface TradeTarget {
 export default function App() {
   const [trade, setTrade] = useState<TradeTarget | null>(null);
 
-  const tradePlayer = trade
-    ? MOCK_PLAYERS.find((p) => p.id === trade.playerId)
-    : null;
+  const { data: user } = useUser();
+  const { data: players, isLoading: playersLoading } = usePlayers();
+  const { data: portfolio } = usePortfolio();
+  const { data: orders } = useOrders();
+  const { data: leaderboard } = useLeaderboard();
+
+  const balance = user?.balance ?? 0;
+
+  const tradePlayer =
+    trade && players ? players.find((p) => p.id === trade.playerId) : null;
 
   return (
     <div className="min-h-screen bg-hex-bg">
-      <Header balance={MOCK_BALANCE} />
+      <Header balance={balance} username={user?.username} />
 
       <main className="mx-auto max-w-7xl px-6 py-8">
         {/* Market ticker bar */}
-        <div className="mb-8 overflow-hidden border-2 border-hex-border bg-hex-bg-alt">
-          <div className="flex divide-x-2 divide-hex-border">
-            {MOCK_PLAYERS.map((p) => {
-              const d = MOCK_DELTAS[p.id] ?? 0;
-              const pos = d >= 0;
-              return (
+        {players && players.length > 0 && (
+          <div className="mb-8 overflow-hidden border-2 border-hex-border bg-hex-bg-alt">
+            <div className="flex divide-x-2 divide-hex-border">
+              {players.map((p) => (
                 <div key={p.id} className="flex items-center gap-3 px-5 py-2.5">
                   <span className="font-mono text-xs font-bold text-hex-white">
                     {p.display_name}
@@ -46,39 +50,39 @@ export default function App() {
                   <span className="font-mono text-sm font-bold text-hex-gold">
                     {p.current_price.toFixed(2)}
                   </span>
-                  <span
-                    className={`font-mono text-xs font-bold ${pos ? "text-hex-magic" : "text-hex-zaun"}`}
-                  >
-                    {pos ? "+" : ""}
-                    {d.toFixed(2)}
-                  </span>
                 </div>
-              );
-            })}
+              ))}
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* Loading state */}
+        {playersLoading && (
+          <p className="py-12 text-center font-mono text-sm text-hex-bronze">
+            Loading market data...
+          </p>
+        )}
 
         {/* Main grid: market + sidebar */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           {/* Market takes 2 cols */}
           <div className="lg:col-span-2">
             <MarketGrid
-              players={MOCK_PLAYERS}
-              deltas={MOCK_DELTAS}
+              players={players ?? []}
               onTrade={(playerId, side) => setTrade({ playerId, side })}
             />
           </div>
 
           {/* Sidebar */}
           <div className="flex flex-col gap-6">
-            <Portfolio holdings={MOCK_HOLDINGS} balance={MOCK_BALANCE} />
-            <Leaderboard entries={MOCK_LEADERBOARD} />
+            <Portfolio holdings={portfolio?.holdings ?? []} balance={balance} />
+            <Leaderboard entries={leaderboard ?? []} />
           </div>
         </div>
 
         {/* Order history */}
         <div className="mt-6">
-          <OrderHistory orders={MOCK_ORDERS} />
+          <OrderHistory orders={orders ?? []} />
         </div>
       </main>
 
@@ -92,7 +96,7 @@ export default function App() {
         <TradeTerminal
           player={tradePlayer}
           side={trade.side}
-          balance={MOCK_BALANCE}
+          balance={balance}
           onClose={() => setTrade(null)}
         />
       )}

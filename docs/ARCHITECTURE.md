@@ -9,7 +9,7 @@ Nashordaq is a single-process Python application backed by SQLite. The FastAPI s
                    |   Nginx/  |
                    |  Pangolin |   (Identity-Aware Proxy)
                    +-----+-----+
-                         |  X-Remote-User header
+                         |  Remote-User header
                          v
 +--------------------------------------------------------+
 |  FastAPI Application                                   |
@@ -79,12 +79,12 @@ All endpoints are prefixed with `/api` except the health check.
 
 ## Authentication
 
-Authentication is handled by an external Identity-Aware Proxy (e.g., Zitadel/Pangolin) that injects an `X-Remote-User` HTTP header. The backend reads this header and auto-provisions new users with a starting balance of 10,000. No passwords, JWTs, or login forms exist in the application.
+Authentication is handled by Pangolin, which acts as an Identity-Aware Proxy. When SSO authentication is configured, Pangolin forwards identity headers to downstream services (`Remote-User`, `Remote-Email`, `Remote-Name`, `Remote-Role`). The backend reads the `Remote-User` header (configurable via `NASHORDAQ_AUTH_HEADER`) and auto-provisions new users with a starting balance of 10,000. No passwords, JWTs, or login forms exist in the application.
 
 ## Security Boundary and Hardening
 
 - **Primary trust boundary:** The backend is intended to be reachable only through Pangolin/Newt + IAP.
-- **Identity source:** The application identifies users only from the configured auth header (`NASHORDAQ_AUTH_HEADER`, default `X-Remote-User`).
+- **Identity source:** The application identifies users only from the configured auth header (`NASHORDAQ_AUTH_HEADER`, default `Remote-User`).
 - **Trusted proxy enforcement (defense-in-depth):**
   - `NASHORDAQ_ENFORCE_TRUSTED_PROXY=true` rejects auth requests from non-trusted source IPs.
   - `NASHORDAQ_TRUSTED_PROXY_CIDRS` defines allowed proxy/tunnel CIDR ranges.
@@ -118,7 +118,7 @@ backend/
     database.py                 # Async SQLAlchemy engine, session factory, init_db
     models.py                   # 6 ORM tables (User, TrackedPlayer, Holding, Order, Transaction, PriceHistory)
     schemas.py                  # Pydantic request/response models
-    auth.py                     # X-Remote-User auth dependency, auto-provisioning
+    auth.py                     # Remote-User auth dependency, auto-provisioning
     pricing.py                  # Pure pricing functions (LP_abs, IPO, dynamic price, streak, gamma)
     riot.py                     # Riot Games API client (httpx)
     seed.py                     # Load players.json into DB on startup

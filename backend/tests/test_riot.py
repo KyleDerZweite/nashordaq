@@ -70,3 +70,41 @@ async def test_get_rank_player_not_found(httpx_mock):
                 game_name="Nobody",
                 tag_line="0000",
             )
+
+
+async def test_get_rank_fallback_to_by_puuid(httpx_mock):
+    httpx_mock.add_response(
+        url=f"{BASE_URL}/riot/account/v1/accounts/by-riot-id/Faker/KR1",
+        json={"puuid": PUUID, "gameName": "Faker", "tagLine": "KR1"},
+    )
+    httpx_mock.add_response(
+        url=f"{REGION_URL}/lol/summoner/v4/summoners/by-puuid/{PUUID}",
+        json={"puuid": PUUID},
+    )
+    httpx_mock.add_response(
+        url=f"{REGION_URL}/lol/league/v4/entries/by-puuid/{PUUID}",
+        json=[
+            {
+                "queueType": "RANKED_SOLO_5x5",
+                "tier": "CHALLENGER",
+                "rank": "I",
+                "leaguePoints": 1200,
+            }
+        ],
+    )
+
+    async with httpx.AsyncClient() as client:
+        result = await get_rank(
+            client=client,
+            base_url=BASE_URL,
+            region_url=REGION_URL,
+            api_key=API_KEY,
+            game_name="Faker",
+            tag_line="KR1",
+        )
+
+    assert result.tier == "CHALLENGER"
+    assert result.rank == "I"
+    assert result.league_points == 1200
+    assert result.puuid == PUUID
+    assert result.summoner_id == PUUID

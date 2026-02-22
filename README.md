@@ -87,13 +87,13 @@ Nashordaq does not handle login or passwords. It expects an Identity-Aware Proxy
 1. Install and configure Pangolin on your server following the [Pangolin documentation](https://docs.fossorial.io/).
 2. Create a new site/resource in Pangolin pointing to your Nashordaq instance.
 3. Enable authentication on the resource. Pangolin will handle login (SSO, OIDC, etc.) and inject headers into proxied requests.
-4. Ensure the header name in Pangolin matches the `NASHORDAQ_AUTH_HEADER` value in your `.env` (default: `X-Remote-User`).
+4. Ensure SSO authentication is enabled on the resource. Pangolin will automatically forward `Remote-User`, `Remote-Email`, and `Remote-Name` headers. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for a step-by-step Pangolin setup guide.
 
 For defense-in-depth, enable trusted-proxy enforcement so direct backend requests are rejected unless they originate from your reverse proxy network:
 
 ```env
-# Header injected by IAP/reverse proxy
-NASHORDAQ_AUTH_HEADER=X-Remote-User
+# Header injected by Pangolin (default: Remote-User)
+NASHORDAQ_AUTH_HEADER=Remote-User
 
 # Optional hardening (recommended in production)
 NASHORDAQ_ENFORCE_TRUSTED_PROXY=true

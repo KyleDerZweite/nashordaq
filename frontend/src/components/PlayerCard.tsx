@@ -2,19 +2,12 @@ import type { PlayerSummary, OrderSide } from "../types";
 
 interface Props {
   player: PlayerSummary;
-  delta: number;
   onTrade: (playerId: number, side: OrderSide) => void;
 }
 
-export default function PlayerCard({ player, delta, onTrade }: Props) {
-  const isPositive = delta >= 0;
-
+export default function PlayerCard({ player, onTrade }: Props) {
   return (
-    <article
-      className={`group border-2 bg-hex-panel p-5 transition-shadow hover:shadow-brutal ${
-        isPositive ? "border-hex-magic/40" : "border-hex-zaun/40"
-      }`}
-    >
+    <article className="group border-2 border-hex-gold-dim/40 bg-hex-panel p-5 transition-shadow hover:shadow-brutal">
       {/* Top row: name + tag */}
       <div className="mb-3 flex items-baseline justify-between">
         <h3 className="font-serif text-xl font-bold text-hex-white">
@@ -38,31 +31,16 @@ export default function PlayerCard({ player, delta, onTrade }: Props) {
             {player.current_price.toFixed(2)}
           </span>
         </div>
-        <div className="text-right">
-          <span className="block text-xs uppercase tracking-wider text-hex-bronze">
-            24h
-          </span>
-          <span
-            className={`font-mono text-lg font-bold ${
-              isPositive ? "text-hex-magic" : "text-hex-zaun"
-            }`}
-          >
-            {isPositive ? "+" : ""}
-            {delta.toFixed(2)}
-          </span>
-        </div>
-      </div>
-
-      {/* Mini bar indicator */}
-      <div className="mt-4 h-1 w-full bg-hex-bg">
-        <div
-          className={`h-full transition-all ${
-            isPositive ? "bg-hex-magic" : "bg-hex-zaun"
-          }`}
-          style={{
-            width: `${Math.min(Math.abs(delta) * 15, 100)}%`,
-          }}
-        />
+        {player.last_updated && (
+          <div className="text-right">
+            <span className="block text-xs uppercase tracking-wider text-hex-bronze">
+              Updated
+            </span>
+            <span className="font-mono text-xs text-hex-bronze">
+              {new Date(player.last_updated).toLocaleTimeString()}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Action row */}

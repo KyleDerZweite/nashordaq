@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -10,7 +11,7 @@ from app.config import settings
 from app.database import SessionLocal, engine, init_db
 from app.riot import PlayerNotFoundError, RateLimitedError, get_rank
 from app.routers import leaderboard, market, orders, portfolio, user
-from app.scheduler import start_scheduler, stop_scheduler
+from app.scheduler import get_last_market_update_at, start_scheduler, stop_scheduler
 from app.seed import sync_tracked_players
 
 
@@ -41,7 +42,7 @@ app.add_middleware(
     allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "DELETE"],
-    allow_headers=["Content-Type", settings.auth_header],
+    allow_headers=["Content-Type", settings.auth_header, "Remote-Email", "Remote-Name"],
 )
 
 app.include_router(user.router, prefix="/api")
@@ -53,7 +54,11 @@ app.include_router(leaderboard.router, prefix="/api")
 
 @app.get("/health")
 async def health() -> dict[str, str]:
-    return {"status": "ok"}
+    last_update = get_last_market_update_at() or datetime.now(UTC)
+    return {
+        "status": "ok",
+        "update": last_update.strftime("%Y-%m-%d %H:%M"),
+    }
 
 
 @app.get("/api/market/quote")

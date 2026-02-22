@@ -28,16 +28,13 @@ class Settings(BaseSettings):
     http_timeout_seconds: float = 10.0
     http_connect_timeout_seconds: float = 5.0
 
-    # Auth (header injected by reverse proxy)
-    auth_header: str = "X-Remote-User"
+    # Auth (header injected by reverse proxy / Pangolin)
+    auth_header: str = "Remote-User"
     enforce_trusted_proxy: bool = False
     trusted_proxy_cidrs: str = "127.0.0.1/32,::1/128"
 
     # Economy
     starting_balance: float = 10000.0
-
-    # Scheduler
-    scheduler_interval_minutes: int = 30
 
     # Player config
     players_file: str = "players.json"

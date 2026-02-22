@@ -1,3 +1,4 @@
+from datetime import datetime
 from unittest.mock import AsyncMock, patch
 
 from app.riot import PlayerNotFoundError, RankData
@@ -6,7 +7,9 @@ from app.riot import PlayerNotFoundError, RankData
 async def test_health(client):
     resp = await client.get("/health")
     assert resp.status_code == 200
-    assert resp.json() == {"status": "ok"}
+    data = resp.json()
+    assert data["status"] == "ok"
+    datetime.strptime(data["update"], "%Y-%m-%d %H:%M")
 
 
 async def test_quote_success(client):

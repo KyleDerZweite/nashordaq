@@ -41,19 +41,25 @@ async def get_rank(
         headers=headers,
     )
     _check_response(account_resp)
-    puuid: str = account_resp.json()["puuid"]
+    account_payload = account_resp.json()
+    puuid = account_payload.get("puuid")
+    if not puuid:
+        raise PlayerNotFoundError(f"No account data for {game_name}#{tag_line}")
 
     summoner_resp = await client.get(
         f"{region_url}/lol/summoner/v4/summoners/by-puuid/{puuid}",
         headers=headers,
     )
     _check_response(summoner_resp)
-    summoner_id: str = summoner_resp.json()["id"]
+    summoner_payload = summoner_resp.json()
+    summoner_id = summoner_payload.get("id") or summoner_payload.get("summonerId")
 
-    league_resp = await client.get(
-        f"{region_url}/lol/league/v4/entries/by-summoner/{summoner_id}",
-        headers=headers,
+    league_url = (
+        f"{region_url}/lol/league/v4/entries/by-summoner/{summoner_id}"
+        if summoner_id
+        else f"{region_url}/lol/league/v4/entries/by-puuid/{puuid}"
     )
+    league_resp = await client.get(league_url, headers=headers)
     _check_response(league_resp)
 
     entries: list[dict] = league_resp.json()
@@ -66,7 +72,7 @@ async def get_rank(
 
     return RankData(
         puuid=puuid,
-        summoner_id=summoner_id,
+        summoner_id=summoner_id or puuid,
         tier=solo_queue["tier"],
         rank=solo_queue["rank"],
         league_points=solo_queue["leaguePoints"],

@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
@@ -33,6 +33,11 @@ logger = logging.getLogger(__name__)
 
 scheduler = AsyncIOScheduler()
 _app: FastAPI | None = None
+_last_market_update_at: datetime | None = None
+
+
+def get_last_market_update_at() -> datetime | None:
+    return _last_market_update_at
 
 
 async def _get_or_create_holding(
@@ -55,12 +60,32 @@ async def _get_or_create_holding(
 
 
 async def market_update_job() -> None:
+    global _last_market_update_at
+
     assert _app is not None
     http_client = _app.state.http_client
 
     async with SessionLocal() as session:
         result = await session.execute(select(TrackedPlayer))
         players = result.scalars().all()
+        successful_player_updates = 0
+
+        required_interval_minutes = max(1, len(players))
+        now = datetime.now(UTC)
+        if (
+            _last_market_update_at is not None
+            and now - _last_market_update_at
+            < timedelta(minutes=required_interval_minutes)
+        ):
+            logger.info(
+                "Skipping market update; next run in %.1f min",
+                (
+                    timedelta(minutes=required_interval_minutes)
+                    - (now - _last_market_update_at)
+                ).total_seconds()
+                / 60,
+            )
+            return
 
         for player in players:
             try:
@@ -122,6 +147,7 @@ async def market_update_job() -> None:
                     lp_abs=player.lp_abs,
                 )
             )
+            successful_player_updates += 1
 
             await asyncio.sleep(0.1)
 
@@ -179,23 +205,31 @@ async def market_update_job() -> None:
             )
 
         await session.commit()
-        logger.info("Market update completed")
+        if successful_player_updates > 0:
+            _last_market_update_at = datetime.now(UTC)
+            logger.info(
+                "Market update completed (%d players)",
+                successful_player_updates,
+            )
+        else:
+            logger.warning("Market cycle completed with no successful player updates")
 
 
 def start_scheduler(app: FastAPI) -> None:
-    global _app
+    global _app, _last_market_update_at
+
     _app = app
+    _last_market_update_at = None
     scheduler.add_job(
         market_update_job,
-        IntervalTrigger(minutes=settings.scheduler_interval_minutes),
+        IntervalTrigger(seconds=30),
         id="market_update",
         replace_existing=True,
         max_instances=1,
+        next_run_time=datetime.now(UTC),
     )
     scheduler.start()
-    logger.info(
-        "Scheduler started (interval: %d min)", settings.scheduler_interval_minutes
-    )
+    logger.info("Scheduler started (dynamic interval: tracked_player_count minutes)")
 
 
 def stop_scheduler() -> None:

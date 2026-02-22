@@ -1,4 +1,12 @@
-export default function Header({ balance }: { balance: number }) {
+export default function Header({
+  balance,
+  username,
+}: {
+  balance: number;
+  username?: string;
+}) {
+  const initial = username ? username[0].toUpperCase() : "?";
+
   return (
     <header className="border-b-4 border-hex-gold bg-hex-bg-alt">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
@@ -27,7 +35,7 @@ export default function Header({ balance }: { balance: number }) {
             </p>
           </div>
           <div className="h-10 w-10 border-2 border-hex-gold bg-hex-panel text-center font-serif text-lg leading-9 font-bold text-hex-gold">
-            K
+            {initial}
           </div>
         </div>
       </div>

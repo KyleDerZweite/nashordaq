@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { PlayerSummary, OrderSide } from "../types";
+import { usePlaceOrder } from "../api";
 
 interface Props {
   player: PlayerSummary;
@@ -15,7 +16,7 @@ export default function TradeTerminal({
   onClose,
 }: Props) {
   const [quantity, setQuantity] = useState(1);
-  const [submitted, setSubmitted] = useState(false);
+  const placeOrder = usePlaceOrder();
 
   const estimatedTotal = player.current_price * quantity;
   const canAfford = side === "BUY" ? balance >= estimatedTotal : true;
@@ -23,11 +24,10 @@ export default function TradeTerminal({
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setSubmitted(true);
-    setTimeout(() => {
-      setSubmitted(false);
-      onClose();
-    }, 1500);
+    placeOrder.mutate(
+      { player_id: player.id, side, quantity },
+      { onSuccess: () => onClose() },
+    );
   }
 
   return (
@@ -98,12 +98,19 @@ export default function TradeTerminal({
             </span>
           </div>
 
+          {/* Error */}
+          {placeOrder.isError && (
+            <p className="font-mono text-xs text-hex-zaun">
+              {placeOrder.error.message}
+            </p>
+          )}
+
           {/* Submit */}
           <button
             type="submit"
-            disabled={!canAfford || submitted}
+            disabled={!canAfford || placeOrder.isPending}
             className={`w-full border-2 py-2.5 font-mono text-sm font-bold uppercase tracking-wider transition-colors ${
-              submitted
+              placeOrder.isPending
                 ? "border-hex-magic bg-hex-magic/20 text-hex-magic"
                 : canAfford
                   ? isBuy
@@ -112,8 +119,8 @@ export default function TradeTerminal({
                   : "cursor-not-allowed border-hex-border text-hex-border"
             }`}
           >
-            {submitted
-              ? "Order Submitted (Mock)"
+            {placeOrder.isPending
+              ? "Submitting..."
               : `${side} ${quantity} share${quantity > 1 ? "s" : ""}`}
           </button>
 

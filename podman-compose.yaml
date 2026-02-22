@@ -13,9 +13,21 @@ services:
       - NASHORDAQ_DATABASE_URL=sqlite+aiosqlite:///data/nashordaq.db
       - NASHORDAQ_CORS_ORIGINS=http://localhost,https://${NASHORDAQ_DOMAIN:-localhost}
     volumes:
-      - nashordaq-data:/app/data
+      - ./data:/app/data
     expose:
       - "8000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 15s
 
   frontend:
     build:
@@ -23,13 +35,14 @@ services:
       dockerfile: Containerfile
     container_name: nashordaq-frontend
     restart: unless-stopped
-    ports:
-      - "80:80"
+    expose:
+      - "80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
 
   newt:
-    image: fosrl/newt
+    image: docker.io/fosrl/newt:latest
     container_name: nashordaq-newt
     restart: unless-stopped
     env_file:
@@ -40,6 +53,3 @@ services:
       - NEWT_SECRET=${NEWT_SECRET}
     depends_on:
       - frontend
-
-volumes:
-  nashordaq-data:

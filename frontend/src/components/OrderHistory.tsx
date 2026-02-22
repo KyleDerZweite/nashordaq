@@ -1,10 +1,13 @@
 import type { OrderResponse } from "../types";
+import { useCancelOrder } from "../api";
 
 interface Props {
   orders: OrderResponse[];
 }
 
 export default function OrderHistory({ orders }: Props) {
+  const cancelOrder = useCancelOrder();
+
   return (
     <section className="border-2 border-hex-gold-dim bg-hex-panel">
       <div className="border-b-2 border-hex-gold-dim px-5 py-3">
@@ -17,16 +20,18 @@ export default function OrderHistory({ orders }: Props) {
         <table className="w-full">
           <thead>
             <tr className="border-b-2 border-hex-border text-left">
-              {["ID", "Player", "Side", "Qty", "Price", "Status"].map((col) => (
-                <th
-                  key={col}
-                  className={`px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider text-hex-bronze ${
-                    ["Qty", "Price"].includes(col) ? "text-right" : ""
-                  }`}
-                >
-                  {col}
-                </th>
-              ))}
+              {["ID", "Player", "Side", "Qty", "Price", "Status", ""].map(
+                (col) => (
+                  <th
+                    key={col || "action"}
+                    className={`px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider text-hex-bronze ${
+                      ["Qty", "Price"].includes(col) ? "text-right" : ""
+                    }`}
+                  >
+                    {col}
+                  </th>
+                ),
+              )}
             </tr>
           </thead>
           <tbody>
@@ -70,6 +75,17 @@ export default function OrderHistory({ orders }: Props) {
                   >
                     {o.status}
                   </span>
+                </td>
+                <td className="px-4 py-2.5">
+                  {o.status === "PENDING" && (
+                    <button
+                      onClick={() => cancelOrder.mutate(o.id)}
+                      disabled={cancelOrder.isPending}
+                      className="font-mono text-xs font-bold text-hex-zaun transition-colors hover:text-hex-white"
+                    >
+                      Cancel
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}

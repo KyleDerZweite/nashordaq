@@ -57,7 +57,7 @@ async def auth_client(db_engine):
     async with AsyncClient(
         transport=transport,
         base_url="http://test",
-        headers={"X-Remote-User": "testuser"},
+        headers={"Remote-User": "testuser"},
     ) as ac:
         yield ac
     await app.state.http_client.aclose()
