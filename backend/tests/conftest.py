@@ -7,8 +7,11 @@ os.environ.setdefault("NASHORDAQ_RIOT_API_REGION_URL", "https://euw1.api.riotgam
 import httpx
 import pytest
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from app.database import get_session
 from app.main import app
+from app.models import Base, TrackedPlayer
 
 
 @pytest.fixture
@@ -18,3 +21,60 @@ async def client():
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
     await app.state.http_client.aclose()
+
+
+@pytest.fixture
+async def db_engine():
+    engine = create_async_engine("sqlite+aiosqlite://", echo=False)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    yield engine
+    await engine.dispose()
+
+
+@pytest.fixture
+async def db_session(db_engine):
+    session_factory = async_sessionmaker(
+        db_engine, class_=AsyncSession, expire_on_commit=False
+    )
+    async with session_factory() as session:
+        yield session
+
+
+@pytest.fixture
+async def auth_client(db_engine):
+    session_factory = async_sessionmaker(
+        db_engine, class_=AsyncSession, expire_on_commit=False
+    )
+
+    async def override_get_session():
+        async with session_factory() as session:
+            yield session
+
+    app.dependency_overrides[get_session] = override_get_session
+    app.state.http_client = httpx.AsyncClient()
+    transport = ASGITransport(app=app)
+    async with AsyncClient(
+        transport=transport,
+        base_url="http://test",
+        headers={"X-Remote-User": "testuser"},
+    ) as ac:
+        yield ac
+    await app.state.http_client.aclose()
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture
+async def seeded_player(db_session):
+    player = TrackedPlayer(
+        game_name="TestPlayer",
+        tag_line="EUW",
+        display_name="Test Player",
+        current_price=25.0,
+        lp_abs=1500,
+        previous_lp_abs=1400,
+    )
+    db_session.add(player)
+    await db_session.commit()
+    await db_session.refresh(player)
+    return player

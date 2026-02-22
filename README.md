@@ -89,6 +89,26 @@ Nashordaq does not handle login or passwords. It expects an Identity-Aware Proxy
 3. Enable authentication on the resource. Pangolin will handle login (SSO, OIDC, etc.) and inject headers into proxied requests.
 4. Ensure the header name in Pangolin matches the `NASHORDAQ_AUTH_HEADER` value in your `.env` (default: `X-Remote-User`).
 
+For defense-in-depth, enable trusted-proxy enforcement so direct backend requests are rejected unless they originate from your reverse proxy network:
+
+```env
+# Header injected by IAP/reverse proxy
+NASHORDAQ_AUTH_HEADER=X-Remote-User
+
+# Optional hardening (recommended in production)
+NASHORDAQ_ENFORCE_TRUSTED_PROXY=true
+NASHORDAQ_TRUSTED_PROXY_CIDRS=10.89.0.0/16,127.0.0.1/32,::1/128
+```
+
+Set `NASHORDAQ_TRUSTED_PROXY_CIDRS` to the CIDR(s) used by your proxy/tunnel containers on the Podman network.
+
+Riot API timeout behavior is also configurable:
+
+```env
+NASHORDAQ_HTTP_TIMEOUT_SECONDS=10
+NASHORDAQ_HTTP_CONNECT_TIMEOUT_SECONDS=5
+```
+
 When a user visits Nashordaq, Pangolin authenticates them first. The backend reads the forwarded header to identify the user. New users are automatically provisioned with the configured starting balance.
 
 ### 7. Start the application

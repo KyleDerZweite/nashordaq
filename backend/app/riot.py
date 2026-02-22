@@ -20,7 +20,7 @@ class RateLimitedError(Exception):
 
 def _check_response(response: httpx.Response) -> None:
     if response.status_code == 404:
-        raise PlayerNotFoundError(f"Not found: {response.url}")
+        raise PlayerNotFoundError("Player not found")
     if response.status_code == 429:
         raise RateLimitedError("Riot API rate limit exceeded")
     response.raise_for_status()

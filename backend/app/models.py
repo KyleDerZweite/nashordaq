@@ -1,0 +1,121 @@
+import enum
+from datetime import datetime
+
+from sqlalchemy import Enum, Float, ForeignKey, Integer, String, UniqueConstraint, func
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+class OrderSide(enum.StrEnum):
+    BUY = "BUY"
+    SELL = "SELL"
+
+
+class OrderStatus(enum.StrEnum):
+    PENDING = "PENDING"
+    EXECUTED = "EXECUTED"
+    CANCELLED = "CANCELLED"
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    username: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    balance: Mapped[float] = mapped_column(Float, default=10000.0)
+    created_at: Mapped[datetime] = mapped_column(insert_default=func.now())
+
+    holdings: Mapped[list["Holding"]] = relationship(back_populates="user")
+    orders: Mapped[list["Order"]] = relationship(back_populates="user")
+
+
+class TrackedPlayer(Base):
+    __tablename__ = "tracked_players"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    game_name: Mapped[str] = mapped_column(String(255))
+    tag_line: Mapped[str] = mapped_column(String(10))
+    display_name: Mapped[str] = mapped_column(String(255))
+    puuid: Mapped[str | None] = mapped_column(String(255), default=None)
+    summoner_id: Mapped[str | None] = mapped_column(String(255), default=None)
+    current_price: Mapped[float] = mapped_column(Float, default=10.0)
+    lp_abs: Mapped[int] = mapped_column(Integer, default=0)
+    previous_lp_abs: Mapped[int] = mapped_column(Integer, default=0)
+    streak: Mapped[int] = mapped_column(Integer, default=0)
+    gamma_factor: Mapped[float] = mapped_column(Float, default=1.0)
+    last_updated: Mapped[datetime | None] = mapped_column(default=None)
+
+    __table_args__ = (
+        UniqueConstraint("game_name", "tag_line", name="uq_player_riot_id"),
+    )
+
+    holdings: Mapped[list["Holding"]] = relationship(back_populates="player")
+    orders: Mapped[list["Order"]] = relationship(back_populates="player")
+    price_history: Mapped[list["PriceHistory"]] = relationship(back_populates="player")
+
+
+class Holding(Base):
+    __tablename__ = "holdings"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    player_id: Mapped[int] = mapped_column(ForeignKey("tracked_players.id"), index=True)
+    quantity: Mapped[int] = mapped_column(Integer, default=0)
+
+    __table_args__ = (UniqueConstraint("user_id", "player_id", name="uq_user_player"),)
+
+    user: Mapped["User"] = relationship(back_populates="holdings")
+    player: Mapped["TrackedPlayer"] = relationship(back_populates="holdings")
+
+
+class Order(Base):
+    __tablename__ = "orders"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    player_id: Mapped[int] = mapped_column(ForeignKey("tracked_players.id"), index=True)
+    side: Mapped[OrderSide] = mapped_column(Enum(OrderSide))
+    quantity: Mapped[int] = mapped_column(Integer)
+    status: Mapped[OrderStatus] = mapped_column(
+        Enum(OrderStatus), default=OrderStatus.PENDING
+    )
+    execution_price: Mapped[float | None] = mapped_column(Float, default=None)
+    created_at: Mapped[datetime] = mapped_column(insert_default=func.now())
+    executed_at: Mapped[datetime | None] = mapped_column(default=None)
+
+    user: Mapped["User"] = relationship(back_populates="orders")
+    player: Mapped["TrackedPlayer"] = relationship(back_populates="orders")
+    transaction: Mapped["Transaction | None"] = relationship(
+        back_populates="order", uselist=False
+    )
+
+
+class Transaction(Base):
+    __tablename__ = "transactions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    player_id: Mapped[int] = mapped_column(ForeignKey("tracked_players.id"), index=True)
+    order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"), unique=True)
+    side: Mapped[OrderSide] = mapped_column(Enum(OrderSide))
+    quantity: Mapped[int] = mapped_column(Integer)
+    price: Mapped[float] = mapped_column(Float)
+    total: Mapped[float] = mapped_column(Float)
+    created_at: Mapped[datetime] = mapped_column(insert_default=func.now())
+
+    order: Mapped["Order"] = relationship(back_populates="transaction")
+
+
+class PriceHistory(Base):
+    __tablename__ = "price_history"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    player_id: Mapped[int] = mapped_column(ForeignKey("tracked_players.id"), index=True)
+    price: Mapped[float] = mapped_column(Float)
+    lp_abs: Mapped[int] = mapped_column(Integer)
+    recorded_at: Mapped[datetime] = mapped_column(insert_default=func.now())
+
+    player: Mapped["TrackedPlayer"] = relationship(back_populates="price_history")

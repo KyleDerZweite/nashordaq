@@ -4,10 +4,13 @@ version = "0.1.0"
 description = "Fantasy stock market for League of Legends players"
 requires-python = ">=3.12"
 dependencies = [
+    "aiosqlite>=0.22.1",
+    "apscheduler>=3.10,<4",
     "fastapi>=0.129.0",
     "httpx>=0.28.1",
     "pydantic>=2.12.5",
     "pydantic-settings>=2.13.1",
+    "sqlalchemy>=2.0.46",
     "uvicorn>=0.41.0",
 ]
 

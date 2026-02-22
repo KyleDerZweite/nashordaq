@@ -1,0 +1,95 @@
+from unittest.mock import patch
+
+from app.pricing import (
+    calculate_ipo_price,
+    calculate_lp_abs,
+    calculate_new_price,
+    generate_gamma_base,
+    update_streak,
+)
+
+
+def test_lp_abs_iron_iv_0():
+    assert calculate_lp_abs("IRON", "IV", 0) == 0
+
+
+def test_lp_abs_gold_ii_75():
+    # T=3, D=2 -> 3*400 + 2*100 + 75 = 1475
+    assert calculate_lp_abs("GOLD", "II", 75) == 1475
+
+
+def test_lp_abs_diamond_i_99():
+    # T=6, D=3 -> 6*400 + 3*100 + 99 = 2799
+    assert calculate_lp_abs("DIAMOND", "I", 99) == 2799
+
+
+def test_lp_abs_master_plus():
+    # Master+ all map to T=7, D=3 -> 7*400 + 3*100 + LP
+    assert calculate_lp_abs("MASTER", "I", 0) == 3100
+    assert calculate_lp_abs("GRANDMASTER", "I", 500) == 3600
+    assert calculate_lp_abs("CHALLENGER", "I", 1200) == 4300
+
+
+def test_lp_abs_case_insensitive():
+    assert calculate_lp_abs("gold", "ii", 50) == calculate_lp_abs("GOLD", "II", 50)
+
+
+def test_ipo_price():
+    assert calculate_ipo_price(0) == 10.0
+    assert calculate_ipo_price(1000) == 20.0
+    assert calculate_ipo_price(3100) == 41.0
+
+
+def test_gamma_base():
+    assert generate_gamma_base(0) == 1.0
+    assert generate_gamma_base(50) == 1.05
+    assert generate_gamma_base(99) == 1.099
+    assert generate_gamma_base(100) == 1.0  # wraps at 100
+
+
+def test_new_price_positive_delta():
+    with patch("app.pricing.generate_epsilon", return_value=0.0):
+        price = calculate_new_price(
+            old_price=20.0, delta_lp=100, streak=0, gamma_base=1.0
+        )
+    # 20 + (100 * 0.15 * (1 + 0.1*0) * 1.0) = 20 + 15 = 35
+    assert price == 35.0
+
+
+def test_new_price_negative_delta():
+    with patch("app.pricing.generate_epsilon", return_value=0.0):
+        price = calculate_new_price(
+            old_price=20.0, delta_lp=-50, streak=-1, gamma_base=1.0
+        )
+    # 20 + (-50 * 0.15 * (1 + 0.1*1) * 1.0) = 20 - 8.25 = 11.75
+    assert price == 11.75
+
+
+def test_price_floor():
+    with patch("app.pricing.generate_epsilon", return_value=0.0):
+        price = calculate_new_price(
+            old_price=2.0, delta_lp=-1000, streak=0, gamma_base=1.0
+        )
+    assert price == 1.0
+
+
+def test_streak_positive():
+    assert update_streak(0, 10) == 1
+    assert update_streak(1, 10) == 2
+    assert update_streak(3, 10) == 4
+
+
+def test_streak_negative():
+    assert update_streak(0, -10) == -1
+    assert update_streak(-1, -10) == -2
+    assert update_streak(-3, -10) == -4
+
+
+def test_streak_direction_change():
+    assert update_streak(3, -10) == -1
+    assert update_streak(-3, 10) == 1
+
+
+def test_streak_no_change():
+    assert update_streak(5, 0) == 0
+    assert update_streak(-3, 0) == 0
