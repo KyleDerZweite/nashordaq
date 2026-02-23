@@ -29,6 +29,13 @@ async def init_db() -> None:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
+        user_cols_result = await conn.execute(text("PRAGMA table_info(users)"))
+        user_columns = {row[1] for row in user_cols_result.fetchall()}
+        if "linked_player_id" not in user_columns:
+            await conn.execute(
+                text("ALTER TABLE users ADD COLUMN linked_player_id INTEGER")
+            )
+
         result = await conn.execute(text("PRAGMA table_info(holding_lots)"))
         columns = {row[1] for row in result.fetchall()}
         if "buy_order_id" not in columns:

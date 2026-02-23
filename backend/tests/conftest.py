@@ -7,11 +7,13 @@ os.environ.setdefault("NASHORDAQ_RIOT_API_REGION_URL", "https://euw1.api.riotgam
 import httpx
 import pytest
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from app.config import settings
 from app.database import get_session
 from app.main import app
-from app.models import Base, TrackedPlayer
+from app.models import Base, TrackedPlayer, User
 
 
 @pytest.fixture
@@ -77,4 +79,20 @@ async def seeded_player(db_session):
     db_session.add(player)
     await db_session.commit()
     await db_session.refresh(player)
+
+    user_result = await db_session.execute(
+        select(User).where(User.username == "testuser")
+    )
+    user = user_result.scalar_one_or_none()
+    if user is None:
+        user = User(
+            username="testuser",
+            balance=settings.starting_balance,
+            linked_player_id=player.id,
+        )
+        db_session.add(user)
+    else:
+        user.linked_player_id = player.id
+    await db_session.commit()
+
     return player

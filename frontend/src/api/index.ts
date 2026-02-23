@@ -9,4 +9,5 @@ export {
   useLeaderboard,
   usePlaceOrder,
   useCancelOrder,
+  useCompleteOnboarding,
 } from "./hooks";

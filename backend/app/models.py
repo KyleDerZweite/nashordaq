@@ -27,11 +27,18 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     username: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     balance: Mapped[float] = mapped_column(Float, default=10000.0)
+    linked_player_id: Mapped[int | None] = mapped_column(
+        ForeignKey("tracked_players.id"), unique=True, default=None
+    )
     created_at: Mapped[datetime] = mapped_column(insert_default=func.now())
 
     holdings: Mapped[list["Holding"]] = relationship(back_populates="user")
     holding_lots: Mapped[list["HoldingLot"]] = relationship(back_populates="user")
     orders: Mapped[list["Order"]] = relationship(back_populates="user")
+    linked_player: Mapped["TrackedPlayer | None"] = relationship(
+        foreign_keys=[linked_player_id],
+        back_populates="linked_users",
+    )
 
 
 class TrackedPlayer(Base):
@@ -58,6 +65,10 @@ class TrackedPlayer(Base):
     holding_lots: Mapped[list["HoldingLot"]] = relationship(back_populates="player")
     orders: Mapped[list["Order"]] = relationship(back_populates="player")
     price_history: Mapped[list["PriceHistory"]] = relationship(back_populates="player")
+    linked_users: Mapped[list["User"]] = relationship(
+        back_populates="linked_player",
+        foreign_keys="User.linked_player_id",
+    )
 
 
 class Holding(Base):

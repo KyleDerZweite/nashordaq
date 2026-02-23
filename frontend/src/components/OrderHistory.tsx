@@ -73,20 +73,23 @@ export default function OrderHistory({ orders }: Props) {
                         ? "border-hex-magic/50 text-hex-magic"
                         : o.status === "PENDING"
                           ? "border-hex-gold-dim text-hex-gold"
-                          : "border-hex-zaun/50 text-hex-zaun"
+                          : o.status === "REVERTED"
+                            ? "border-hex-bronze/50 text-hex-bronze"
+                            : "border-hex-zaun/50 text-hex-zaun"
                     }`}
                   >
                     {o.status}
                   </span>
                 </td>
                 <td className="px-4 py-2.5">
-                  {o.status === "PENDING" && (
+                  {(o.status === "PENDING" ||
+                    (o.status === "EXECUTED" && o.side === "BUY")) && (
                     <button
                       onClick={() => cancelOrder.mutate(o.id)}
                       disabled={cancelOrder.isPending}
                       className="font-mono text-xs font-bold text-hex-zaun transition-colors hover:text-hex-white"
                     >
-                      Cancel
+                      {o.status === "PENDING" ? "Cancel" : "Revert"}
                     </button>
                   )}
                 </td>
@@ -95,6 +98,11 @@ export default function OrderHistory({ orders }: Props) {
           </tbody>
         </table>
       </div>
+      {cancelOrder.isError && (
+        <p className="border-t border-hex-border/50 px-4 py-2 font-mono text-xs text-hex-zaun">
+          {cancelOrder.error.message}
+        </p>
+      )}
     </section>
   );
 }

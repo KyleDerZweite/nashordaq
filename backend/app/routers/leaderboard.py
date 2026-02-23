@@ -15,7 +15,9 @@ SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 @router.get("/leaderboard", response_model=list[LeaderboardEntry])
 async def get_leaderboard(session: SessionDep) -> list[LeaderboardEntry]:
-    users_result = await session.execute(select(User))
+    users_result = await session.execute(
+        select(User).where(User.linked_player_id.is_not(None))
+    )
     users = users_result.scalars().all()
 
     players_result = await session.execute(select(TrackedPlayer))

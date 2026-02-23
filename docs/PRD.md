@@ -25,7 +25,7 @@ A closed, trusted friend group. Public registration and email verification are o
 - **Long only:** Users cannot short sell. Selling requires owning sufficient shares (accounting for pending sell orders).
 - **Whole shares only:** Fractional share quantities are not supported.
 - **Market orders only:** No limit orders or other order types.
-- **Pre-seeded players:** The list of tracked players is defined in a configuration file (`players.json`) and loaded at startup. There is no runtime API to add or remove players.
+- **Self-onboarding players:** Each user links their own Riot account on first access by submitting `game_name`, `tag_line`, and `display_name`. Linked players become tracked in the market. Deletion is out of scope.
 
 ## System Requirements
 

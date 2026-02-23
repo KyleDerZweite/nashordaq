@@ -46,19 +46,9 @@ The scheduler wakes every 30 seconds internally and runs immediately on startup,
 
 ## 2. Tracked Players
 
-Edit `backend/players.json` to list the League of Legends accounts you want to track. Each entry needs `game_name`, `tag_line`, and a `display_name`:
+Tracked players are created through user self-onboarding. On first authenticated visit, each user must enter their own Riot `game_name`, `tag_line`, and `display_name`. After submission, their linked Riot account is added to the tracked player set.
 
-```json
-[
-  {
-    "game_name": "Faker",
-    "tag_line": "KR1",
-    "display_name": "Faker"
-  }
-]
-```
-
-Players are upserted into the database on every startup.
+This replaces static player seeding and does not require editing JSON files during deployment.
 
 ## 3. Build and Run
 

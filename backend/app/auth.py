@@ -67,3 +67,12 @@ async def _get_current_user(request: Request, session: SessionDep) -> User:
 
 
 CurrentUser = Annotated[User, Depends(_get_current_user)]
+
+
+def _require_onboarded_user(user: CurrentUser) -> User:
+    if user.linked_player_id is None:
+        raise HTTPException(status_code=403, detail="Complete onboarding first")
+    return user
+
+
+CurrentOnboardedUser = Annotated[User, Depends(_require_onboarded_user)]

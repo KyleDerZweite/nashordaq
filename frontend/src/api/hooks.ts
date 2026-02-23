@@ -6,6 +6,7 @@ import type {
   PlayerDetail,
   OrderResponse,
   OrderCreate,
+  UserOnboardingCreate,
   PortfolioResponse,
   LeaderboardEntry,
 } from "../types";
@@ -45,18 +46,20 @@ export function usePlayer(id: number) {
   });
 }
 
-export function usePortfolio() {
+export function usePortfolio(enabled = true) {
   return useQuery<PortfolioResponse>({
     queryKey: queryKeys.portfolio,
     queryFn: () => get<PortfolioResponse>("/portfolio"),
+    enabled,
     refetchInterval: 30_000,
   });
 }
 
-export function useOrders() {
+export function useOrders(enabled = true) {
   return useQuery<OrderResponse[]>({
     queryKey: queryKeys.orders,
     queryFn: () => get<OrderResponse[]>("/orders"),
+    enabled,
     refetchInterval: 15_000,
   });
 }
@@ -91,6 +94,21 @@ export function useCancelOrder() {
       void qc.invalidateQueries({ queryKey: queryKeys.orders });
       void qc.invalidateQueries({ queryKey: queryKeys.portfolio });
       void qc.invalidateQueries({ queryKey: queryKeys.user });
+    },
+  });
+}
+
+export function useCompleteOnboarding() {
+  const qc = useQueryClient();
+  return useMutation<UserResponse, Error, UserOnboardingCreate>({
+    mutationFn: (body) => post<UserResponse>("/user/onboarding", body),
+    onSuccess: async (user) => {
+      qc.setQueryData(queryKeys.user, user);
+      await qc.refetchQueries({ queryKey: queryKeys.user });
+      void qc.invalidateQueries({ queryKey: queryKeys.players });
+      void qc.invalidateQueries({ queryKey: queryKeys.portfolio });
+      void qc.invalidateQueries({ queryKey: queryKeys.orders });
+      void qc.invalidateQueries({ queryKey: queryKeys.leaderboard });
     },
   });
 }

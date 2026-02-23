@@ -109,7 +109,7 @@ NASHORDAQ_HTTP_TIMEOUT_SECONDS=10
 NASHORDAQ_HTTP_CONNECT_TIMEOUT_SECONDS=5
 ```
 
-When a user visits Nashordaq, Pangolin authenticates them first. The backend reads the forwarded header to identify the user. New users are automatically provisioned with the configured starting balance.
+When a user visits Nashordaq, Pangolin authenticates them first. The backend reads the forwarded header to identify the user. New users are automatically provisioned with the configured starting balance and then complete a one-time in-app self-onboarding step to link their Riot `game_name`, `tag_line`, and `display_name`.
 
 ### 7. Start the application
 

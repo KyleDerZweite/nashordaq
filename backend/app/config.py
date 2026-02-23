@@ -41,8 +41,5 @@ class Settings(BaseSettings):
     long_hold_bonus_start_hours: float = 12.0
     buy_revert_grace_seconds: int = 60
 
-    # Player config
-    players_file: str = "players.json"
-
 
 settings = Settings()

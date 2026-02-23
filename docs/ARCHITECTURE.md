@@ -21,9 +21,9 @@ Nashordaq is a single-process Python application backed by SQLite. The FastAPI s
 |  /api/portfolio   new users     - Execute pending orders |
 |  /api/leaderboard                                       |
 |                                                        |
-|  Pricing Engine   Riot Client   Seed (players.json)     |
-|  LP_abs, IPO,     httpx async   Upsert tracked players  |
-|  dynamic price    3 API calls   on startup              |
+|  Pricing Engine   Riot Client   Self-onboarding         |
+|  LP_abs, IPO,     httpx async   Creates tracked players |
+|  dynamic price    3 API calls   at first user login     |
 |                   per player                            |
 +---------------------------+----------------------------+
                             |
@@ -55,7 +55,7 @@ Six tables managed by SQLAlchemy ORM:
 | Table | Purpose |
 |---|---|
 | `users` | User accounts (auto-provisioned). Stores username and cash balance. |
-| `tracked_players` | League of Legends accounts whose share prices are tracked. Seeded from `players.json`. |
+| `tracked_players` | League of Legends accounts whose share prices are tracked. Added during user onboarding. |
 | `holdings` | User-player share positions. One row per pair, quantity updated in place. |
 | `orders` | Buy/sell orders. Created as PENDING, resolved to EXECUTED or CANCELLED by the scheduler. |
 | `transactions` | Immutable ledger. One record per executed order. |
@@ -69,6 +69,7 @@ All endpoints are prefixed with `/api` except the health check.
 |---|---|---|---|
 | GET | `/health` | No | Health check |
 | GET | `/api/user/me` | Yes | Current user profile (auto-provisions on first call) |
+| POST | `/api/user/onboarding` | Yes | Link user Riot account and create tracked player |
 | GET | `/api/market/players` | No | List all tracked players with current prices |
 | GET | `/api/market/players/{id}` | No | Player detail with price history |
 | POST | `/api/orders` | Yes | Place a buy or sell order |
@@ -79,7 +80,7 @@ All endpoints are prefixed with `/api` except the health check.
 
 ## Authentication
 
-Authentication is handled by Pangolin, which acts as an Identity-Aware Proxy. When SSO authentication is configured, Pangolin forwards identity headers to downstream services (`Remote-User`, `Remote-Email`, `Remote-Name`, `Remote-Role`). The backend reads the `Remote-User` header (configurable via `NASHORDAQ_AUTH_HEADER`) and auto-provisions new users with a starting balance of 10,000. No passwords, JWTs, or login forms exist in the application.
+Authentication is handled by Pangolin, which acts as an Identity-Aware Proxy. When SSO authentication is configured, Pangolin forwards identity headers to downstream services (`Remote-User`, `Remote-Email`, `Remote-Name`, `Remote-Role`). The backend reads the `Remote-User` header (configurable via `NASHORDAQ_AUTH_HEADER`) and auto-provisions new users with a starting balance of 10,000. Each user then completes a one-time self-onboarding step to link their Riot account. No passwords, JWTs, or login forms exist in the application.
 
 ## Security Boundary and Hardening
 
@@ -111,7 +112,6 @@ The market update job runs as a single atomic operation:
 
 ```
 backend/
-  players.json                  # Tracked player seed data
   app/
     main.py                     # FastAPI app, lifespan, middleware, router mounts
     config.py                   # Pydantic settings (env vars with NASHORDAQ_ prefix)
@@ -121,7 +121,6 @@ backend/
     auth.py                     # Remote-User auth dependency, auto-provisioning
     pricing.py                  # Pure pricing functions (LP_abs, IPO, dynamic price, streak, gamma)
     riot.py                     # Riot Games API client (httpx)
-    seed.py                     # Load players.json into DB on startup
     scheduler.py                # APScheduler job (LP fetch, price update, order execution)
     routers/
       user.py                   # GET /api/user/me

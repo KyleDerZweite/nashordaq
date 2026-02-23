@@ -31,7 +31,6 @@ Do not duplicate complex architecture or formula details outside those canonical
 ```
 nashordaq/
   backend/               # FastAPI + uv
-    players.json         # Tracked player seed data
     app/
       main.py            # App entrypoint, lifespan, router mounts
       config.py          # Pydantic settings (NASHORDAQ_ env prefix)
@@ -41,7 +40,6 @@ nashordaq/
       auth.py            # Remote-User auth dependency
       pricing.py         # Pure pricing functions
       riot.py            # Riot Games API client
-      seed.py            # Player seeding from players.json
       scheduler.py       # APScheduler market update job
       routers/           # FastAPI route modules
     tests/               # pytest (async, in-memory SQLite)

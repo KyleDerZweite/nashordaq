@@ -5,6 +5,7 @@ import Portfolio from "./components/Portfolio";
 import Leaderboard from "./components/Leaderboard";
 import OrderHistory from "./components/OrderHistory";
 import TradeTerminal from "./components/TradeTerminal";
+import OnboardingModal from "./components/OnboardingModal";
 import type { OrderSide } from "./types";
 import { formatAmount } from "./utils/format";
 
@@ -25,9 +26,10 @@ export default function App() {
   const [trade, setTrade] = useState<TradeTarget | null>(null);
 
   const { data: user } = useUser();
+  const onboardingComplete = user?.onboarding_complete ?? false;
   const { data: players, isLoading: playersLoading } = usePlayers();
-  const { data: portfolio } = usePortfolio();
-  const { data: orders } = useOrders();
+  const { data: portfolio } = usePortfolio(onboardingComplete);
+  const { data: orders } = useOrders(onboardingComplete);
   const { data: leaderboard } = useLeaderboard();
 
   const balance = user?.balance ?? 0;
@@ -36,10 +38,10 @@ export default function App() {
     trade && players ? players.find((p) => p.id === trade.playerId) : null;
 
   return (
-    <div className="min-h-screen bg-hex-bg">
+    <div className="flex min-h-screen flex-col bg-hex-bg">
       <Header balance={balance} username={user?.username} />
 
-      <main className="mx-auto max-w-7xl px-6 py-8">
+      <main className="mx-auto w-full max-w-7xl flex-1 px-6 py-8">
         {/* Market ticker bar */}
         {players && players.length > 0 && (
           <div className="mb-8 overflow-hidden border-2 border-hex-border bg-hex-bg-alt">
@@ -102,6 +104,9 @@ export default function App() {
           onClose={() => setTrade(null)}
         />
       )}
+
+      {/* First-login onboarding modal */}
+      {user && !user.onboarding_complete && <OnboardingModal />}
     </div>
   );
 }

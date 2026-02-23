@@ -9,7 +9,15 @@ class UserResponse(BaseModel):
     id: int
     username: str
     balance: float
+    linked_player_id: int | None
+    onboarding_complete: bool
     created_at: datetime
+
+
+class UserOnboardingCreate(BaseModel):
+    game_name: str = Field(min_length=1, max_length=255)
+    tag_line: str = Field(min_length=1, max_length=10)
+    display_name: str = Field(min_length=1, max_length=255)
 
 
 class PriceHistoryEntry(BaseModel):

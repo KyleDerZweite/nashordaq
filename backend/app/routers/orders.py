@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import CurrentUser
+from app.auth import CurrentOnboardedUser
 from app.config import settings
 from app.database import get_session
 from app.models import (
@@ -70,7 +70,7 @@ def _order_response(order: Order, player_name: str) -> OrderResponse:
 @router.post("/orders", response_model=OrderResponse, status_code=201)
 async def place_order(
     body: OrderCreate,
-    user: CurrentUser,
+    user: CurrentOnboardedUser,
     session: SessionDep,
 ) -> OrderResponse:
     result = await session.execute(
@@ -222,7 +222,7 @@ async def place_order(
 
 @router.get("/orders", response_model=list[OrderResponse])
 async def list_orders(
-    user: CurrentUser,
+    user: CurrentOnboardedUser,
     session: SessionDep,
     status: OrderStatus | None = Query(default=None),  # noqa: B008
 ) -> list[OrderResponse]:
@@ -246,7 +246,7 @@ async def list_orders(
 @router.delete("/orders/{order_id}", response_model=OrderResponse)
 async def cancel_order(
     order_id: int,
-    user: CurrentUser,
+    user: CurrentOnboardedUser,
     session: SessionDep,
 ) -> OrderResponse:
     result = await session.execute(select(Order).where(Order.id == order_id))

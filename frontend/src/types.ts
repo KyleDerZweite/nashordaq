@@ -10,7 +10,15 @@ export interface UserResponse {
   id: number;
   username: string;
   balance: number;
+  linked_player_id: number | null;
+  onboarding_complete: boolean;
   created_at: string;
+}
+
+export interface UserOnboardingCreate {
+  game_name: string;
+  tag_line: string;
+  display_name: string;
 }
 
 export interface PriceHistoryEntry {

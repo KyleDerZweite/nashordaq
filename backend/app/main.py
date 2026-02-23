@@ -8,11 +8,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import settings
-from app.database import SessionLocal, engine, init_db
+from app.database import engine, init_db
 from app.riot import PlayerNotFoundError, RateLimitedError, get_rank
 from app.routers import leaderboard, market, orders, portfolio, user
 from app.scheduler import get_last_market_update_at, start_scheduler, stop_scheduler
-from app.seed import sync_tracked_players
 
 
 @asynccontextmanager
@@ -24,8 +23,6 @@ async def lifespan(app: FastAPI):
         )
     )
     await init_db()
-    async with SessionLocal() as session:
-        await sync_tracked_players(session)
     start_scheduler(app)
     yield
     stop_scheduler()

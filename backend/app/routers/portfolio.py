@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import CurrentUser
+from app.auth import CurrentOnboardedUser
 from app.database import get_session
 from app.models import Holding, TrackedPlayer
 from app.schemas import HoldingResponse, PortfolioResponse
@@ -16,7 +16,7 @@ SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 @router.get("/portfolio", response_model=PortfolioResponse)
 async def get_portfolio(
-    user: CurrentUser,
+    user: CurrentOnboardedUser,
     session: SessionDep,
 ) -> PortfolioResponse:
     result = await session.execute(

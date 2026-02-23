@@ -45,6 +45,16 @@ async def test_place_sell_no_shares(auth_client, seeded_player):
 
 
 async def test_place_order_invalid_player(auth_client):
+    onboard = await auth_client.post(
+        "/api/user/onboarding",
+        json={
+            "game_name": "invalid-user",
+            "tag_line": "EUW",
+            "display_name": "Invalid User",
+        },
+    )
+    assert onboard.status_code == 200
+
     resp = await auth_client.post(
         "/api/orders",
         json={"player_id": 999, "side": "BUY", "quantity": 1},
@@ -78,6 +88,16 @@ async def test_cancel_order(auth_client, seeded_player):
 
 
 async def test_cancel_nonexistent_order(auth_client):
+    onboard = await auth_client.post(
+        "/api/user/onboarding",
+        json={
+            "game_name": "cancel-user",
+            "tag_line": "EUW",
+            "display_name": "Cancel User",
+        },
+    )
+    assert onboard.status_code == 200
+
     resp = await auth_client.delete("/api/orders/999")
     assert resp.status_code == 404
 

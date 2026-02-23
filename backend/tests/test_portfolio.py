@@ -3,6 +3,16 @@ from app.models import Holding
 
 
 async def test_empty_portfolio(auth_client):
+    onboard = await auth_client.post(
+        "/api/user/onboarding",
+        json={
+            "game_name": "portfolio-user",
+            "tag_line": "EUW",
+            "display_name": "Portfolio User",
+        },
+    )
+    assert onboard.status_code == 200
+
     resp = await auth_client.get("/api/portfolio")
     assert resp.status_code == 200
     data = resp.json()
