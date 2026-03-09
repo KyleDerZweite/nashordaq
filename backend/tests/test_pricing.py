@@ -1,10 +1,13 @@
 from unittest.mock import patch
 
+import pytest
+
 from app.pricing import (
     calculate_ipo_price,
     calculate_lp_abs,
     calculate_new_price,
     calculate_sell_multiplier,
+    calculate_win_rate,
     generate_gamma_base,
     update_streak,
 )
@@ -41,6 +44,21 @@ def test_ipo_price():
     assert calculate_ipo_price(3100) == 41.0
 
 
+def test_win_rate():
+    assert calculate_win_rate(0, 0) == 0.5
+    assert calculate_win_rate(7, 3) == 0.7
+
+
+def test_ipo_price_with_win_rate_and_status_bonus():
+    price = calculate_ipo_price(
+        1000,
+        0.7,
+        veteran=True,
+        fresh_blood=True,
+    )
+    assert price == pytest.approx(22.2)
+
+
 def test_gamma_base():
     assert generate_gamma_base(0) == 1.0
     assert generate_gamma_base(50) == 1.05
@@ -72,6 +90,35 @@ def test_price_floor():
             old_price=2.0, delta_lp=-1000, streak=0, gamma_base=1.0
         )
     assert price == 1.0
+
+
+def test_new_price_with_status_and_win_rate_modifiers():
+    with patch("app.pricing.generate_epsilon", return_value=0.0):
+        price = calculate_new_price(
+            old_price=20.0,
+            delta_lp=100,
+            streak=0,
+            gamma_base=1.0,
+            win_rate=0.7,
+            hot_streak=True,
+            veteran=True,
+            fresh_blood=True,
+        )
+
+    assert price == pytest.approx(39.255875)
+
+
+def test_new_price_inactive_decay_without_lp_change():
+    with patch("app.pricing.generate_epsilon", return_value=0.0):
+        price = calculate_new_price(
+            old_price=20.0,
+            delta_lp=0,
+            streak=0,
+            gamma_base=1.0,
+            inactive=True,
+        )
+
+    assert price == 19.9
 
 
 def test_streak_positive():

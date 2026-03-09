@@ -19,6 +19,12 @@ async def test_quote_success(client):
         tier="GOLD",
         rank="II",
         league_points=75,
+        wins=12,
+        losses=8,
+        hot_streak=True,
+        veteran=False,
+        inactive=False,
+        fresh_blood=True,
     )
 
     with patch("app.main.get_rank", new_callable=AsyncMock, return_value=mock_rank):
@@ -31,6 +37,9 @@ async def test_quote_success(client):
     assert data["tier"] == "GOLD"
     assert data["rank"] == "II"
     assert data["leaguePoints"] == 75
+    assert data["wins"] == 12
+    assert data["losses"] == 8
+    assert data["hotStreak"] is True
 
 
 async def test_quote_not_found(client):

@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_session
-from app.models import TrackedPlayer
+from app.models import PriceHistory, TrackedPlayer
 from app.schemas import PlayerDetail, PlayerSummary, PlayerTrend, PriceHistoryEntry
 
 router = APIRouter(tags=["market"])
@@ -14,7 +14,28 @@ router = APIRouter(tags=["market"])
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 
-def _trend_for_player(player: TrackedPlayer) -> PlayerTrend:
+TREND_WINDOW = 10
+
+
+def _trend_for_player(
+    player: TrackedPlayer,
+    price_history: list[PriceHistory] | None = None,
+) -> PlayerTrend:
+    recent_history = sorted(
+        price_history or [],
+        key=lambda entry: entry.recorded_at,
+        reverse=True,
+    )[:TREND_WINDOW]
+
+    if len(recent_history) >= 2:
+        newest_price = recent_history[0].price
+        oldest_price = recent_history[-1].price
+
+        if newest_price > oldest_price:
+            return "up"
+        if newest_price < oldest_price:
+            return "down"
+
     if player.lp_abs > player.previous_lp_abs:
         return "up"
     if player.lp_abs < player.previous_lp_abs:
@@ -26,6 +47,11 @@ def _trend_for_player(player: TrackedPlayer) -> PlayerTrend:
 async def list_players(session: SessionDep) -> list[PlayerSummary]:
     result = await session.execute(select(TrackedPlayer))
     players = result.scalars().all()
+    history_result = await session.execute(select(PriceHistory))
+    history_by_player: dict[int, list[PriceHistory]] = {}
+    for entry in history_result.scalars():
+        history_by_player.setdefault(entry.player_id, []).append(entry)
+
     return [
         PlayerSummary(
             id=p.id,
@@ -33,7 +59,7 @@ async def list_players(session: SessionDep) -> list[PlayerSummary]:
             game_name=p.game_name,
             tag_line=p.tag_line,
             current_price=p.current_price,
-            trend=_trend_for_player(p),
+            trend=_trend_for_player(p, history_by_player.get(p.id)),
             last_updated=p.last_updated,
         )
         for p in players
@@ -68,7 +94,7 @@ async def get_player(
         game_name=player.game_name,
         tag_line=player.tag_line,
         current_price=player.current_price,
-        trend=_trend_for_player(player),
+        trend=_trend_for_player(player, player.price_history),
         last_updated=player.last_updated,
         previous_lp_abs=player.previous_lp_abs,
         lp_abs=player.lp_abs,

@@ -68,3 +68,29 @@ async def test_get_player_detail_returns_full_history_by_default(
     assert len(limited_data["price_history"]) == 2
     assert limited_data["price_history"][0]["price"] == 15.0
     assert limited_data["price_history"][1]["price"] == 12.5
+
+
+async def test_trend_uses_recent_ten_history_points(
+    auth_client, db_session, seeded_player
+):
+    history_entries = [
+        PriceHistory(
+            player_id=seeded_player.id,
+            price=20.0 - index,
+            lp_abs=2000 - (index * 10),
+            recorded_at=datetime.now(UTC) - timedelta(days=10 - index),
+        )
+        for index in range(10)
+    ]
+    db_session.add_all(history_entries)
+    await db_session.commit()
+
+    list_resp = await auth_client.get("/api/market/players")
+    assert list_resp.status_code == 200
+    list_data = list_resp.json()
+    assert list_data[0]["trend"] == "down"
+
+    detail_resp = await auth_client.get(f"/api/market/players/{seeded_player.id}")
+    assert detail_resp.status_code == 200
+    detail_data = detail_resp.json()
+    assert detail_data["trend"] == "down"

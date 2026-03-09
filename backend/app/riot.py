@@ -8,6 +8,12 @@ class RankData(BaseModel):
     tier: str
     rank: str
     league_points: int
+    wins: int
+    losses: int
+    hot_streak: bool
+    veteran: bool
+    inactive: bool
+    fresh_blood: bool
 
 
 class PlayerNotFoundError(Exception):
@@ -76,4 +82,10 @@ async def get_rank(
         tier=solo_queue["tier"],
         rank=solo_queue["rank"],
         league_points=solo_queue["leaguePoints"],
+        wins=solo_queue.get("wins", 0),
+        losses=solo_queue.get("losses", 0),
+        hot_streak=solo_queue.get("hotStreak", False),
+        veteran=solo_queue.get("veteran", False),
+        inactive=solo_queue.get("inactive", False),
+        fresh_blood=solo_queue.get("freshBlood", False),
     )

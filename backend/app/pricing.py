@@ -23,6 +23,13 @@ DIVISION_MAP: dict[str, int] = {
 ALPHA = 0.15
 BETA = 0.1
 PRICE_FLOOR = 1.0
+WIN_RATE_NEUTRAL = 0.5
+WIN_RATE_IPO_WEIGHT = 0.4
+WIN_RATE_PRICE_WEIGHT = 0.25
+HOT_STREAK_BONUS = 0.15
+VETERAN_BONUS = 0.01
+FRESH_BLOOD_BONUS = 0.02
+INACTIVE_DECAY_RATE = 0.005
 
 
 def calculate_lp_abs(tier: str, rank: str, league_points: int) -> int:
@@ -31,8 +38,29 @@ def calculate_lp_abs(tier: str, rank: str, league_points: int) -> int:
     return (t * 400) + (d * 100) + league_points
 
 
-def calculate_ipo_price(lp_abs: int) -> float:
-    return (lp_abs / 100) + 10
+def calculate_win_rate(wins: int, losses: int) -> float:
+    total_games = max(0, wins) + max(0, losses)
+    if total_games == 0:
+        return WIN_RATE_NEUTRAL
+    return max(0.0, min(1.0, wins / total_games))
+
+
+def calculate_ipo_price(
+    lp_abs: int,
+    win_rate: float = WIN_RATE_NEUTRAL,
+    *,
+    veteran: bool = False,
+    fresh_blood: bool = False,
+) -> float:
+    base_price = (lp_abs / 100) + 10
+    win_rate_premium = max(0.0, win_rate - WIN_RATE_NEUTRAL) * WIN_RATE_IPO_WEIGHT
+    status_premium = 0.0
+    if veteran:
+        status_premium += VETERAN_BONUS
+    if fresh_blood:
+        status_premium += FRESH_BLOOD_BONUS
+
+    return max(base_price * (1 + win_rate_premium + status_premium), PRICE_FLOOR)
 
 
 def generate_gamma_base(account_identifier: int) -> float:
@@ -48,10 +76,33 @@ def calculate_new_price(
     delta_lp: int,
     streak: int,
     gamma_base: float,
+    *,
+    win_rate: float = WIN_RATE_NEUTRAL,
+    hot_streak: bool = False,
+    veteran: bool = False,
+    inactive: bool = False,
+    fresh_blood: bool = False,
 ) -> float:
     epsilon = generate_epsilon()
     gamma = gamma_base + epsilon
-    new_price = old_price + (delta_lp * ALPHA * (1 + BETA * abs(streak))) * gamma
+    streak_multiplier = 1 + BETA * abs(streak)
+    if hot_streak:
+        streak_multiplier += HOT_STREAK_BONUS
+
+    win_rate_multiplier = 1 + ((win_rate - WIN_RATE_NEUTRAL) * WIN_RATE_PRICE_WEIGHT)
+    status_multiplier = 1.0
+    if veteran:
+        status_multiplier += VETERAN_BONUS
+    if fresh_blood:
+        status_multiplier += FRESH_BLOOD_BONUS
+
+    new_price = (
+        old_price + (delta_lp * ALPHA * streak_multiplier) * gamma * win_rate_multiplier
+    ) * status_multiplier
+
+    if inactive and delta_lp == 0:
+        new_price *= 1 - INACTIVE_DECAY_RATE
+
     return max(new_price, PRICE_FLOOR)
 
 

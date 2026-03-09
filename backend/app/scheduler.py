@@ -24,6 +24,7 @@ from app.pricing import (
     calculate_ipo_price,
     calculate_lp_abs,
     calculate_new_price,
+    calculate_win_rate,
     generate_gamma_base,
     update_streak,
 )
@@ -124,9 +125,15 @@ async def market_update_job() -> None:
             new_lp_abs = calculate_lp_abs(
                 rank_data.tier, rank_data.rank, rank_data.league_points
             )
+            win_rate = calculate_win_rate(rank_data.wins, rank_data.losses)
 
             if player.lp_abs == 0 and player.current_price <= 10.0:
-                player.current_price = calculate_ipo_price(new_lp_abs)
+                player.current_price = calculate_ipo_price(
+                    new_lp_abs,
+                    win_rate,
+                    veteran=rank_data.veteran,
+                    fresh_blood=rank_data.fresh_blood,
+                )
                 player.lp_abs = new_lp_abs
                 player.previous_lp_abs = new_lp_abs
                 player.gamma_factor = generate_gamma_base(hash(player.puuid) % 10000)
@@ -146,13 +153,19 @@ async def market_update_job() -> None:
                     delta_lp,
                     player.streak,
                     player.gamma_factor,
+                    win_rate=win_rate,
+                    hot_streak=rank_data.hot_streak,
+                    veteran=rank_data.veteran,
+                    inactive=rank_data.inactive,
+                    fresh_blood=rank_data.fresh_blood,
                 )
                 logger.info(
-                    "Updated price for %s#%s to %.2f (delta_lp=%d)",
+                    "Updated price for %s#%s to %.2f (delta_lp=%d, win_rate=%.3f)",
                     player.game_name,
                     player.tag_line,
                     player.current_price,
                     delta_lp,
+                    win_rate,
                 )
 
             player.last_updated = datetime.now(UTC)

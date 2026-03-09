@@ -10,7 +10,12 @@ from app.auth import CurrentUser, get_user_role, is_spectator_user
 from app.config import settings
 from app.database import get_session
 from app.models import PriceHistory, TrackedPlayer, User
-from app.pricing import calculate_ipo_price, calculate_lp_abs, generate_gamma_base
+from app.pricing import (
+    calculate_ipo_price,
+    calculate_lp_abs,
+    calculate_win_rate,
+    generate_gamma_base,
+)
 from app.riot import PlayerNotFoundError, RateLimitedError, get_rank
 from app.schemas import UserOnboardingCreate, UserProfileUpdate, UserResponse
 
@@ -85,7 +90,13 @@ async def _initialize_player_market_state(
         rank_data.rank,
         rank_data.league_points,
     )
-    player.current_price = calculate_ipo_price(new_lp_abs)
+    win_rate = calculate_win_rate(rank_data.wins, rank_data.losses)
+    player.current_price = calculate_ipo_price(
+        new_lp_abs,
+        win_rate,
+        veteran=rank_data.veteran,
+        fresh_blood=rank_data.fresh_blood,
+    )
     player.lp_abs = new_lp_abs
     player.previous_lp_abs = new_lp_abs
     player.gamma_factor = generate_gamma_base(hash(player.puuid) % 10000)

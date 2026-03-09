@@ -20,10 +20,19 @@ Implementation: `app/pricing.py::calculate_lp_abs()`
 Sets the starting share price when a player's LP data is first fetched.
 
 ```
-P_initial = (LP_abs / 100) + 10
+P_initial = ((LP_abs / 100) + 10) * (1 + WinRatePremium + StatusPremium)
 ```
 
 This is applied once per player (when `lp_abs == 0` and `current_price <= 10.0`). After the IPO, all subsequent updates use the dynamic formula.
+
+### IPO Modifiers
+
+- `WinRatePremium = max(0, WinRate - 0.50) * 0.40`
+	- Neutral at 50% win rate.
+	- Only upward pressure is applied at IPO; weak win rates do not reduce the initial listing price.
+- `StatusPremium`
+	- `+0.01` if Riot marks the player as `veteran`
+	- `+0.02` if Riot marks the player as `freshBlood`
 
 Implementation: `app/pricing.py::calculate_ipo_price()`
 
@@ -32,18 +41,34 @@ Implementation: `app/pricing.py::calculate_ipo_price()`
 Calculates the new share price at each market update cycle.
 
 ```
-P_new = P_old + (Delta_LP_abs * Alpha * (1 + Beta * |S|)) * Gamma
+P_new = (P_old + (Delta_LP_abs * Alpha * StreakMultiplier) * Gamma * WinRateMultiplier) * StatusMultiplier
 ```
 
 | Variable | Description | Value |
 |---|---|---|
 | Delta_LP_abs | Change in Absolute LP since last update | Computed per cycle |
 | Alpha | Base volatility scalar | 0.15 |
-| S | Streak counter (signed) | See below |
-| Beta | Momentum weight | 0.1 |
+| StreakMultiplier | Internal streak momentum plus Riot `hotStreak` bonus | See below |
 | Gamma | Obfuscation factor | `gamma_base + epsilon` |
 
-**Streak (S):** A signed integer tracking consecutive same-direction updates. Positive for consecutive LP gains, negative for consecutive losses. Resets to +1 or -1 on direction change. Resets to 0 when delta is zero. The absolute value `|S|` is used in the formula.
+### League-V4 Risk Adjustments
+
+- `WinRateMultiplier = 1 + ((WinRate - 0.50) * 0.25)`
+	- High win rates slightly amplify positive and negative LP moves.
+	- Low win rates slightly dampen the move size.
+- `StatusMultiplier`
+	- `+0.01` if `veteran`
+	- `+0.02` if `freshBlood`
+- `hotStreak`
+	- Adds an extra `+0.15` momentum bonus on top of the internal streak multiplier.
+- `inactive`
+	- If Riot marks the player inactive and LP did not change this cycle, the stock decays by `0.5%` for that cycle.
+
+**Internal streak:** A signed integer tracking consecutive same-direction updates. Positive for consecutive LP gains, negative for consecutive losses. Resets to +1 or -1 on direction change. Resets to 0 when delta is zero.
+
+```
+StreakMultiplier = 1 + (Beta * |S|) + (0.15 if hotStreak else 0)
+```
 
 **Gamma base:** Deterministic per-player value generated once from `hash(puuid) % 10000`:
 ```
@@ -58,7 +83,7 @@ epsilon = random.uniform(-0.03, 0.03)
 
 **Floor:** `P_new` cannot drop below 1.00.
 
-Implementation: `app/pricing.py::calculate_new_price()`, `update_streak()`
+Implementation: `app/pricing.py::calculate_new_price()`, `calculate_win_rate()`, `update_streak()`
 
 ## 4. Immediate Execution + Holding Adjustment
 
