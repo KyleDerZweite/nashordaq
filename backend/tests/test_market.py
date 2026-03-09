@@ -1,3 +1,8 @@
+from datetime import UTC, datetime, timedelta
+
+from app.models import PriceHistory
+
+
 async def test_list_players(auth_client, seeded_player):
     resp = await auth_client.get("/api/market/players")
     assert resp.status_code == 200
@@ -21,3 +26,45 @@ async def test_get_player_detail(auth_client, seeded_player):
 async def test_get_player_not_found(auth_client):
     resp = await auth_client.get("/api/market/players/999")
     assert resp.status_code == 404
+
+
+async def test_get_player_detail_returns_full_history_by_default(
+    auth_client, db_session, seeded_player
+):
+    history_entries = [
+        PriceHistory(
+            player_id=seeded_player.id,
+            price=10.0,
+            lp_abs=1000,
+            recorded_at=datetime.now(UTC) - timedelta(days=3),
+        ),
+        PriceHistory(
+            player_id=seeded_player.id,
+            price=12.5,
+            lp_abs=1200,
+            recorded_at=datetime.now(UTC) - timedelta(days=2),
+        ),
+        PriceHistory(
+            player_id=seeded_player.id,
+            price=15.0,
+            lp_abs=1500,
+            recorded_at=datetime.now(UTC) - timedelta(days=1),
+        ),
+    ]
+    db_session.add_all(history_entries)
+    await db_session.commit()
+
+    full_resp = await auth_client.get(f"/api/market/players/{seeded_player.id}")
+    assert full_resp.status_code == 200
+    full_data = full_resp.json()
+    assert len(full_data["price_history"]) == 3
+    assert full_data["price_history"][0]["price"] == 15.0
+
+    limited_resp = await auth_client.get(
+        f"/api/market/players/{seeded_player.id}?limit=2"
+    )
+    assert limited_resp.status_code == 200
+    limited_data = limited_resp.json()
+    assert len(limited_data["price_history"]) == 2
+    assert limited_data["price_history"][0]["price"] == 15.0
+    assert limited_data["price_history"][1]["price"] == 12.5

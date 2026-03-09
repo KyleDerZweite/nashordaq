@@ -102,7 +102,7 @@ export default function TradeTerminal({
           </span>
           <span className="font-mono text-lg font-bold text-hex-gold">
             {formatAmount(player.current_price)}
-            <span className="ml-1 text-xs text-hex-bronze">G / share</span>
+            <span className="ml-1 text-xs text-hex-bronze">P / share</span>
           </span>
         </div>
 
@@ -152,7 +152,7 @@ export default function TradeTerminal({
               className={`font-mono text-lg font-bold ${canAfford ? "text-hex-gold" : "text-hex-zaun"}`}
             >
               {formatAmount(estimatedTotal)}
-              <span className="ml-1 text-xs text-hex-bronze">G</span>
+              <span className="ml-1 text-xs text-hex-bronze">P</span>
             </span>
           </div>
 

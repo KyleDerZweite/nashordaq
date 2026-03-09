@@ -14,14 +14,14 @@ export default function Portfolio({ holdings, balance }: Props) {
     <section className="border-2 border-hex-gold-dim bg-hex-panel">
       <div className="border-b-2 border-hex-gold-dim px-5 py-3">
         <h2 className="font-serif text-xl font-bold text-hex-gold">
-          Portfolio
+          Porofolio
         </h2>
       </div>
 
       {/* Summary numbers */}
       <div className="grid grid-cols-3 divide-x-2 divide-hex-border border-b-2 border-hex-border">
         {[
-          { label: "Cash", value: balance },
+          { label: "Poro", value: balance },
           { label: "Holdings", value: holdingsTotal },
           { label: "Total", value: totalValue },
         ].map((item) => (

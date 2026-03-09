@@ -17,7 +17,8 @@ import type {
 export const queryKeys = {
   user: ["user"] as const,
   players: ["players"] as const,
-  player: (id: number) => ["player", id] as const,
+  player: (id: number, limit?: number | null) =>
+    ["player", id, limit ?? "all"] as const,
   portfolio: ["portfolio"] as const,
   orders: ["orders"] as const,
   recentOrders: ["recentOrders"] as const,
@@ -41,10 +42,13 @@ export function usePlayers() {
   });
 }
 
-export function usePlayer(id: number) {
+export function usePlayer(id: number, limit: number | null = null) {
+  const search = limit === null ? "" : `?limit=${limit}`;
+
   return useQuery<PlayerDetail>({
-    queryKey: queryKeys.player(id),
-    queryFn: () => get<PlayerDetail>(`/market/players/${id}`),
+    queryKey: queryKeys.player(id, limit),
+    queryFn: () => get<PlayerDetail>(`/market/players/${id}${search}`),
+    refetchInterval: 60_000,
   });
 }
 

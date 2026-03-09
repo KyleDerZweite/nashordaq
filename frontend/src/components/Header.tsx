@@ -43,7 +43,7 @@ export default function Header({
             </span>
             <p className="font-mono text-lg font-bold text-hex-gold">
               {formatAmount(balance)}
-              <span className="ml-1 text-xs text-hex-bronze">G</span>
+              <span className="ml-1 text-xs text-hex-bronze">P</span>
             </p>
           </div>
           <div className="relative">

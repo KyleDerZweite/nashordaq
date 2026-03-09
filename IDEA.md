@@ -93,3 +93,7 @@ User table changes:
 - Can a guest be in multiple rooms?
 - What happens when a room admin disappears? (Transfer ownership? Auto-expire?)
 - How to handle the Riot API rate limit if many rooms track many players?
+
+## Additional Game Scoring Ideas
+
+- Add recent KDA from the last matches into the score calculation so price movement can reflect not only ranked LP changes but also short-term in-game performance.

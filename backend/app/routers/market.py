@@ -7,14 +7,14 @@ from sqlalchemy.orm import selectinload
 
 from app.database import get_session
 from app.models import TrackedPlayer
-from app.schemas import PlayerDetail, PlayerSummary, PriceHistoryEntry
+from app.schemas import PlayerDetail, PlayerSummary, PlayerTrend, PriceHistoryEntry
 
 router = APIRouter(tags=["market"])
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 
-def _trend_for_player(player: TrackedPlayer) -> str:
+def _trend_for_player(player: TrackedPlayer) -> PlayerTrend:
     if player.lp_abs > player.previous_lp_abs:
         return "up"
     if player.lp_abs < player.previous_lp_abs:
@@ -44,7 +44,7 @@ async def list_players(session: SessionDep) -> list[PlayerSummary]:
 async def get_player(
     player_id: int,
     session: SessionDep,
-    limit: int = Query(default=100, ge=1, le=1000),  # noqa: B008
+    limit: int | None = Query(default=None, ge=1, le=10000),  # noqa: B008
 ) -> PlayerDetail:
     result = await session.execute(
         select(TrackedPlayer)
@@ -55,9 +55,12 @@ async def get_player(
     if player is None:
         raise HTTPException(status_code=404, detail="Player not found")
 
-    history = sorted(player.price_history, key=lambda h: h.recorded_at, reverse=True)[
-        :limit
-    ]
+    sorted_history = sorted(
+        player.price_history,
+        key=lambda h: h.recorded_at,
+        reverse=True,
+    )
+    history = sorted_history if limit is None else sorted_history[:limit]
 
     return PlayerDetail(
         id=player.id,

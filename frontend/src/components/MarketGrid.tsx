@@ -8,12 +8,14 @@ type MarketSortDirection = "asc" | "desc";
 interface Props {
   players: PlayerSummary[];
   onTrade: (playerId: number, side: OrderSide) => void;
+  onOpenDetails: (playerId: number) => void;
   canTrade?: boolean;
 }
 
 export default function MarketGrid({
   players,
   onTrade,
+  onOpenDetails,
   canTrade = true,
 }: Props) {
   const [sortField, setSortField] = useState<MarketSortField>("value");
@@ -109,6 +111,7 @@ export default function MarketGrid({
             key={p.id}
             player={p}
             onTrade={onTrade}
+            onOpenDetails={onOpenDetails}
             canTrade={canTrade}
           />
         ))}

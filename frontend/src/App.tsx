@@ -5,6 +5,7 @@ import Portfolio from "./components/Portfolio";
 import Leaderboard from "./components/Leaderboard";
 import OrderHistory from "./components/OrderHistory";
 import PlayerProfileModal from "./components/PlayerProfileModal";
+import PlayerDetailsModal from "./components/PlayerDetailsModal";
 import TradeTerminal from "./components/TradeTerminal";
 import OnboardingModal from "./components/OnboardingModal";
 import type { OrderSide } from "./types";
@@ -29,6 +30,7 @@ type TickerSortMode = "value" | "name";
 
 export default function App() {
   const [trade, setTrade] = useState<TradeTarget | null>(null);
+  const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
   const [tickerSortMode, setTickerSortMode] = useState<TickerSortMode>("value");
   const [isProfileEditorOpen, setIsProfileEditorOpen] = useState(false);
 
@@ -177,6 +179,7 @@ export default function App() {
             <MarketGrid
               players={players ?? []}
               onTrade={(playerId, side) => setTrade({ playerId, side })}
+              onOpenDetails={(playerId) => setSelectedPlayerId(playerId)}
               canTrade={canTrade}
             />
           </div>
@@ -210,6 +213,18 @@ export default function App() {
           balance={balance}
           ownedQuantity={tradeHolding?.quantity ?? 0}
           onClose={() => setTrade(null)}
+        />
+      )}
+
+      {selectedPlayerId !== null && (
+        <PlayerDetailsModal
+          playerId={selectedPlayerId}
+          canTrade={canTrade}
+          onTrade={(side) => {
+            setSelectedPlayerId(null);
+            setTrade({ playerId: selectedPlayerId, side });
+          }}
+          onClose={() => setSelectedPlayerId(null)}
         />
       )}
 
