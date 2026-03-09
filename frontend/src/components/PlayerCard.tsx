@@ -1,5 +1,5 @@
 import type { PlayerSummary, OrderSide } from "../types";
-import { formatAmount } from "../utils/format";
+import { formatAmount, formatLocalTime } from "../utils/format";
 
 interface Props {
   player: PlayerSummary;
@@ -68,7 +68,7 @@ export default function PlayerCard({
                 Updated
               </span>
               <span className="font-mono text-xs text-hex-bronze">
-                {new Date(player.last_updated).toLocaleTimeString()}
+                {formatLocalTime(player.last_updated)}
               </span>
             </div>
           )}

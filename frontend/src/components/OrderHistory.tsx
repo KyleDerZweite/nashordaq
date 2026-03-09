@@ -6,13 +6,18 @@ import { formatAmount } from "../utils/format";
 interface Props {
   ownOrders: OrderResponse[];
   allOrders: OrderResponse[];
+  defaultView?: OrderHistoryView;
 }
 
 type OrderHistoryView = "own" | "all";
 
-export default function OrderHistory({ ownOrders, allOrders }: Props) {
+export default function OrderHistory({
+  ownOrders,
+  allOrders,
+  defaultView = "own",
+}: Props) {
   const cancelOrder = useCancelOrder();
-  const [view, setView] = useState<OrderHistoryView>("own");
+  const [view, setView] = useState<OrderHistoryView>(defaultView);
 
   const orders = useMemo(
     () => (view === "own" ? ownOrders : allOrders),
@@ -131,6 +136,18 @@ export default function OrderHistory({ ownOrders, allOrders }: Props) {
                 </td>
               </tr>
             ))}
+            {orders.length === 0 && (
+              <tr>
+                <td
+                  colSpan={view === "all" ? 8 : 7}
+                  className="px-4 py-6 text-center font-mono text-sm text-hex-bronze"
+                >
+                  {view === "own"
+                    ? "No own orders yet."
+                    : "No recent market orders yet."}
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

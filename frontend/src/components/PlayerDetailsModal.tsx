@@ -1,7 +1,13 @@
 import { useMemo, useState } from "react";
 import { usePlayer } from "../api";
 import type { OrderSide, PriceHistoryEntry } from "../types";
-import { formatAmount } from "../utils/format";
+import {
+  formatAmount,
+  formatLocalDate,
+  formatLocalDateShort,
+  formatLocalDateTime,
+  parseBackendUtcTimestamp,
+} from "../utils/format";
 
 type ChartRange = 30 | 90 | "all";
 type TrendDirection = "up" | "down" | "flat";
@@ -40,14 +46,6 @@ function formatSignedPercent(value: number): string {
   })}%`;
 }
 
-function formatDateLabel(value: string): string {
-  return new Intl.DateTimeFormat("de-DE", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(new Date(value));
-}
-
 function buildBaseHistory(
   history: PriceHistoryEntry[],
   fallback: PriceHistoryEntry,
@@ -58,8 +56,8 @@ function buildBaseHistory(
 
   return [...history].sort(
     (left, right) =>
-      new Date(left.recorded_at).getTime() -
-      new Date(right.recorded_at).getTime(),
+      parseBackendUtcTimestamp(left.recorded_at).getTime() -
+      parseBackendUtcTimestamp(right.recorded_at).getTime(),
   );
 }
 
@@ -72,8 +70,8 @@ function buildDailySeries(history: PriceHistoryEntry[]): PriceHistoryEntry[] {
 
   return Array.from(byDay.values()).sort(
     (left, right) =>
-      new Date(left.recorded_at).getTime() -
-      new Date(right.recorded_at).getTime(),
+      parseBackendUtcTimestamp(left.recorded_at).getTime() -
+      parseBackendUtcTimestamp(right.recorded_at).getTime(),
   );
 }
 
@@ -85,12 +83,13 @@ function filterSeriesByRange(
     return history;
   }
 
-  const latestTime = new Date(
+  const latestTime = parseBackendUtcTimestamp(
     history[history.length - 1].recorded_at,
   ).getTime();
   const cutoffTime = latestTime - range * 24 * 60 * 60 * 1000;
   const filtered = history.filter(
-    (entry) => new Date(entry.recorded_at).getTime() >= cutoffTime,
+    (entry) =>
+      parseBackendUtcTimestamp(entry.recorded_at).getTime() >= cutoffTime,
   );
 
   return filtered.length > 0 ? filtered : history;
@@ -633,10 +632,7 @@ export default function PlayerDetailsModal({
                                 fontSize="11"
                                 fontFamily="monospace"
                               >
-                                {new Intl.DateTimeFormat("de-DE", {
-                                  day: "2-digit",
-                                  month: "short",
-                                }).format(new Date(point.entry.recorded_at))}
+                                {formatLocalDateShort(point.entry.recorded_at)}
                               </text>
                             );
                           })}
@@ -689,7 +685,7 @@ export default function PlayerDetailsModal({
                     {formatAmount(metrics.ath.price)}
                   </div>
                   <div className="mt-2 font-mono text-xs leading-5 text-hex-bronze">
-                    Hit on {formatDateLabel(metrics.ath.recorded_at)}
+                    Hit on {formatLocalDate(metrics.ath.recorded_at)}
                   </div>
                 </section>
 
@@ -701,7 +697,7 @@ export default function PlayerDetailsModal({
                     {formatAmount(metrics.atl.price)}
                   </div>
                   <div className="mt-2 font-mono text-xs leading-5 text-hex-bronze">
-                    Hit on {formatDateLabel(metrics.atl.recorded_at)}
+                    Hit on {formatLocalDate(metrics.atl.recorded_at)}
                   </div>
                 </section>
 
@@ -725,8 +721,8 @@ export default function PlayerDetailsModal({
                     {player.streak}
                   </div>
                   <div className="mt-2 font-mono text-xs leading-5 text-hex-bronze">
-                    From {formatDateLabel(metrics.rangeStart.recorded_at)} to{" "}
-                    {formatDateLabel(metrics.rangeEnd.recorded_at)}
+                    From {formatLocalDate(metrics.rangeStart.recorded_at)} to{" "}
+                    {formatLocalDate(metrics.rangeEnd.recorded_at)}
                   </div>
                 </section>
 
@@ -736,7 +732,7 @@ export default function PlayerDetailsModal({
                   </div>
                   <div className="mt-3 font-mono text-sm font-bold uppercase tracking-[0.16em] text-hex-white">
                     {player.last_updated
-                      ? formatDateLabel(player.last_updated)
+                      ? formatLocalDateTime(player.last_updated)
                       : "Awaiting first live update"}
                   </div>
                   <div className="mt-2 font-mono text-xs leading-5 text-hex-bronze">

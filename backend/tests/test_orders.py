@@ -311,6 +311,42 @@ async def test_list_recent_orders_includes_all_players(
     }
 
 
+async def test_spectator_list_orders_returns_empty_list(auth_client, tradable_player):
+    await auth_client.post(
+        "/api/orders",
+        json={"player_id": tradable_player.id, "side": "BUY", "quantity": 1},
+    )
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(
+        transport=transport,
+        base_url="http://test",
+        headers={"Remote-User": settings.spectator_remote_user},
+    ) as spectator_client:
+        resp = await spectator_client.get("/api/orders")
+
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+async def test_spectator_can_view_recent_orders(auth_client, tradable_player):
+    await auth_client.post(
+        "/api/orders",
+        json={"player_id": tradable_player.id, "side": "BUY", "quantity": 1},
+    )
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(
+        transport=transport,
+        base_url="http://test",
+        headers={"Remote-User": settings.spectator_remote_user},
+    ) as spectator_client:
+        resp = await spectator_client.get("/api/orders/recent")
+
+    assert resp.status_code == 200
+    assert len(resp.json()) >= 1
+
+
 async def test_sell_applies_short_hold_fee(auth_client, tradable_player, db_session):
     buy_resp = await auth_client.post(
         "/api/orders",

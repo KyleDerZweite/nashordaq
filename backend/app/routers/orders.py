@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import CurrentOnboardedUser
+from app.auth import CurrentOnboardedUser, CurrentUser, is_spectator_user
 from app.config import settings
 from app.database import get_session
 from app.models import (
@@ -285,10 +285,16 @@ async def place_order(
 
 @router.get("/orders", response_model=list[OrderResponse])
 async def list_orders(
-    user: CurrentOnboardedUser,
+    user: CurrentUser,
     session: SessionDep,
     status: OrderStatus | None = Query(default=None),  # noqa: B008
 ) -> list[OrderResponse]:
+    if is_spectator_user(user):
+        return []
+
+    if user.linked_player_id is None:
+        return []
+
     stmt = select(Order).where(Order.user_id == user.id)
     if status is not None:
         stmt = stmt.where(Order.status == status)
@@ -302,7 +308,7 @@ async def list_orders(
 
 @router.get("/orders/recent", response_model=list[OrderResponse])
 async def list_recent_orders(
-    user: CurrentOnboardedUser,
+    user: CurrentUser,
     session: SessionDep,
     limit: int = Query(default=100, ge=1, le=500),  # noqa: B008
 ) -> list[OrderResponse]:

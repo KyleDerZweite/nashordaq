@@ -36,15 +36,15 @@ export default function App() {
 
   const { data: user } = useUser();
   const onboardingComplete = user?.onboarding_complete ?? false;
+  const isSpectator = user?.role === "spectator";
   const { data: players, isLoading: playersLoading } = usePlayers();
   const { data: portfolio } = usePortfolio(onboardingComplete);
-  const { data: orders } = useOrders(onboardingComplete);
-  const { data: recentOrders } = useRecentOrders(onboardingComplete);
+  const { data: orders } = useOrders(Boolean(user));
+  const { data: recentOrders } = useRecentOrders(Boolean(user));
   const { data: leaderboard } = useLeaderboard();
   const updateUserProfile = useUpdateUserProfile();
 
   const balance = user?.balance ?? 0;
-  const isSpectator = user?.role === "spectator";
   const canTrade =
     Boolean(user) && user?.role === "player" && onboardingComplete;
 
@@ -197,6 +197,7 @@ export default function App() {
           <OrderHistory
             ownOrders={orders ?? []}
             allOrders={recentOrders ?? []}
+            defaultView={isSpectator ? "all" : "own"}
           />
         </div>
       </main>
