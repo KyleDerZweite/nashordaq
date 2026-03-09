@@ -4,6 +4,7 @@ import MarketGrid from "./components/MarketGrid";
 import Portfolio from "./components/Portfolio";
 import Leaderboard from "./components/Leaderboard";
 import OrderHistory from "./components/OrderHistory";
+import PlayerProfileModal from "./components/PlayerProfileModal";
 import TradeTerminal from "./components/TradeTerminal";
 import OnboardingModal from "./components/OnboardingModal";
 import type { OrderSide } from "./types";
@@ -14,7 +15,9 @@ import {
   usePlayers,
   usePortfolio,
   useOrders,
+  useRecentOrders,
   useLeaderboard,
+  useUpdateUserProfile,
 } from "./api";
 
 interface TradeTarget {
@@ -27,13 +30,16 @@ type TickerSortMode = "value" | "name";
 export default function App() {
   const [trade, setTrade] = useState<TradeTarget | null>(null);
   const [tickerSortMode, setTickerSortMode] = useState<TickerSortMode>("value");
+  const [isProfileEditorOpen, setIsProfileEditorOpen] = useState(false);
 
   const { data: user } = useUser();
   const onboardingComplete = user?.onboarding_complete ?? false;
   const { data: players, isLoading: playersLoading } = usePlayers();
   const { data: portfolio } = usePortfolio(onboardingComplete);
   const { data: orders } = useOrders(onboardingComplete);
+  const { data: recentOrders } = useRecentOrders(onboardingComplete);
   const { data: leaderboard } = useLeaderboard();
+  const updateUserProfile = useUpdateUserProfile();
 
   const balance = user?.balance ?? 0;
   const isSpectator = user?.role === "spectator";
@@ -42,6 +48,10 @@ export default function App() {
 
   const tradePlayer =
     trade && players ? players.find((p) => p.id === trade.playerId) : null;
+  const linkedPlayer =
+    user?.linked_player_id && players
+      ? players.find((player) => player.id === user.linked_player_id)
+      : null;
 
   const sortedTickerPlayers = useMemo(() => {
     if (!players) {
@@ -67,9 +77,15 @@ export default function App() {
 
   return (
     <div className="flex min-h-screen flex-col bg-hex-bg">
-      <Header balance={balance} username={user?.username} />
+      <Header
+        balance={balance}
+        username={user?.username}
+        playerDisplayName={linkedPlayer?.display_name}
+        canEditProfile={Boolean(linkedPlayer) && !isSpectator}
+        onEditProfile={() => setIsProfileEditorOpen(true)}
+      />
 
-      <main className="mx-auto w-full max-w-7xl flex-1 px-6 py-8">
+      <main className="mx-auto w-full max-w-[88rem] flex-1 px-6 py-8">
         {/* Market ticker bar */}
         {players && players.length > 0 && (
           <div className="mb-8 overflow-hidden border-2 border-hex-border bg-hex-bg-alt">
@@ -168,7 +184,10 @@ export default function App() {
 
         {/* Order history */}
         <div className="mt-6">
-          <OrderHistory orders={orders ?? []} />
+          <OrderHistory
+            ownOrders={orders ?? []}
+            allOrders={recentOrders ?? []}
+          />
         </div>
       </main>
 
@@ -184,6 +203,32 @@ export default function App() {
           side={trade.side}
           balance={balance}
           onClose={() => setTrade(null)}
+        />
+      )}
+
+      {isProfileEditorOpen && linkedPlayer && (
+        <PlayerProfileModal
+          key={`${linkedPlayer.id}-${linkedPlayer.game_name}-${linkedPlayer.tag_line}-${linkedPlayer.display_name}`}
+          title="Update Your Summoner Profile"
+          description="Change your Riot game name, tag line, or display name."
+          submitLabel="Save Changes"
+          initialValues={{
+            game_name: linkedPlayer.game_name,
+            tag_line: linkedPlayer.tag_line,
+            display_name: linkedPlayer.display_name,
+          }}
+          isPending={updateUserProfile.isPending}
+          errorMessage={
+            updateUserProfile.isError
+              ? updateUserProfile.error.message
+              : undefined
+          }
+          onSubmit={(body) => {
+            updateUserProfile.mutate(body, {
+              onSuccess: () => setIsProfileEditorOpen(false),
+            });
+          }}
+          onClose={() => setIsProfileEditorOpen(false)}
         />
       )}
 

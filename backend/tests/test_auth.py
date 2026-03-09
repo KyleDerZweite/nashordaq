@@ -167,3 +167,85 @@ async def test_onboarding_initializes_market_price(auth_client, monkeypatch):
     assert player_detail_resp.status_code == 200
     player_detail = player_detail_resp.json()
     assert player_detail["lp_abs"] == 3200
+
+
+async def test_update_profile(auth_client):
+    onboard_resp = await auth_client.post(
+        "/api/user/onboarding",
+        json={
+            "game_name": "beforeupdate",
+            "tag_line": "EUW",
+            "display_name": "Before Update",
+        },
+    )
+    assert onboard_resp.status_code == 200
+
+    update_resp = await auth_client.put(
+        "/api/user/profile",
+        json={
+            "game_name": "afterupdate",
+            "tag_line": "EUW",
+            "display_name": "After Update",
+        },
+    )
+    assert update_resp.status_code == 200
+
+    players_resp = await auth_client.get("/api/market/players")
+    assert players_resp.status_code == 200
+    players = players_resp.json()
+    assert players[0]["game_name"] == "afterupdate"
+    assert players[0]["display_name"] == "After Update"
+
+
+async def test_update_profile_duplicate_player_rejected(auth_client):
+    first = await auth_client.post(
+        "/api/user/onboarding",
+        json={
+            "game_name": "firstplayer",
+            "tag_line": "EUW",
+            "display_name": "First Player",
+        },
+    )
+    assert first.status_code == 200
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(
+        transport=transport,
+        base_url="http://test",
+        headers={"Remote-User": "seconduser"},
+    ) as second_user_client:
+        second = await second_user_client.post(
+            "/api/user/onboarding",
+            json={
+                "game_name": "secondplayer",
+                "tag_line": "EUW",
+                "display_name": "Second Player",
+            },
+        )
+        assert second.status_code == 200
+
+        update_resp = await second_user_client.put(
+            "/api/user/profile",
+            json={
+                "game_name": "firstplayer",
+                "tag_line": "EUW",
+                "display_name": "Collision",
+            },
+        )
+
+    assert update_resp.status_code == 409
+
+
+async def test_spectator_user_profile_update_blocked(auth_client, monkeypatch):
+    monkeypatch.setattr(settings, "spectator_remote_user", "testuser")
+
+    update_resp = await auth_client.put(
+        "/api/user/profile",
+        json={
+            "game_name": "viewer",
+            "tag_line": "EUW",
+            "display_name": "Viewer",
+        },
+    )
+    assert update_resp.status_code == 403
+    assert update_resp.json()["detail"] == "Spectator users cannot edit their profile"

@@ -1,4 +1,4 @@
-export { get, post, del } from "./client";
+export { get, post, put, del } from "./client";
 export {
   queryKeys,
   useUser,
@@ -6,8 +6,10 @@ export {
   usePlayer,
   usePortfolio,
   useOrders,
+  useRecentOrders,
   useLeaderboard,
   usePlaceOrder,
   useCancelOrder,
   useCompleteOnboarding,
+  useUpdateUserProfile,
 } from "./hooks";

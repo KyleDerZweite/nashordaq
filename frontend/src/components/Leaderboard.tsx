@@ -44,7 +44,9 @@ export default function Leaderboard({ entries }: Props) {
                         ? "border-hex-gold bg-hex-gold text-hex-bg"
                         : e.rank === 2
                           ? "border-hex-bronze text-hex-bronze"
-                          : "border-hex-border text-hex-border"
+                          : e.rank === 3
+                            ? "border-[#CD7F32] text-[#CD7F32]"
+                            : "border-hex-border text-hex-border"
                     }`}
                   >
                     {e.rank}

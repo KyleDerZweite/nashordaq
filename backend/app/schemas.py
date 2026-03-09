@@ -25,6 +25,12 @@ class UserOnboardingCreate(BaseModel):
     display_name: str = Field(min_length=1, max_length=255)
 
 
+class UserProfileUpdate(BaseModel):
+    game_name: str = Field(min_length=1, max_length=255)
+    tag_line: str = Field(min_length=1, max_length=10)
+    display_name: str = Field(min_length=1, max_length=255)
+
+
 class PriceHistoryEntry(BaseModel):
     price: float
     lp_abs: int
@@ -58,6 +64,7 @@ class OrderResponse(BaseModel):
     id: int
     player_id: int
     player_name: str
+    user_name: str | None = None
     side: OrderSide
     quantity: int
     status: OrderStatus

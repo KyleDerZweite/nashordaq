@@ -23,6 +23,12 @@ export interface UserOnboardingCreate {
   display_name: string;
 }
 
+export interface UserProfileUpdate {
+  game_name: string;
+  tag_line: string;
+  display_name: string;
+}
+
 export interface PriceHistoryEntry {
   price: number;
   lp_abs: number;
@@ -56,6 +62,7 @@ export interface OrderResponse {
   id: number;
   player_id: number;
   player_name: string;
+  user_name: string | null;
   side: OrderSide;
   quantity: number;
   status: OrderStatus;

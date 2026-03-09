@@ -1,9 +1,11 @@
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
 
 from app.config import settings
+from app.main import app
 from app.models import HoldingLot, Order, OrderStatus, TrackedPlayer
 
 
@@ -198,6 +200,7 @@ async def test_list_orders(auth_client, seeded_player):
     resp = await auth_client.get("/api/orders")
     assert resp.status_code == 200
     assert len(resp.json()) == 2
+    assert resp.json()[0]["user_name"] == "Test Player"
 
 
 async def test_list_orders_filter_status(auth_client, seeded_player):
@@ -228,6 +231,52 @@ async def test_list_orders_filter_status_reverted(auth_client, seeded_player):
     assert resp.status_code == 200
     assert len(resp.json()) == 1
     assert resp.json()[0]["status"] == "REVERTED"
+
+
+async def test_list_recent_orders_includes_all_players(auth_client, seeded_player):
+    await auth_client.post(
+        "/api/orders",
+        json={"player_id": seeded_player.id, "side": "BUY", "quantity": 1},
+    )
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(
+        transport=transport,
+        base_url="http://test",
+        headers={"Remote-User": "seconduser"},
+    ) as second_user_client:
+        second_onboarding = await second_user_client.post(
+            "/api/user/onboarding",
+            json={
+                "game_name": "secondrecent",
+                "tag_line": "EUW",
+                "display_name": "Second Recent",
+            },
+        )
+        assert second_onboarding.status_code == 200
+
+        recent_players_resp = await second_user_client.get("/api/market/players")
+        recent_players = recent_players_resp.json()
+        test_player = next(
+            player
+            for player in recent_players
+            if player["display_name"] == "Test Player"
+        )
+        buy_resp = await second_user_client.post(
+            "/api/orders",
+            json={"player_id": test_player["id"], "side": "BUY", "quantity": 1},
+        )
+        assert buy_resp.status_code == 201
+
+        recent_resp = await second_user_client.get("/api/orders/recent")
+
+    assert recent_resp.status_code == 200
+    data = recent_resp.json()
+    assert len(data) >= 2
+    assert {entry["user_name"] for entry in data[:2]} == {
+        "Test Player",
+        "Second Recent",
+    }
 
 
 async def test_sell_applies_short_hold_fee(auth_client, seeded_player, db_session):

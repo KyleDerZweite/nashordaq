@@ -12,12 +12,31 @@ from app.database import get_session
 from app.models import PriceHistory, TrackedPlayer, User
 from app.pricing import calculate_ipo_price, calculate_lp_abs, generate_gamma_base
 from app.riot import PlayerNotFoundError, RateLimitedError, get_rank
-from app.schemas import UserOnboardingCreate, UserResponse
+from app.schemas import UserOnboardingCreate, UserProfileUpdate, UserResponse
 
 router = APIRouter(tags=["user"])
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 logger = logging.getLogger(__name__)
+
+
+def _normalize_player_identity(
+    game_name: str,
+    tag_line: str,
+    display_name: str,
+) -> tuple[str, str, str]:
+    normalized_game_name = game_name.strip()
+    normalized_tag_line = tag_line.strip().lstrip("#")
+    normalized_display_name = display_name.strip()
+
+    if (
+        not normalized_game_name
+        or not normalized_tag_line
+        or not normalized_display_name
+    ):
+        raise HTTPException(status_code=400, detail="All fields are required")
+
+    return normalized_game_name, normalized_tag_line, normalized_display_name
 
 
 async def _initialize_player_market_state(
@@ -118,12 +137,11 @@ async def complete_onboarding(
     if user.linked_player_id is not None:
         raise HTTPException(status_code=409, detail="Onboarding already completed")
 
-    game_name = body.game_name.strip()
-    tag_line = body.tag_line.strip().lstrip("#")
-    display_name = body.display_name.strip()
-
-    if not game_name or not tag_line or not display_name:
-        raise HTTPException(status_code=400, detail="All fields are required")
+    game_name, tag_line, display_name = _normalize_player_identity(
+        body.game_name,
+        body.tag_line,
+        body.display_name,
+    )
 
     existing_result = await session.execute(
         select(TrackedPlayer).where(
@@ -151,6 +169,53 @@ async def complete_onboarding(
         raise HTTPException(status_code=409, detail="Player is already linked")
 
     user.linked_player_id = player.id
+    await _initialize_player_market_state(request, session, player)
+    await session.commit()
+    await session.refresh(user)
+    return _to_user_response(user)
+
+
+@router.put("/user/profile", response_model=UserResponse)
+async def update_profile(
+    body: UserProfileUpdate,
+    request: Request,
+    user: CurrentUser,
+    session: SessionDep,
+) -> UserResponse:
+    if is_spectator_user(user):
+        raise HTTPException(
+            status_code=403,
+            detail="Spectator users cannot edit their profile",
+        )
+
+    if user.linked_player_id is None:
+        raise HTTPException(status_code=403, detail="Complete onboarding first")
+
+    player = await session.get(TrackedPlayer, user.linked_player_id)
+    if player is None:
+        raise HTTPException(status_code=404, detail="Linked player not found")
+
+    game_name, tag_line, display_name = _normalize_player_identity(
+        body.game_name,
+        body.tag_line,
+        body.display_name,
+    )
+
+    existing_result = await session.execute(
+        select(TrackedPlayer).where(
+            TrackedPlayer.game_name == game_name,
+            TrackedPlayer.tag_line == tag_line,
+            TrackedPlayer.id != player.id,
+        )
+    )
+    existing_player = existing_result.scalar_one_or_none()
+    if existing_player is not None:
+        raise HTTPException(status_code=409, detail="Player is already tracked")
+
+    player.game_name = game_name
+    player.tag_line = tag_line
+    player.display_name = display_name
+
     await _initialize_player_market_state(request, session, player)
     await session.commit()
     await session.refresh(user)

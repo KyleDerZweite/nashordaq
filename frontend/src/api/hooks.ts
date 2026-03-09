@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { get, post, del } from "./client";
+import { get, post, put, del } from "./client";
 import type {
   UserResponse,
   PlayerSummary,
@@ -7,6 +7,7 @@ import type {
   OrderResponse,
   OrderCreate,
   UserOnboardingCreate,
+  UserProfileUpdate,
   PortfolioResponse,
   LeaderboardEntry,
 } from "../types";
@@ -19,6 +20,7 @@ export const queryKeys = {
   player: (id: number) => ["player", id] as const,
   portfolio: ["portfolio"] as const,
   orders: ["orders"] as const,
+  recentOrders: ["recentOrders"] as const,
   leaderboard: ["leaderboard"] as const,
 };
 
@@ -64,6 +66,15 @@ export function useOrders(enabled = true) {
   });
 }
 
+export function useRecentOrders(enabled = true) {
+  return useQuery<OrderResponse[]>({
+    queryKey: queryKeys.recentOrders,
+    queryFn: () => get<OrderResponse[]>("/orders/recent"),
+    enabled,
+    refetchInterval: 15_000,
+  });
+}
+
 export function useLeaderboard() {
   return useQuery<LeaderboardEntry[]>({
     queryKey: queryKeys.leaderboard,
@@ -80,6 +91,7 @@ export function usePlaceOrder() {
     mutationFn: (body) => post<OrderResponse>("/orders", body),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: queryKeys.orders });
+      void qc.invalidateQueries({ queryKey: queryKeys.recentOrders });
       void qc.invalidateQueries({ queryKey: queryKeys.portfolio });
       void qc.invalidateQueries({ queryKey: queryKeys.user });
     },
@@ -92,6 +104,7 @@ export function useCancelOrder() {
     mutationFn: (orderId) => del<OrderResponse>(`/orders/${orderId}`),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: queryKeys.orders });
+      void qc.invalidateQueries({ queryKey: queryKeys.recentOrders });
       void qc.invalidateQueries({ queryKey: queryKeys.portfolio });
       void qc.invalidateQueries({ queryKey: queryKeys.user });
     },
@@ -108,6 +121,23 @@ export function useCompleteOnboarding() {
       void qc.invalidateQueries({ queryKey: queryKeys.players });
       void qc.invalidateQueries({ queryKey: queryKeys.portfolio });
       void qc.invalidateQueries({ queryKey: queryKeys.orders });
+      void qc.invalidateQueries({ queryKey: queryKeys.recentOrders });
+      void qc.invalidateQueries({ queryKey: queryKeys.leaderboard });
+    },
+  });
+}
+
+export function useUpdateUserProfile() {
+  const qc = useQueryClient();
+  return useMutation<UserResponse, Error, UserProfileUpdate>({
+    mutationFn: (body) => put<UserResponse>("/user/profile", body),
+    onSuccess: async (user) => {
+      qc.setQueryData(queryKeys.user, user);
+      await qc.refetchQueries({ queryKey: queryKeys.user });
+      void qc.invalidateQueries({ queryKey: queryKeys.players });
+      void qc.invalidateQueries({ queryKey: queryKeys.portfolio });
+      void qc.invalidateQueries({ queryKey: queryKeys.orders });
+      void qc.invalidateQueries({ queryKey: queryKeys.recentOrders });
       void qc.invalidateQueries({ queryKey: queryKeys.leaderboard });
     },
   });

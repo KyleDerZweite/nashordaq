@@ -16,6 +16,7 @@ from app.models import (
     OrderStatus,
     TrackedPlayer,
     Transaction,
+    User,
 )
 from app.pricing import calculate_sell_multiplier
 from app.schemas import OrderCreate, OrderResponse
@@ -53,11 +54,16 @@ def _pending_sells_query(user_id: int, player_id: int) -> Select[tuple[Order]]:
     )
 
 
-def _order_response(order: Order, player_name: str) -> OrderResponse:
+def _order_response(
+    order: Order,
+    player_name: str,
+    user_name: str | None = None,
+) -> OrderResponse:
     return OrderResponse(
         id=order.id,
         player_id=order.player_id,
         player_name=player_name,
+        user_name=user_name,
         side=order.side,
         quantity=order.quantity,
         status=order.status,
@@ -65,6 +71,51 @@ def _order_response(order: Order, player_name: str) -> OrderResponse:
         created_at=order.created_at,
         executed_at=order.executed_at,
     )
+
+
+async def _build_order_responses(
+    session: AsyncSession,
+    orders: list[Order],
+) -> list[OrderResponse]:
+    if not orders:
+        return []
+
+    player_ids = {o.player_id for o in orders}
+    user_ids = {o.user_id for o in orders}
+
+    players_result = await session.execute(
+        select(TrackedPlayer).where(TrackedPlayer.id.in_(player_ids))
+    )
+    player_map = {p.id: p.display_name for p in players_result.scalars()}
+
+    users_result = await session.execute(select(User).where(User.id.in_(user_ids)))
+    users = users_result.scalars().all()
+    linked_player_ids = {
+        user.linked_player_id for user in users if user.linked_player_id
+    }
+    linked_players_result = await session.execute(
+        select(TrackedPlayer).where(TrackedPlayer.id.in_(linked_player_ids))
+    )
+    linked_player_name_map = {
+        player.id: player.display_name for player in linked_players_result.scalars()
+    }
+    user_name_map = {
+        user.id: (
+            linked_player_name_map.get(user.linked_player_id, user.username)
+            if user.linked_player_id is not None
+            else user.username
+        )
+        for user in users
+    }
+
+    return [
+        _order_response(
+            order,
+            player_map.get(order.player_id, ""),
+            user_name_map.get(order.user_id),
+        )
+        for order in orders
+    ]
 
 
 @router.post("/orders", response_model=OrderResponse, status_code=201)
@@ -240,13 +291,22 @@ async def list_orders(
     result = await session.execute(stmt)
     orders = result.scalars().all()
 
-    player_ids = {o.player_id for o in orders}
-    players_result = await session.execute(
-        select(TrackedPlayer).where(TrackedPlayer.id.in_(player_ids))
-    )
-    player_map = {p.id: p.display_name for p in players_result.scalars()}
+    return await _build_order_responses(session, orders)
 
-    return [_order_response(o, player_map.get(o.player_id, "")) for o in orders]
+
+@router.get("/orders/recent", response_model=list[OrderResponse])
+async def list_recent_orders(
+    user: CurrentOnboardedUser,
+    session: SessionDep,
+    limit: int = Query(default=100, ge=1, le=500),  # noqa: B008
+) -> list[OrderResponse]:
+    del user
+
+    result = await session.execute(
+        select(Order).order_by(Order.created_at.desc()).limit(limit)
+    )
+    orders = result.scalars().all()
+    return await _build_order_responses(session, orders)
 
 
 @router.delete("/orders/{order_id}", response_model=OrderResponse)

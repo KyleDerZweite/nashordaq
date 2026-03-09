@@ -1,38 +1,68 @@
+import { useMemo, useState } from "react";
 import type { OrderResponse } from "../types";
 import { useCancelOrder } from "../api";
 import { formatAmount } from "../utils/format";
 
 interface Props {
-  orders: OrderResponse[];
+  ownOrders: OrderResponse[];
+  allOrders: OrderResponse[];
 }
 
-export default function OrderHistory({ orders }: Props) {
+type OrderHistoryView = "own" | "all";
+
+export default function OrderHistory({ ownOrders, allOrders }: Props) {
   const cancelOrder = useCancelOrder();
+  const [view, setView] = useState<OrderHistoryView>("own");
+
+  const orders = useMemo(
+    () => (view === "own" ? ownOrders : allOrders),
+    [allOrders, ownOrders, view],
+  );
+
+  const showScrollbar = orders.length > 30;
 
   return (
     <section className="border-2 border-hex-gold-dim bg-hex-panel">
-      <div className="border-b-2 border-hex-gold-dim px-5 py-3">
+      <div className="flex items-center justify-between border-b-2 border-hex-gold-dim px-5 py-3">
         <h2 className="font-serif text-xl font-bold text-hex-gold">
           Recent Orders
         </h2>
+        <button
+          type="button"
+          onClick={() =>
+            setView((current) => (current === "own" ? "all" : "own"))
+          }
+          className="border border-hex-gold px-3 py-1 font-mono text-xs font-bold uppercase tracking-wider text-hex-gold transition-colors hover:bg-hex-gold hover:text-hex-bg"
+        >
+          {view === "own" ? "Show All" : "Show Own"}
+        </button>
       </div>
 
-      <div className="overflow-x-auto">
+      <div
+        className={`overflow-x-auto ${showScrollbar ? "max-h-[48rem] overflow-y-auto" : ""}`}
+      >
         <table className="w-full">
           <thead>
             <tr className="border-b-2 border-hex-border text-left">
-              {["ID", "Player", "Side", "Qty", "Price", "Status", ""].map(
-                (col) => (
-                  <th
-                    key={col || "action"}
-                    className={`px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider text-hex-bronze ${
-                      ["Qty", "Price"].includes(col) ? "text-right" : ""
-                    }`}
-                  >
-                    {col}
-                  </th>
-                ),
-              )}
+              {[
+                "ID",
+                "Stock",
+                ...(view === "all" ? ["Player"] : []),
+                "Side",
+                "Qty",
+                "Price",
+                "Status",
+                "",
+              ].map((col) => (
+                <th
+                  key={col || "action"}
+                  className={`px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider text-hex-bronze ${
+                    ["Qty", "Price"].includes(col) ? "text-right" : ""
+                  }`}
+                >
+                  {col}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
@@ -47,6 +77,11 @@ export default function OrderHistory({ orders }: Props) {
                 <td className="px-4 py-2.5 font-mono text-sm text-hex-white">
                   {o.player_name}
                 </td>
+                {view === "all" && (
+                  <td className="px-4 py-2.5 font-mono text-sm text-hex-bronze">
+                    {o.user_name ?? "--"}
+                  </td>
+                )}
                 <td className="px-4 py-2.5">
                   <span
                     className={`inline-block border-2 px-2 py-0.5 font-mono text-xs font-bold ${
@@ -82,16 +117,17 @@ export default function OrderHistory({ orders }: Props) {
                   </span>
                 </td>
                 <td className="px-4 py-2.5">
-                  {(o.status === "PENDING" ||
-                    (o.status === "EXECUTED" && o.side === "BUY")) && (
-                    <button
-                      onClick={() => cancelOrder.mutate(o.id)}
-                      disabled={cancelOrder.isPending}
-                      className="font-mono text-xs font-bold text-hex-zaun transition-colors hover:text-hex-white"
-                    >
-                      {o.status === "PENDING" ? "Cancel" : "Revert"}
-                    </button>
-                  )}
+                  {view === "own" &&
+                    (o.status === "PENDING" ||
+                      (o.status === "EXECUTED" && o.side === "BUY")) && (
+                      <button
+                        onClick={() => cancelOrder.mutate(o.id)}
+                        disabled={cancelOrder.isPending}
+                        className="font-mono text-xs font-bold text-hex-zaun transition-colors hover:text-hex-white"
+                      >
+                        {o.status === "PENDING" ? "Cancel" : "Revert"}
+                      </button>
+                    )}
                 </td>
               </tr>
             ))}
