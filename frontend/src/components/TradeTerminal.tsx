@@ -22,6 +22,8 @@ export default function TradeTerminal({
   const estimatedTotal = player.current_price * quantity;
   const canAfford = side === "BUY" ? balance >= estimatedTotal : true;
   const isBuy = side === "BUY";
+  const hasInitialUpdate = player.last_updated !== null;
+  const canSubmit = canAfford && (!isBuy || hasInitialUpdate);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -106,14 +108,21 @@ export default function TradeTerminal({
             </p>
           )}
 
+          {isBuy && !hasInitialUpdate && (
+            <p className="font-mono text-xs text-hex-bronze">
+              Buying is locked until this stock receives its first market
+              update.
+            </p>
+          )}
+
           {/* Submit */}
           <button
             type="submit"
-            disabled={!canAfford || placeOrder.isPending}
+            disabled={!canSubmit || placeOrder.isPending}
             className={`w-full border-2 py-2.5 font-mono text-sm font-bold uppercase tracking-wider transition-colors ${
               placeOrder.isPending
                 ? "border-hex-magic bg-hex-magic/20 text-hex-magic"
-                : canAfford
+                : canSubmit
                   ? isBuy
                     ? "border-hex-magic bg-transparent text-hex-magic hover:bg-hex-magic hover:text-hex-bg"
                     : "border-hex-zaun bg-transparent text-hex-zaun hover:bg-hex-zaun hover:text-hex-bg"

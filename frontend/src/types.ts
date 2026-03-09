@@ -9,6 +9,7 @@ export type OrderStatus = "PENDING" | "EXECUTED" | "CANCELLED" | "REVERTED";
 export interface UserResponse {
   id: number;
   username: string;
+  role: "player" | "spectator";
   balance: number;
   linked_player_id: number | null;
   onboarding_complete: boolean;
@@ -76,7 +77,7 @@ export interface PortfolioResponse {
 }
 
 export interface LeaderboardEntry {
-  username: string;
+  game_name: string;
   total_value: number;
   rank: number;
 }

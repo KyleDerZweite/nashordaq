@@ -29,6 +29,7 @@ NEWT_SECRET=your-newt-secret
 | Variable | Default | Description |
 |---|---|---|
 | `NASHORDAQ_AUTH_HEADER` | `Remote-User` | Header containing the authenticated username |
+| `NASHORDAQ_SPECTATOR_REMOTE_USER` | unset | Authenticated username that should be treated as spectator-only |
 | `NASHORDAQ_STARTING_BALANCE` | `10000.0` | Initial balance for new users |
 | `NASHORDAQ_ENFORCE_TRUSTED_PROXY` | `false` | Reject auth headers from non-trusted source IPs |
 | `NASHORDAQ_TRUSTED_PROXY_CIDRS` | `127.0.0.1/32,::1/128` | Allowed proxy CIDR ranges (when enforcement is on) |
@@ -47,6 +48,8 @@ The scheduler wakes every 30 seconds internally and runs immediately on startup,
 ## 2. Tracked Players
 
 Tracked players are created through user self-onboarding. On first authenticated visit, each user must enter their own Riot `game_name`, `tag_line`, and `display_name`. After submission, their linked Riot account is added to the tracked player set.
+
+Players cannot be bought until they have received their first successful market update. This avoids trading against the placeholder pre-update price.
 
 This replaces static player seeding and does not require editing JSON files during deployment.
 

@@ -1,13 +1,17 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
 from app.models import OrderSide, OrderStatus
 
+UserRole = Literal["player", "spectator"]
+
 
 class UserResponse(BaseModel):
     id: int
     username: str
+    role: UserRole
     balance: float
     linked_player_id: int | None
     onboarding_complete: bool
@@ -75,6 +79,6 @@ class PortfolioResponse(BaseModel):
 
 
 class LeaderboardEntry(BaseModel):
-    username: str
+    game_name: str
     total_value: float
     rank: int

@@ -4,9 +4,14 @@ import PlayerCard from "./PlayerCard";
 interface Props {
   players: PlayerSummary[];
   onTrade: (playerId: number, side: OrderSide) => void;
+  canTrade?: boolean;
 }
 
-export default function MarketGrid({ players, onTrade }: Props) {
+export default function MarketGrid({
+  players,
+  onTrade,
+  canTrade = true,
+}: Props) {
   return (
     <section>
       <div className="mb-4 flex items-baseline justify-between border-b-2 border-hex-border pb-2">
@@ -17,7 +22,12 @@ export default function MarketGrid({ players, onTrade }: Props) {
       </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {players.map((p) => (
-          <PlayerCard key={p.id} player={p} onTrade={onTrade} />
+          <PlayerCard
+            key={p.id}
+            player={p}
+            onTrade={onTrade}
+            canTrade={canTrade}
+          />
         ))}
       </div>
     </section>

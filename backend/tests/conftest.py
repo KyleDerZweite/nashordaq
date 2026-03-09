@@ -1,4 +1,5 @@
 import os
+from datetime import UTC, datetime
 
 os.environ.setdefault("NASHORDAQ_RIOT_API_KEY", "test-api-key")
 os.environ.setdefault("NASHORDAQ_RIOT_API_BASE_URL", "https://europe.api.riotgames.com")
@@ -14,6 +15,19 @@ from app.config import settings
 from app.database import get_session
 from app.main import app
 from app.models import Base, TrackedPlayer, User
+from app.routers import user as user_router
+
+
+@pytest.fixture(autouse=True)
+def stub_initial_player_refresh(monkeypatch):
+    async def _noop_initialize_player_market_state(request, session, player):
+        return None
+
+    monkeypatch.setattr(
+        user_router,
+        "_initialize_player_market_state",
+        _noop_initialize_player_market_state,
+    )
 
 
 @pytest.fixture
@@ -75,6 +89,7 @@ async def seeded_player(db_session):
         current_price=25.0,
         lp_abs=1500,
         previous_lp_abs=1400,
+        last_updated=datetime.now(UTC),
     )
     db_session.add(player)
     await db_session.commit()

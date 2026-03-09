@@ -83,6 +83,12 @@ async def place_order(
     now = datetime.now(UTC)
 
     if body.side == OrderSide.BUY:
+        if player.last_updated is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Player has not received a first market update yet",
+            )
+
         execution_price = player.current_price
         total_cost = execution_price * body.quantity
         if user.balance < total_cost:

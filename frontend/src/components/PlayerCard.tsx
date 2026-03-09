@@ -4,9 +4,16 @@ import { formatAmount } from "../utils/format";
 interface Props {
   player: PlayerSummary;
   onTrade: (playerId: number, side: OrderSide) => void;
+  canTrade?: boolean;
 }
 
-export default function PlayerCard({ player, onTrade }: Props) {
+export default function PlayerCard({
+  player,
+  onTrade,
+  canTrade = true,
+}: Props) {
+  const canBuy = canTrade && player.last_updated !== null;
+
   return (
     <article className="group border-2 border-hex-gold-dim/40 bg-hex-panel p-5 transition-shadow hover:shadow-brutal">
       {/* Top row: name + tag */}
@@ -47,18 +54,34 @@ export default function PlayerCard({ player, onTrade }: Props) {
       {/* Action row */}
       <div className="mt-4 flex gap-2">
         <button
+          disabled={!canBuy}
           onClick={() => onTrade(player.id, "BUY")}
-          className="flex-1 border-2 border-hex-magic bg-transparent py-1.5 font-mono text-xs font-bold uppercase tracking-wider text-hex-magic transition-colors hover:bg-hex-magic hover:text-hex-bg"
+          className={`flex-1 border-2 py-1.5 font-mono text-xs font-bold uppercase tracking-wider transition-colors ${
+            canBuy
+              ? "border-hex-magic bg-transparent text-hex-magic hover:bg-hex-magic hover:text-hex-bg"
+              : "cursor-not-allowed border-hex-border text-hex-border"
+          }`}
         >
-          Buy
+          {!canTrade ? "Spectator" : canBuy ? "Buy" : "Awaiting Update"}
         </button>
         <button
+          disabled={!canTrade}
           onClick={() => onTrade(player.id, "SELL")}
-          className="flex-1 border-2 border-hex-zaun bg-transparent py-1.5 font-mono text-xs font-bold uppercase tracking-wider text-hex-zaun transition-colors hover:bg-hex-zaun hover:text-hex-bg"
+          className={`flex-1 border-2 py-1.5 font-mono text-xs font-bold uppercase tracking-wider transition-colors ${
+            canTrade
+              ? "border-hex-zaun bg-transparent text-hex-zaun hover:bg-hex-zaun hover:text-hex-bg"
+              : "cursor-not-allowed border-hex-border text-hex-border"
+          }`}
         >
           Sell
         </button>
       </div>
+
+      {player.last_updated === null && (
+        <p className="mt-3 font-mono text-xs text-hex-bronze">
+          Buying unlocks after the first market update.
+        </p>
+      )}
     </article>
   );
 }

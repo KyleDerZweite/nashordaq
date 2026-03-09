@@ -1,23 +1,98 @@
+import logging
+from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import CurrentUser
+from app.auth import CurrentUser, get_user_role, is_spectator_user
+from app.config import settings
 from app.database import get_session
-from app.models import TrackedPlayer, User
+from app.models import PriceHistory, TrackedPlayer, User
+from app.pricing import calculate_ipo_price, calculate_lp_abs, generate_gamma_base
+from app.riot import PlayerNotFoundError, RateLimitedError, get_rank
 from app.schemas import UserOnboardingCreate, UserResponse
 
 router = APIRouter(tags=["user"])
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
+logger = logging.getLogger(__name__)
+
+
+async def _initialize_player_market_state(
+    request: Request,
+    session: AsyncSession,
+    player: TrackedPlayer,
+) -> None:
+    try:
+        rank_data = await get_rank(
+            client=request.app.state.http_client,
+            base_url=settings.riot_api_base_url,
+            region_url=settings.riot_api_region_url,
+            api_key=settings.riot_api_key,
+            game_name=player.game_name,
+            tag_line=player.tag_line,
+        )
+    except PlayerNotFoundError:
+        logger.warning(
+            "Onboarding completed without initial price refresh for %s#%s: "
+            "no ranked Riot data",
+            player.game_name,
+            player.tag_line,
+        )
+        return
+    except RateLimitedError:
+        logger.warning(
+            "Onboarding completed without initial price refresh for %s#%s: "
+            "Riot API rate limited",
+            player.game_name,
+            player.tag_line,
+        )
+        return
+    except Exception:
+        logger.exception(
+            "Onboarding completed without initial price refresh for %s#%s",
+            player.game_name,
+            player.tag_line,
+        )
+        return
+
+    player.puuid = rank_data.puuid
+    player.summoner_id = rank_data.summoner_id
+
+    new_lp_abs = calculate_lp_abs(
+        rank_data.tier,
+        rank_data.rank,
+        rank_data.league_points,
+    )
+    player.current_price = calculate_ipo_price(new_lp_abs)
+    player.lp_abs = new_lp_abs
+    player.previous_lp_abs = new_lp_abs
+    player.gamma_factor = generate_gamma_base(hash(player.puuid) % 10000)
+    player.last_updated = datetime.now(UTC)
+
+    session.add(
+        PriceHistory(
+            player_id=player.id,
+            price=player.current_price,
+            lp_abs=player.lp_abs,
+        )
+    )
+
+    logger.info(
+        "Initialized market price for %s#%s at %.2f",
+        player.game_name,
+        player.tag_line,
+        player.current_price,
+    )
 
 
 def _to_user_response(user: User) -> UserResponse:
     return UserResponse(
         id=user.id,
         username=user.username,
+        role=get_user_role(user.username),
         balance=user.balance,
         linked_player_id=user.linked_player_id,
         onboarding_complete=user.linked_player_id is not None,
@@ -33,9 +108,13 @@ async def get_me(user: CurrentUser) -> UserResponse:
 @router.post("/user/onboarding", response_model=UserResponse)
 async def complete_onboarding(
     body: UserOnboardingCreate,
+    request: Request,
     user: CurrentUser,
     session: SessionDep,
 ) -> UserResponse:
+    if is_spectator_user(user):
+        raise HTTPException(status_code=403, detail="Spectator users cannot onboard")
+
     if user.linked_player_id is not None:
         raise HTTPException(status_code=409, detail="Onboarding already completed")
 
@@ -72,6 +151,7 @@ async def complete_onboarding(
         raise HTTPException(status_code=409, detail="Player is already linked")
 
     user.linked_player_id = player.id
+    await _initialize_player_market_state(request, session, player)
     await session.commit()
     await session.refresh(user)
     return _to_user_response(user)

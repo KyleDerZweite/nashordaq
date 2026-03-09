@@ -30,6 +30,7 @@ class Settings(BaseSettings):
 
     # Auth (header injected by reverse proxy / Pangolin)
     auth_header: str = "Remote-User"
+    spectator_remote_user: str | None = None
     enforce_trusted_proxy: bool = False
     trusted_proxy_cidrs: str = "127.0.0.1/32,::1/128"
 

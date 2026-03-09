@@ -95,12 +95,17 @@ For defense-in-depth, enable trusted-proxy enforcement so direct backend request
 # Header injected by Pangolin (default: Remote-User)
 NASHORDAQ_AUTH_HEADER=Remote-User
 
+# Optional spectator account that can view but not onboard or trade
+NASHORDAQ_SPECTATOR_REMOTE_USER=admin@yourdomain.com
+
 # Optional hardening (recommended in production)
 NASHORDAQ_ENFORCE_TRUSTED_PROXY=true
 NASHORDAQ_TRUSTED_PROXY_CIDRS=10.89.0.0/16,127.0.0.1/32,::1/128
 ```
 
 Set `NASHORDAQ_TRUSTED_PROXY_CIDRS` to the CIDR(s) used by your proxy/tunnel containers on the Podman network.
+
+Newly tracked players cannot be bought until they receive their first successful market update, so users do not trade against the placeholder startup price.
 
 Riot API timeout behavior is also configurable:
 

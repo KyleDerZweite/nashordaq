@@ -66,7 +66,3 @@ pnpm run format            # Format (Prettier)
 pnpm run dev               # Dev server
 pnpm run build             # Production build
 ```
-
-## AGENTS.md
-
-**Read [`AGENTS.md`](AGENTS.md) before starting any work.**

@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy import select
 
 from app.config import settings
-from app.models import HoldingLot, Order, OrderStatus
+from app.models import HoldingLot, Order, OrderStatus, TrackedPlayer
 
 
 async def test_place_buy_order(auth_client, seeded_player):
@@ -33,6 +33,30 @@ async def test_place_buy_insufficient_balance(auth_client, seeded_player):
     )
     assert resp.status_code == 400
     assert "Insufficient balance" in resp.json()["detail"]
+
+
+async def test_place_buy_requires_first_market_update(
+    auth_client, seeded_player, db_session
+):
+    player = TrackedPlayer(
+        game_name="FreshPlayer",
+        tag_line="EUW",
+        display_name="Fresh Player",
+        current_price=10.0,
+        lp_abs=0,
+        previous_lp_abs=0,
+        last_updated=None,
+    )
+    db_session.add(player)
+    await db_session.commit()
+    await db_session.refresh(player)
+
+    resp = await auth_client.post(
+        "/api/orders",
+        json={"player_id": player.id, "side": "BUY", "quantity": 1},
+    )
+    assert resp.status_code == 400
+    assert resp.json()["detail"] == "Player has not received a first market update yet"
 
 
 async def test_place_sell_no_shares(auth_client, seeded_player):

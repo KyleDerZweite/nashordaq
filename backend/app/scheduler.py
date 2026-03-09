@@ -70,6 +70,10 @@ async def market_update_job() -> None:
         players = result.scalars().all()
         successful_player_updates = 0
 
+        if not players:
+            logger.info("Skipping market update; no tracked players exist yet")
+            return
+
         required_interval_minutes = max(1, len(players))
         now = datetime.now(UTC)
         if (
@@ -126,6 +130,12 @@ async def market_update_job() -> None:
                 player.lp_abs = new_lp_abs
                 player.previous_lp_abs = new_lp_abs
                 player.gamma_factor = generate_gamma_base(hash(player.puuid) % 10000)
+                logger.info(
+                    "Initialized price for %s#%s at %.2f",
+                    player.game_name,
+                    player.tag_line,
+                    player.current_price,
+                )
             else:
                 delta_lp = new_lp_abs - player.lp_abs
                 player.previous_lp_abs = player.lp_abs
@@ -136,6 +146,13 @@ async def market_update_job() -> None:
                     delta_lp,
                     player.streak,
                     player.gamma_factor,
+                )
+                logger.info(
+                    "Updated price for %s#%s to %.2f (delta_lp=%d)",
+                    player.game_name,
+                    player.tag_line,
+                    player.current_price,
+                    delta_lp,
                 )
 
             player.last_updated = datetime.now(UTC)
@@ -212,7 +229,9 @@ async def market_update_job() -> None:
                 successful_player_updates,
             )
         else:
-            logger.warning("Market cycle completed with no successful player updates")
+            logger.warning(
+                "Market cycle completed, but every tracked player refresh failed"
+            )
 
 
 def start_scheduler(app: FastAPI) -> None:

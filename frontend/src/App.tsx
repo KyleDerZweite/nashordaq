@@ -33,6 +33,9 @@ export default function App() {
   const { data: leaderboard } = useLeaderboard();
 
   const balance = user?.balance ?? 0;
+  const isSpectator = user?.role === "spectator";
+  const canTrade =
+    Boolean(user) && user?.role === "player" && onboardingComplete;
 
   const tradePlayer =
     trade && players ? players.find((p) => p.id === trade.playerId) : null;
@@ -74,6 +77,7 @@ export default function App() {
             <MarketGrid
               players={players ?? []}
               onTrade={(playerId, side) => setTrade({ playerId, side })}
+              canTrade={canTrade}
             />
           </div>
 
@@ -96,7 +100,7 @@ export default function App() {
       </footer>
 
       {/* Trade modal */}
-      {trade && tradePlayer && (
+      {trade && tradePlayer && canTrade && (
         <TradeTerminal
           player={tradePlayer}
           side={trade.side}
@@ -106,7 +110,13 @@ export default function App() {
       )}
 
       {/* First-login onboarding modal */}
-      {user && !user.onboarding_complete && <OnboardingModal />}
+      {isSpectator && (
+        <div className="pointer-events-none fixed bottom-4 right-4 border-2 border-hex-border bg-hex-panel px-3 py-2 font-mono text-xs uppercase tracking-wider text-hex-bronze">
+          Spectator Mode
+        </div>
+      )}
+
+      {user && !user.onboarding_complete && !isSpectator && <OnboardingModal />}
     </div>
   );
 }

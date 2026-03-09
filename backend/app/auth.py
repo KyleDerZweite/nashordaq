@@ -12,6 +12,7 @@ from app.database import get_session
 from app.models import User
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
+UserRole = str
 
 
 @lru_cache(maxsize=1)
@@ -37,6 +38,24 @@ def _is_trusted_proxy_request(request: Request) -> bool:
         client_ip in network
         for network in _trusted_proxy_networks(settings.trusted_proxy_cidrs)
     )
+
+
+def get_user_role(username: str) -> UserRole:
+    spectator_remote_user = settings.spectator_remote_user
+    if (
+        spectator_remote_user
+        and username.casefold() == spectator_remote_user.casefold()
+    ):
+        return "spectator"
+    return "player"
+
+
+def is_spectator_username(username: str) -> bool:
+    return get_user_role(username) == "spectator"
+
+
+def is_spectator_user(user: User) -> bool:
+    return is_spectator_username(user.username)
 
 
 async def _get_current_user(request: Request, session: SessionDep) -> User:
@@ -70,6 +89,9 @@ CurrentUser = Annotated[User, Depends(_get_current_user)]
 
 
 def _require_onboarded_user(user: CurrentUser) -> User:
+    if is_spectator_user(user):
+        raise HTTPException(status_code=403, detail="Spectator users cannot trade")
+
     if user.linked_player_id is None:
         raise HTTPException(status_code=403, detail="Complete onboarding first")
     return user

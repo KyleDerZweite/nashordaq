@@ -2,6 +2,7 @@ from httpx import ASGITransport, AsyncClient
 
 from app.config import settings
 from app.main import app
+from app.routers import user as user_router
 
 
 async def test_auto_provision_new_user(auth_client):
@@ -9,6 +10,7 @@ async def test_auto_provision_new_user(auth_client):
     assert resp.status_code == 200
     data = resp.json()
     assert data["username"] == "testuser"
+    assert data["role"] == "player"
     assert data["balance"] == settings.starting_balance
     assert data["linked_player_id"] is None
     assert data["onboarding_complete"] is False
@@ -110,3 +112,58 @@ async def test_onboarding_tagline_with_hash_is_accepted(auth_client):
     assert resp.status_code == 200
     data = resp.json()
     assert data["onboarding_complete"] is True
+
+
+async def test_spectator_user_role_and_onboarding_blocked(auth_client, monkeypatch):
+    monkeypatch.setattr(settings, "spectator_remote_user", "testuser")
+
+    me_resp = await auth_client.get("/api/user/me")
+    assert me_resp.status_code == 200
+    assert me_resp.json()["role"] == "spectator"
+
+    onboarding_resp = await auth_client.post(
+        "/api/user/onboarding",
+        json={
+            "game_name": "viewer",
+            "tag_line": "EUW",
+            "display_name": "Viewer",
+        },
+    )
+    assert onboarding_resp.status_code == 403
+    assert onboarding_resp.json()["detail"] == "Spectator users cannot onboard"
+
+
+async def test_onboarding_initializes_market_price(auth_client, monkeypatch):
+    async def _initialize(request, session, player):
+        player.current_price = 42.0
+        player.lp_abs = 3200
+        player.previous_lp_abs = 3200
+
+    monkeypatch.setattr(
+        user_router,
+        "_initialize_player_market_state",
+        _initialize,
+    )
+
+    resp = await auth_client.post(
+        "/api/user/onboarding",
+        json={
+            "game_name": "priceduser",
+            "tag_line": "EUW",
+            "display_name": "Priced User",
+        },
+    )
+
+    assert resp.status_code == 200
+
+    players_resp = await auth_client.get("/api/market/players")
+    assert players_resp.status_code == 200
+    players = players_resp.json()
+    assert players[0]["current_price"] == 42.0
+
+    player_detail_resp = await auth_client.get(
+        f"/api/market/players/{players[0]['id']}"
+    )
+    assert player_detail_resp.status_code == 200
+    player_detail = player_detail_resp.json()
+    assert player_detail["lp_abs"] == 3200
