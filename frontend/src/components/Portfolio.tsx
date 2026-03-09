@@ -48,10 +48,16 @@ export default function Portfolio({ holdings, balance }: Props) {
                 Qty
               </th>
               <th className="px-4 py-2 text-right font-mono text-xs font-bold uppercase tracking-wider text-hex-bronze">
-                Price
+                Buy
+              </th>
+              <th className="px-4 py-2 text-right font-mono text-xs font-bold uppercase tracking-wider text-hex-bronze">
+                Current
               </th>
               <th className="px-4 py-2 text-right font-mono text-xs font-bold uppercase tracking-wider text-hex-bronze">
                 Value
+              </th>
+              <th className="px-4 py-2 text-right font-mono text-xs font-bold uppercase tracking-wider text-hex-bronze">
+                P/L
               </th>
             </tr>
           </thead>
@@ -68,10 +74,29 @@ export default function Portfolio({ holdings, balance }: Props) {
                   {h.quantity}
                 </td>
                 <td className="px-4 py-2.5 text-right font-mono text-sm text-hex-gold">
+                  {formatAmount(h.average_buy_price)}
+                </td>
+                <td className="px-4 py-2.5 text-right font-mono text-sm text-hex-gold">
                   {formatAmount(h.current_price)}
                 </td>
                 <td className="px-4 py-2.5 text-right font-mono text-sm font-bold text-hex-magic">
                   {formatAmount(h.market_value)}
+                </td>
+                <td
+                  className={`px-4 py-2.5 text-right font-mono text-sm font-bold ${
+                    h.unrealized_pnl > 0
+                      ? "text-emerald-400"
+                      : h.unrealized_pnl < 0
+                        ? "text-red-400"
+                        : "text-hex-bronze"
+                  }`}
+                >
+                  {h.unrealized_pnl > 0 ? "+" : ""}
+                  {formatAmount(h.unrealized_pnl)}
+                  <span className="ml-1 text-xs opacity-80">
+                    ({h.unrealized_pnl > 0 ? "+" : ""}
+                    {formatAmount(h.unrealized_pnl_pct)}%)
+                  </span>
                 </td>
               </tr>
             ))}

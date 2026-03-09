@@ -13,6 +13,12 @@ export default function PlayerCard({
   canTrade = true,
 }: Props) {
   const canBuy = canTrade && player.last_updated !== null;
+  const trendIndicator =
+    player.trend === "up"
+      ? { arrow: "▲", color: "text-emerald-400", label: "Rising" }
+      : player.trend === "down"
+        ? { arrow: "▼", color: "text-red-400", label: "Falling" }
+        : { arrow: "■", color: "text-hex-bronze", label: "Flat" };
 
   return (
     <article className="group border-2 border-hex-gold-dim/40 bg-hex-panel p-5 transition-shadow hover:shadow-brutal">
@@ -35,9 +41,17 @@ export default function PlayerCard({
           <span className="block text-xs uppercase tracking-wider text-hex-bronze">
             Price
           </span>
-          <span className="font-mono text-2xl font-bold text-hex-gold">
-            {formatAmount(player.current_price)}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-2xl font-bold text-hex-gold">
+              {formatAmount(player.current_price)}
+            </span>
+            <span
+              className={`font-mono text-sm font-bold ${trendIndicator.color}`}
+              title={trendIndicator.label}
+            >
+              {trendIndicator.arrow}
+            </span>
+          </div>
         </div>
         {player.last_updated && (
           <div className="text-right">

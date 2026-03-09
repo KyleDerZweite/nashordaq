@@ -5,6 +5,7 @@
 
 export type OrderSide = "BUY" | "SELL";
 export type OrderStatus = "PENDING" | "EXECUTED" | "CANCELLED" | "REVERTED";
+export type PlayerTrend = "up" | "down" | "flat";
 
 export interface UserResponse {
   id: number;
@@ -34,6 +35,7 @@ export interface PlayerSummary {
   game_name: string;
   tag_line: string;
   current_price: number;
+  trend: PlayerTrend;
   last_updated: string | null;
 }
 
@@ -66,8 +68,12 @@ export interface HoldingResponse {
   player_id: number;
   player_name: string;
   quantity: number;
+  average_buy_price: number;
   current_price: number;
+  cost_basis: number;
   market_value: number;
+  unrealized_pnl: number;
+  unrealized_pnl_pct: number;
 }
 
 export interface PortfolioResponse {

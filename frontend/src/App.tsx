@@ -114,6 +114,24 @@ export default function App() {
                   <span className="font-mono text-xs font-bold text-hex-white">
                     {p.display_name}
                   </span>
+                  <span
+                    className={`font-mono text-xs font-bold ${
+                      p.trend === "up"
+                        ? "text-emerald-400"
+                        : p.trend === "down"
+                          ? "text-red-400"
+                          : "text-hex-bronze"
+                    }`}
+                    title={
+                      p.trend === "up"
+                        ? "Rising"
+                        : p.trend === "down"
+                          ? "Falling"
+                          : "Flat"
+                    }
+                  >
+                    {p.trend === "up" ? "▲" : p.trend === "down" ? "▼" : "■"}
+                  </span>
                   <span className="font-mono text-sm font-bold text-hex-gold">
                     {formatAmount(p.current_price)}
                   </span>

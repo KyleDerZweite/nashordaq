@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 from app.models import OrderSide, OrderStatus
 
 UserRole = Literal["player", "spectator"]
+PlayerTrend = Literal["up", "down", "flat"]
 
 
 class UserResponse(BaseModel):
@@ -36,6 +37,7 @@ class PlayerSummary(BaseModel):
     game_name: str
     tag_line: str
     current_price: float
+    trend: PlayerTrend
     last_updated: datetime | None
 
 
@@ -68,8 +70,12 @@ class HoldingResponse(BaseModel):
     player_id: int
     player_name: str
     quantity: int
+    average_buy_price: float
     current_price: float
+    cost_basis: float
     market_value: float
+    unrealized_pnl: float
+    unrealized_pnl_pct: float
 
 
 class PortfolioResponse(BaseModel):

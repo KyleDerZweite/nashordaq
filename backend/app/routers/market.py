@@ -14,6 +14,14 @@ router = APIRouter(tags=["market"])
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 
+def _trend_for_player(player: TrackedPlayer) -> str:
+    if player.lp_abs > player.previous_lp_abs:
+        return "up"
+    if player.lp_abs < player.previous_lp_abs:
+        return "down"
+    return "flat"
+
+
 @router.get("/market/players", response_model=list[PlayerSummary])
 async def list_players(session: SessionDep) -> list[PlayerSummary]:
     result = await session.execute(select(TrackedPlayer))
@@ -25,6 +33,7 @@ async def list_players(session: SessionDep) -> list[PlayerSummary]:
             game_name=p.game_name,
             tag_line=p.tag_line,
             current_price=p.current_price,
+            trend=_trend_for_player(p),
             last_updated=p.last_updated,
         )
         for p in players
@@ -56,6 +65,7 @@ async def get_player(
         game_name=player.game_name,
         tag_line=player.tag_line,
         current_price=player.current_price,
+        trend=_trend_for_player(player),
         last_updated=player.last_updated,
         previous_lp_abs=player.previous_lp_abs,
         lp_abs=player.lp_abs,

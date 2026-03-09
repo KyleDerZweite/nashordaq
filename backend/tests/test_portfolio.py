@@ -36,6 +36,35 @@ async def test_portfolio_with_holdings(auth_client, seeded_player, db_session):
     data = resp.json()
     assert len(data["holdings"]) == 1
     assert data["holdings"][0]["quantity"] == 10
+    assert data["holdings"][0]["average_buy_price"] == 0.0
     assert data["holdings"][0]["current_price"] == 25.0
+    assert data["holdings"][0]["cost_basis"] == 0.0
     assert data["holdings"][0]["market_value"] == 250.0
+    assert data["holdings"][0]["unrealized_pnl"] == 250.0
+    assert data["holdings"][0]["unrealized_pnl_pct"] == 0.0
     assert data["total_value"] == settings.starting_balance + 250.0
+
+
+async def test_portfolio_shows_buy_price_vs_current(
+    auth_client, seeded_player, db_session
+):
+    buy_resp = await auth_client.post(
+        "/api/orders",
+        json={"player_id": seeded_player.id, "side": "BUY", "quantity": 2},
+    )
+    assert buy_resp.status_code == 201
+
+    seeded_player.current_price = 30.0
+    await db_session.commit()
+
+    resp = await auth_client.get("/api/portfolio")
+    assert resp.status_code == 200
+    data = resp.json()
+
+    assert len(data["holdings"]) == 1
+    assert data["holdings"][0]["average_buy_price"] == 25.0
+    assert data["holdings"][0]["current_price"] == 30.0
+    assert data["holdings"][0]["cost_basis"] == 50.0
+    assert data["holdings"][0]["market_value"] == 60.0
+    assert data["holdings"][0]["unrealized_pnl"] == 10.0
+    assert data["holdings"][0]["unrealized_pnl_pct"] == 20.0
