@@ -134,6 +134,12 @@ async def place_order(
     now = datetime.now(UTC)
 
     if body.side == OrderSide.BUY:
+        if user.linked_player_id == body.player_id:
+            raise HTTPException(
+                status_code=400,
+                detail="You cannot buy your own stock",
+            )
+
         if player.last_updated is None:
             raise HTTPException(
                 status_code=400,

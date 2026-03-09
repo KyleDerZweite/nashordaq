@@ -111,3 +111,22 @@ async def seeded_player(db_session):
     await db_session.commit()
 
     return player
+
+
+@pytest.fixture
+async def tradable_player(db_session, seeded_player):
+    del seeded_player
+
+    player = TrackedPlayer(
+        game_name="TradablePlayer",
+        tag_line="EUW",
+        display_name="Tradable Player",
+        current_price=25.0,
+        lp_abs=1500,
+        previous_lp_abs=1400,
+        last_updated=datetime.now(UTC),
+    )
+    db_session.add(player)
+    await db_session.commit()
+    await db_session.refresh(player)
+    return player

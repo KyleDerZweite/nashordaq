@@ -8,6 +8,7 @@ interface Props {
   side: OrderSide;
   balance: number;
   ownedQuantity: number;
+  isOwnStock?: boolean;
   onClose: () => void;
 }
 
@@ -16,6 +17,7 @@ export default function TradeTerminal({
   side,
   balance,
   ownedQuantity,
+  isOwnStock = false,
   onClose,
 }: Props) {
   const [quantity, setQuantity] = useState(1);
@@ -26,14 +28,17 @@ export default function TradeTerminal({
   const maxBuyQuantity =
     player.current_price > 0 ? Math.floor(balance / player.current_price) : 0;
   const maxSellQuantity = ownedQuantity;
-  const maxQuantity = isBuy ? maxBuyQuantity : maxSellQuantity;
+  const effectiveMaxBuyQuantity = isOwnStock ? 0 : maxBuyQuantity;
+  const maxQuantity = isBuy ? effectiveMaxBuyQuantity : maxSellQuantity;
   const estimatedTotal = player.current_price * quantity;
   const canAfford = balance >= estimatedTotal;
   const exceedsHoldings = !isBuy && quantity > maxSellQuantity;
   const canSubmit =
     quantity >= 1 &&
     (!isBuy || hasInitialUpdate) &&
-    (isBuy ? canAfford : !exceedsHoldings && maxSellQuantity > 0);
+    (isBuy
+      ? canAfford && !isOwnStock
+      : !exceedsHoldings && maxSellQuantity > 0);
 
   function handleQuantityChange(value: string) {
     const nextQuantity = Number(value);
@@ -138,7 +143,7 @@ export default function TradeTerminal({
             </div>
             <p className="mt-2 font-mono text-xs text-hex-bronze">
               {isBuy
-                ? `Affordable now: ${maxBuyQuantity} share${maxBuyQuantity === 1 ? "" : "s"}`
+                ? `Affordable now: ${effectiveMaxBuyQuantity} share${effectiveMaxBuyQuantity === 1 ? "" : "s"}`
                 : `Owned now: ${maxSellQuantity} share${maxSellQuantity === 1 ? "" : "s"}`}
             </p>
           </div>
@@ -167,6 +172,12 @@ export default function TradeTerminal({
             <p className="font-mono text-xs text-hex-bronze">
               Buying is locked until this stock receives its first market
               update.
+            </p>
+          )}
+
+          {isBuy && isOwnStock && (
+            <p className="font-mono text-xs text-hex-bronze">
+              You cannot buy your own stock.
             </p>
           )}
 
@@ -202,7 +213,7 @@ export default function TradeTerminal({
               : `${side} ${quantity} share${quantity > 1 ? "s" : ""}`}
           </button>
 
-          {!canAfford && isBuy && (
+          {!canAfford && isBuy && !isOwnStock && (
             <p className="font-mono text-xs text-hex-zaun">
               Insufficient balance
             </p>

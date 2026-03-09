@@ -9,6 +9,7 @@ type TrendDirection = "up" | "down" | "flat";
 interface Props {
   playerId: number;
   canTrade?: boolean;
+  isOwnStock?: boolean;
   onTrade?: (side: OrderSide) => void;
   onClose: () => void;
 }
@@ -183,6 +184,7 @@ function buildChartGeometry(history: PriceHistoryEntry[]) {
 export default function PlayerDetailsModal({
   playerId,
   canTrade = false,
+  isOwnStock = false,
   onTrade,
   onClose,
 }: Props) {
@@ -371,14 +373,14 @@ export default function PlayerDetailsModal({
                   <button
                     type="button"
                     onClick={() => onTrade("BUY")}
-                    disabled={player.last_updated === null}
+                    disabled={player.last_updated === null || isOwnStock}
                     className={`border-2 px-4 py-3 font-mono text-xs font-bold uppercase tracking-[0.18em] transition-colors ${
-                      player.last_updated !== null
+                      player.last_updated !== null && !isOwnStock
                         ? "border-hex-magic text-hex-magic hover:bg-hex-magic hover:text-hex-bg"
                         : "cursor-not-allowed border-hex-border text-hex-border"
                     }`}
                   >
-                    Buy
+                    {isOwnStock ? "Own Stock" : "Buy"}
                   </button>
                   <button
                     type="button"

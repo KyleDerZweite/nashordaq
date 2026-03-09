@@ -6,6 +6,7 @@ interface Props {
   onTrade: (playerId: number, side: OrderSide) => void;
   onOpenDetails: (playerId: number) => void;
   canTrade?: boolean;
+  isOwnStock?: boolean;
 }
 
 export default function PlayerCard({
@@ -13,8 +14,9 @@ export default function PlayerCard({
   onTrade,
   onOpenDetails,
   canTrade = true,
+  isOwnStock = false,
 }: Props) {
-  const canBuy = canTrade && player.last_updated !== null;
+  const canBuy = canTrade && player.last_updated !== null && !isOwnStock;
   const trendIndicator =
     player.trend === "up"
       ? { arrow: "▲", color: "text-emerald-400", label: "Rising" }
@@ -93,7 +95,13 @@ export default function PlayerCard({
               : "cursor-not-allowed border-hex-border text-hex-border"
           }`}
         >
-          {!canTrade ? "Spectator" : canBuy ? "Buy" : "Awaiting Update"}
+          {!canTrade
+            ? "Spectator"
+            : isOwnStock
+              ? "Own Stock"
+              : canBuy
+                ? "Buy"
+                : "Awaiting Update"}
         </button>
         <button
           disabled={!canTrade}
@@ -111,6 +119,12 @@ export default function PlayerCard({
       {player.last_updated === null && (
         <p className="mt-3 font-mono text-xs text-hex-bronze">
           Buying unlocks after the first market update.
+        </p>
+      )}
+
+      {isOwnStock && (
+        <p className="mt-3 font-mono text-xs text-hex-bronze">
+          You cannot buy your own stock.
         </p>
       )}
     </article>

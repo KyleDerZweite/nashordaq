@@ -46,15 +46,15 @@ async def test_portfolio_with_holdings(auth_client, seeded_player, db_session):
 
 
 async def test_portfolio_shows_buy_price_vs_current(
-    auth_client, seeded_player, db_session
+    auth_client, tradable_player, db_session
 ):
     buy_resp = await auth_client.post(
         "/api/orders",
-        json={"player_id": seeded_player.id, "side": "BUY", "quantity": 2},
+        json={"player_id": tradable_player.id, "side": "BUY", "quantity": 2},
     )
     assert buy_resp.status_code == 201
 
-    seeded_player.current_price = 30.0
+    tradable_player.current_price = 30.0
     await db_session.commit()
 
     resp = await auth_client.get("/api/portfolio")
