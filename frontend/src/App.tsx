@@ -48,6 +48,12 @@ export default function App() {
 
   const tradePlayer =
     trade && players ? players.find((p) => p.id === trade.playerId) : null;
+  const tradeHolding =
+    tradePlayer && portfolio
+      ? portfolio.holdings.find(
+          (holding) => holding.player_id === tradePlayer.id,
+        )
+      : null;
   const linkedPlayer =
     user?.linked_player_id && players
       ? players.find((player) => player.id === user.linked_player_id)
@@ -202,6 +208,7 @@ export default function App() {
           player={tradePlayer}
           side={trade.side}
           balance={balance}
+          ownedQuantity={tradeHolding?.quantity ?? 0}
           onClose={() => setTrade(null)}
         />
       )}

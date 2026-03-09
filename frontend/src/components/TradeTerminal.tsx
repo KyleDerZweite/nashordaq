@@ -7,6 +7,7 @@ interface Props {
   player: PlayerSummary;
   side: OrderSide;
   balance: number;
+  ownedQuantity: number;
   onClose: () => void;
 }
 
@@ -14,19 +15,52 @@ export default function TradeTerminal({
   player,
   side,
   balance,
+  ownedQuantity,
   onClose,
 }: Props) {
   const [quantity, setQuantity] = useState(1);
   const placeOrder = usePlaceOrder();
 
-  const estimatedTotal = player.current_price * quantity;
-  const canAfford = side === "BUY" ? balance >= estimatedTotal : true;
   const isBuy = side === "BUY";
   const hasInitialUpdate = player.last_updated !== null;
-  const canSubmit = canAfford && (!isBuy || hasInitialUpdate);
+  const maxBuyQuantity =
+    player.current_price > 0 ? Math.floor(balance / player.current_price) : 0;
+  const maxSellQuantity = ownedQuantity;
+  const maxQuantity = isBuy ? maxBuyQuantity : maxSellQuantity;
+  const estimatedTotal = player.current_price * quantity;
+  const canAfford = balance >= estimatedTotal;
+  const exceedsHoldings = !isBuy && quantity > maxSellQuantity;
+  const canSubmit =
+    quantity >= 1 &&
+    (!isBuy || hasInitialUpdate) &&
+    (isBuy ? canAfford : !exceedsHoldings && maxSellQuantity > 0);
+
+  function handleQuantityChange(value: string) {
+    const nextQuantity = Number(value);
+
+    if (!Number.isFinite(nextQuantity)) {
+      setQuantity(1);
+      return;
+    }
+
+    setQuantity(Math.max(1, Math.floor(nextQuantity)));
+  }
+
+  function handleSetMax() {
+    if (maxQuantity < 1) {
+      return;
+    }
+
+    setQuantity(maxQuantity);
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    if (!canSubmit) {
+      return;
+    }
+
     placeOrder.mutate(
       { player_id: player.id, side, quantity },
       { onSuccess: () => onClose() },
@@ -78,14 +112,35 @@ export default function TradeTerminal({
             <label className="mb-1 block font-mono text-xs uppercase tracking-wider text-hex-bronze">
               Quantity
             </label>
-            <input
-              type="number"
-              min={1}
-              value={quantity}
-              onChange={(e) => setQuantity(Math.max(1, Number(e.target.value)))}
-              autoFocus
-              className="w-full border-2 border-hex-border bg-hex-bg px-3 py-2 font-mono text-sm text-hex-white outline-none focus:border-hex-gold"
-            />
+            <div className="flex gap-2">
+              <input
+                type="number"
+                min={1}
+                value={quantity}
+                onChange={(e) => handleQuantityChange(e.target.value)}
+                autoFocus
+                className="w-full border-2 border-hex-border bg-hex-bg px-3 py-2 font-mono text-sm text-hex-white outline-none focus:border-hex-gold"
+              />
+              <button
+                type="button"
+                onClick={handleSetMax}
+                disabled={maxQuantity < 1}
+                className={`shrink-0 border-2 px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider transition-colors ${
+                  maxQuantity >= 1
+                    ? isBuy
+                      ? "border-hex-gold text-hex-gold hover:bg-hex-gold hover:text-hex-bg"
+                      : "border-hex-bronze text-hex-bronze hover:bg-hex-bronze hover:text-hex-bg"
+                    : "cursor-not-allowed border-hex-border text-hex-border"
+                }`}
+              >
+                Max {isBuy ? "Buy" : "Sell"}
+              </button>
+            </div>
+            <p className="mt-2 font-mono text-xs text-hex-bronze">
+              {isBuy
+                ? `Affordable now: ${maxBuyQuantity} share${maxBuyQuantity === 1 ? "" : "s"}`
+                : `Owned now: ${maxSellQuantity} share${maxSellQuantity === 1 ? "" : "s"}`}
+            </p>
           </div>
 
           {/* Estimate */}
@@ -115,6 +170,19 @@ export default function TradeTerminal({
             </p>
           )}
 
+          {!isBuy && maxSellQuantity < 1 && (
+            <p className="font-mono text-xs text-hex-bronze">
+              You do not currently own any shares of this stock.
+            </p>
+          )}
+
+          {!isBuy && exceedsHoldings && maxSellQuantity > 0 && (
+            <p className="font-mono text-xs text-hex-zaun">
+              You can sell at most {maxSellQuantity} share
+              {maxSellQuantity === 1 ? "" : "s"}.
+            </p>
+          )}
+
           {/* Submit */}
           <button
             type="submit"
@@ -134,7 +202,7 @@ export default function TradeTerminal({
               : `${side} ${quantity} share${quantity > 1 ? "s" : ""}`}
           </button>
 
-          {!canAfford && side === "BUY" && (
+          {!canAfford && isBuy && (
             <p className="font-mono text-xs text-hex-zaun">
               Insufficient balance
             </p>
