@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Header from "./components/Header";
 import MarketGrid from "./components/MarketGrid";
 import Portfolio from "./components/Portfolio";
@@ -22,8 +22,11 @@ interface TradeTarget {
   side: OrderSide;
 }
 
+type TickerSortMode = "value" | "name";
+
 export default function App() {
   const [trade, setTrade] = useState<TradeTarget | null>(null);
+  const [tickerSortMode, setTickerSortMode] = useState<TickerSortMode>("value");
 
   const { data: user } = useUser();
   const onboardingComplete = user?.onboarding_complete ?? false;
@@ -40,6 +43,28 @@ export default function App() {
   const tradePlayer =
     trade && players ? players.find((p) => p.id === trade.playerId) : null;
 
+  const sortedTickerPlayers = useMemo(() => {
+    if (!players) {
+      return [];
+    }
+
+    return [...players].sort((left, right) => {
+      if (tickerSortMode === "value") {
+        if (right.current_price !== left.current_price) {
+          return right.current_price - left.current_price;
+        }
+
+        return left.display_name.localeCompare(right.display_name, undefined, {
+          sensitivity: "base",
+        });
+      }
+
+      return left.display_name.localeCompare(right.display_name, undefined, {
+        sensitivity: "base",
+      });
+    });
+  }, [players, tickerSortMode]);
+
   return (
     <div className="flex min-h-screen flex-col bg-hex-bg">
       <Header balance={balance} username={user?.username} />
@@ -48,8 +73,43 @@ export default function App() {
         {/* Market ticker bar */}
         {players && players.length > 0 && (
           <div className="mb-8 overflow-hidden border-2 border-hex-border bg-hex-bg-alt">
-            <div className="flex divide-x-2 divide-hex-border">
-              {players.map((p) => (
+            <div className="flex items-center justify-between border-b-2 border-hex-border px-4 py-2">
+              <span className="font-mono text-xs font-bold uppercase tracking-wider text-hex-bronze">
+                Market Snapshot
+              </span>
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-xs uppercase tracking-wider text-hex-bronze">
+                  Sort
+                </span>
+                <div className="flex border border-hex-border">
+                  <button
+                    type="button"
+                    onClick={() => setTickerSortMode("value")}
+                    className={`px-3 py-1 font-mono text-xs font-bold uppercase tracking-wider transition-colors ${
+                      tickerSortMode === "value"
+                        ? "bg-hex-gold text-hex-bg"
+                        : "bg-transparent text-hex-bronze hover:bg-hex-panel hover:text-hex-white"
+                    }`}
+                  >
+                    Value
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTickerSortMode("name")}
+                    className={`border-l border-hex-border px-3 py-1 font-mono text-xs font-bold uppercase tracking-wider transition-colors ${
+                      tickerSortMode === "name"
+                        ? "bg-hex-gold text-hex-bg"
+                        : "bg-transparent text-hex-bronze hover:bg-hex-panel hover:text-hex-white"
+                    }`}
+                  >
+                    Name
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex divide-x-2 divide-hex-border overflow-x-auto">
+              {sortedTickerPlayers.map((p) => (
                 <div key={p.id} className="flex items-center gap-3 px-5 py-2.5">
                   <span className="font-mono text-xs font-bold text-hex-white">
                     {p.display_name}
