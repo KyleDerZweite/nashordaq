@@ -34,11 +34,11 @@ async def get_leaderboard(session: SessionDep) -> list[LeaderboardEntry]:
             h.quantity * price_map.get(h.player_id, 0.0)
             for h in holdings_result.scalars()
         )
-        entries.append((tracked_player.game_name, user.balance + holdings_value))
+        entries.append((tracked_player.display_name, user.balance + holdings_value))
 
     entries.sort(key=lambda e: e[1], reverse=True)
 
     return [
-        LeaderboardEntry(game_name=game_name, total_value=total, rank=i + 1)
-        for i, (game_name, total) in enumerate(entries)
+        LeaderboardEntry(display_name=display_name, total_value=total, rank=i + 1)
+        for i, (display_name, total) in enumerate(entries)
     ]

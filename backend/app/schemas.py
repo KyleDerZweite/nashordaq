@@ -79,6 +79,6 @@ class PortfolioResponse(BaseModel):
 
 
 class LeaderboardEntry(BaseModel):
-    game_name: str
+    display_name: str
     total_value: float
     rank: int

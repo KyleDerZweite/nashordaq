@@ -77,7 +77,7 @@ export interface PortfolioResponse {
 }
 
 export interface LeaderboardEntry {
-  game_name: string;
+  display_name: string;
   total_value: number;
   rank: number;
 }

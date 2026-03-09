@@ -51,7 +51,7 @@ export default function Leaderboard({ entries }: Props) {
                   </span>
                 </td>
                 <td className="px-4 py-2.5 font-mono text-sm font-medium text-hex-white">
-                  {e.game_name}
+                  {e.display_name}
                 </td>
                 <td className="px-4 py-2.5 text-right font-mono text-sm font-bold text-hex-gold">
                   {formatAmount(e.total_value)}
