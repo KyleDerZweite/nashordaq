@@ -69,7 +69,7 @@ async def market_update_job() -> None:
     async with SessionLocal() as session:
         result = await session.execute(select(TrackedPlayer))
         players = result.scalars().all()
-        successful_player_updates = 0
+        successful_player_refreshes = 0
 
         if not players:
             logger.info("Skipping market update; no tracked players exist yet")
@@ -122,6 +122,8 @@ async def market_update_job() -> None:
                 player.puuid = rank_data.puuid
                 player.summoner_id = rank_data.summoner_id
 
+            successful_player_refreshes += 1
+
             new_lp_abs = calculate_lp_abs(
                 rank_data.tier, rank_data.rank, rank_data.league_points
             )
@@ -145,6 +147,16 @@ async def market_update_job() -> None:
                 )
             else:
                 delta_lp = new_lp_abs - player.lp_abs
+
+                if delta_lp == 0:
+                    logger.info(
+                        "No LP change for %s#%s; skipping market state update",
+                        player.game_name,
+                        player.tag_line,
+                    )
+                    await asyncio.sleep(0.1)
+                    continue
+
                 player.previous_lp_abs = player.lp_abs
                 player.lp_abs = new_lp_abs
                 player.streak = update_streak(player.streak, delta_lp)
@@ -177,7 +189,6 @@ async def market_update_job() -> None:
                     lp_abs=player.lp_abs,
                 )
             )
-            successful_player_updates += 1
 
             await asyncio.sleep(0.1)
 
@@ -235,11 +246,11 @@ async def market_update_job() -> None:
             )
 
         await session.commit()
-        if successful_player_updates > 0:
+        if successful_player_refreshes > 0:
             _last_market_update_at = datetime.now(UTC)
             logger.info(
-                "Market update completed (%d players)",
-                successful_player_updates,
+                "Market update completed (%d players refreshed)",
+                successful_player_refreshes,
             )
         else:
             logger.warning(

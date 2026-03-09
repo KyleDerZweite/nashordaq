@@ -29,7 +29,6 @@ WIN_RATE_PRICE_WEIGHT = 0.25
 HOT_STREAK_BONUS = 0.15
 VETERAN_BONUS = 0.01
 FRESH_BLOOD_BONUS = 0.02
-INACTIVE_DECAY_RATE = 0.005
 
 
 def calculate_lp_abs(tier: str, rank: str, league_points: int) -> int:
@@ -83,6 +82,9 @@ def calculate_new_price(
     inactive: bool = False,
     fresh_blood: bool = False,
 ) -> float:
+    if delta_lp == 0:
+        return max(old_price, PRICE_FLOOR)
+
     epsilon = generate_epsilon()
     gamma = gamma_base + epsilon
     streak_multiplier = 1 + BETA * abs(streak)
@@ -99,9 +101,6 @@ def calculate_new_price(
     new_price = (
         old_price + (delta_lp * ALPHA * streak_multiplier) * gamma * win_rate_multiplier
     ) * status_multiplier
-
-    if inactive and delta_lp == 0:
-        new_price *= 1 - INACTIVE_DECAY_RATE
 
     return max(new_price, PRICE_FLOOR)
 

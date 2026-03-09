@@ -44,6 +44,8 @@ Calculates the new share price at each market update cycle.
 P_new = (P_old + (Delta_LP_abs * Alpha * StreakMultiplier) * Gamma * WinRateMultiplier) * StatusMultiplier
 ```
 
+If `Delta_LP_abs == 0`, the market state is left unchanged for that cycle.
+
 | Variable | Description | Value |
 |---|---|---|
 | Delta_LP_abs | Change in Absolute LP since last update | Computed per cycle |
@@ -61,10 +63,10 @@ P_new = (P_old + (Delta_LP_abs * Alpha * StreakMultiplier) * Gamma * WinRateMult
 	- `+0.02` if `freshBlood`
 - `hotStreak`
 	- Adds an extra `+0.15` momentum bonus on top of the internal streak multiplier.
-- `inactive`
-	- If Riot marks the player inactive and LP did not change this cycle, the stock decays by `0.5%` for that cycle.
+- Flat LP cycle
+	- If Riot reports the same Absolute LP as the previous refresh, Nashordaq does not change price, streak, `last_updated`, or stored price history for that cycle.
 
-**Internal streak:** A signed integer tracking consecutive same-direction updates. Positive for consecutive LP gains, negative for consecutive losses. Resets to +1 or -1 on direction change. Resets to 0 when delta is zero.
+**Internal streak:** A signed integer tracking consecutive same-direction updates. Positive for consecutive LP gains and negative for consecutive losses. Resets to +1 or -1 on direction change. It is only recalculated on cycles where LP changes.
 
 ```
 StreakMultiplier = 1 + (Beta * |S|) + (0.15 if hotStreak else 0)

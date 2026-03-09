@@ -108,17 +108,19 @@ def test_new_price_with_status_and_win_rate_modifiers():
     assert price == pytest.approx(39.255875)
 
 
-def test_new_price_inactive_decay_without_lp_change():
+def test_new_price_unchanged_without_lp_change():
     with patch("app.pricing.generate_epsilon", return_value=0.0):
         price = calculate_new_price(
             old_price=20.0,
             delta_lp=0,
             streak=0,
             gamma_base=1.0,
+            veteran=True,
             inactive=True,
+            fresh_blood=True,
         )
 
-    assert price == 19.9
+    assert price == 20.0
 
 
 def test_streak_positive():
