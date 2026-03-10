@@ -70,7 +70,10 @@ export default function GambaWidget({ balance, canTrade }: Props) {
               Multiplier
             </div>
             <div className="font-mono text-sm font-bold text-hex-gold">
-              x{Number.isInteger(displayMultiplier) ? displayMultiplier.toFixed(0) : displayMultiplier}
+              x
+              {Number.isInteger(displayMultiplier)
+                ? displayMultiplier.toFixed(0)
+                : displayMultiplier}
             </div>
           </div>
         </div>

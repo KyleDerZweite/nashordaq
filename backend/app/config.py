@@ -49,6 +49,7 @@ class Settings(BaseSettings):
     bank_interest_interval_hours: float = 72.0
     bank_max_borrow_absolute: float = 2500.0
     bank_max_borrow_net_worth_ratio: float = 0.25
+    bank_base_credit_limit: float = 250.0
     bank_credit_limit_rounding_increment: float = 50.0
 
 

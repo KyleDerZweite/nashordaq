@@ -68,14 +68,15 @@ def floor_to_increment(value: float, increment: float) -> float:
 
 
 def calculate_credit_limit(debt_adjusted_net_worth: float) -> float:
-    if debt_adjusted_net_worth <= 0:
-        return 0.0
-
-    ratio_limit = floor_to_increment(
-        debt_adjusted_net_worth * settings.bank_max_borrow_net_worth_ratio,
+    raw_limit = (
+        debt_adjusted_net_worth * settings.bank_max_borrow_net_worth_ratio
+        + settings.bank_base_credit_limit
+    )
+    credit_limit = floor_to_increment(
+        max(0.0, raw_limit),
         settings.bank_credit_limit_rounding_increment,
     )
-    return round_currency(min(settings.bank_max_borrow_absolute, ratio_limit))
+    return round_currency(min(settings.bank_max_borrow_absolute, credit_limit))
 
 
 def _pending_interest_intervals(

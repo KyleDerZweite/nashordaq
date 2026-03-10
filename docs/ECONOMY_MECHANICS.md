@@ -126,7 +126,7 @@ Bank debt is a separate account-level liability. Borrowing adds cash immediately
 ### Credit Limit
 
 ```
-credit_limit = min(2500, floor_to_50(0.25 * debt_adjusted_net_worth))
+credit_limit = min(2500, floor_to_50((0.25 * debt_adjusted_net_worth) + 250))
 ```
 
 Where:
