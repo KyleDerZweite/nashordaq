@@ -12,7 +12,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.database import engine, get_session, init_db
 from app.models import TrackedPlayer
-from app.riot import PlayerNotFoundError, RateLimitedError, get_rank
+from app.riot import (
+    PlayerNotFoundError,
+    RateLimitedError,
+    get_account_by_riot_id,
+    get_rank,
+)
 from app.routers import leaderboard, market, orders, portfolio, user
 from app.scheduler import (
     classify_market_status,
@@ -22,7 +27,7 @@ from app.scheduler import (
     start_scheduler,
     stop_scheduler,
 )
-from app.schemas import SystemStatusResponse
+from app.schemas import MarketAccountResponse, SystemStatusResponse
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
@@ -135,3 +140,28 @@ async def quote(
         "inactive": rank_data.inactive,
         "freshBlood": rank_data.fresh_blood,
     }
+
+
+@app.get("/api/market/account", response_model=MarketAccountResponse)
+async def verify_market_account(
+    gameName: str = Query(...),
+    tagLine: str = Query(...),
+) -> MarketAccountResponse:
+    try:
+        account = await get_account_by_riot_id(
+            client=app.state.http_client,
+            base_url=settings.riot_api_base_url,
+            api_key=settings.riot_api_key,
+            game_name=gameName,
+            tag_line=tagLine,
+        )
+    except PlayerNotFoundError as e:
+        return JSONResponse(status_code=404, content={"detail": str(e)})
+    except RateLimitedError as e:
+        return JSONResponse(status_code=429, content={"detail": str(e)})
+
+    return MarketAccountResponse(
+        game_name=account.game_name,
+        tag_line=account.tag_line,
+        puuid=account.puuid,
+    )

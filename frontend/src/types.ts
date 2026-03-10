@@ -104,3 +104,23 @@ export interface SystemStatusResponse {
   expected_update_interval_minutes: number;
   last_market_update_at: string | null;
 }
+
+export interface MarketQuoteResponse {
+  gameName: string;
+  tagLine: string;
+  tier: string;
+  rank: string;
+  leaguePoints: number;
+  wins: number;
+  losses: number;
+  hotStreak: boolean;
+  veteran: boolean;
+  inactive: boolean;
+  freshBlood: boolean;
+}
+
+export interface MarketAccountResponse {
+  game_name: string;
+  tag_line: string;
+  puuid: string;
+}

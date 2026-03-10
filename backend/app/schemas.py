@@ -105,3 +105,9 @@ class SystemStatusResponse(BaseModel):
     tracked_player_count: int
     expected_update_interval_minutes: int
     last_market_update_at: datetime | None
+
+
+class MarketAccountResponse(BaseModel):
+    game_name: str
+    tag_line: str
+    puuid: str

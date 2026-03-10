@@ -1,5 +1,15 @@
 const BASE_URL = "/api";
 
+export class ApiError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
     ...init,
@@ -10,7 +20,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.detail ?? `Request failed: ${res.status}`);
+    throw new ApiError(
+      body.detail ?? `Request failed: ${res.status}`,
+      res.status,
+    );
   }
   return res.json() as Promise<T>;
 }
@@ -35,4 +48,28 @@ export function put<T>(path: string, body: unknown): Promise<T> {
 
 export function del<T>(path: string): Promise<T> {
   return request<T>(path, { method: "DELETE" });
+}
+
+export function getMarketQuote<T>(
+  gameName: string,
+  tagLine: string,
+): Promise<T> {
+  const search = new URLSearchParams({
+    gameName,
+    tagLine,
+  });
+
+  return get<T>(`/market/quote?${search.toString()}`);
+}
+
+export function getMarketAccount<T>(
+  gameName: string,
+  tagLine: string,
+): Promise<T> {
+  const search = new URLSearchParams({
+    gameName,
+    tagLine,
+  });
+
+  return get<T>(`/market/account?${search.toString()}`);
 }

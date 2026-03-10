@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, patch
 
 import app.main as main_module
 from app.models import TrackedPlayer
-from app.riot import PlayerNotFoundError, RankData
+from app.riot import AccountData, PlayerNotFoundError, RankData
 
 
 async def test_health(client):
@@ -143,3 +143,42 @@ async def test_quote_not_found(client):
 
     assert resp.status_code == 404
     assert "Not found" in resp.json()["detail"]
+
+
+async def test_market_account_success(client):
+    mock_account = AccountData(
+        puuid="test-puuid",
+        game_name="TestPlayer",
+        tag_line="NA1",
+    )
+
+    with patch(
+        "app.main.get_account_by_riot_id",
+        new_callable=AsyncMock,
+        return_value=mock_account,
+    ):
+        resp = await client.get(
+            "/api/market/account", params={"gameName": "TestPlayer", "tagLine": "NA1"}
+        )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data == {
+        "game_name": "TestPlayer",
+        "tag_line": "NA1",
+        "puuid": "test-puuid",
+    }
+
+
+async def test_market_account_not_found(client):
+    with patch(
+        "app.main.get_account_by_riot_id",
+        new_callable=AsyncMock,
+        side_effect=PlayerNotFoundError("Player not found"),
+    ):
+        resp = await client.get(
+            "/api/market/account", params={"gameName": "Nobody", "tagLine": "0000"}
+        )
+
+    assert resp.status_code == 404
+    assert "Player not found" in resp.json()["detail"]

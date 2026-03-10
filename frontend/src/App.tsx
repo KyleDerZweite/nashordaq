@@ -244,11 +244,11 @@ export default function App() {
                 aria-hidden="true"
                 className={`inline-block h-2 w-2 border ${marketStatusBeaconClass}`}
               />
-              <span>
-                {marketStatusLabel}
-              </span>
+              <span>{marketStatusLabel}</span>
             </div>
-            <div className="leading-4 text-hex-bronze/90">{marketStatusDetail}</div>
+            <div className="leading-4 text-hex-bronze/90">
+              {marketStatusDetail}
+            </div>
           </div>
         </div>
       </footer>

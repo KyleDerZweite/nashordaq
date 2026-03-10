@@ -1,4 +1,12 @@
-export { get, post, put, del } from "./client";
+export {
+  ApiError,
+  del,
+  get,
+  getMarketAccount,
+  getMarketQuote,
+  post,
+  put,
+} from "./client";
 export {
   queryKeys,
   useUser,

@@ -2,6 +2,12 @@ import httpx
 from pydantic import BaseModel
 
 
+class AccountData(BaseModel):
+    puuid: str
+    game_name: str
+    tag_line: str
+
+
 class RankData(BaseModel):
     puuid: str
     summoner_id: str
@@ -32,14 +38,13 @@ def _check_response(response: httpx.Response) -> None:
     response.raise_for_status()
 
 
-async def get_rank(
+async def get_account_by_riot_id(
     client: httpx.AsyncClient,
     base_url: str,
-    region_url: str,
     api_key: str,
     game_name: str,
     tag_line: str,
-) -> RankData:
+) -> AccountData:
     headers = {"X-Riot-Token": api_key}
 
     account_resp = await client.get(
@@ -51,6 +56,31 @@ async def get_rank(
     puuid = account_payload.get("puuid")
     if not puuid:
         raise PlayerNotFoundError(f"No account data for {game_name}#{tag_line}")
+
+    return AccountData(
+        puuid=puuid,
+        game_name=account_payload.get("gameName") or game_name,
+        tag_line=account_payload.get("tagLine") or tag_line,
+    )
+
+
+async def get_rank(
+    client: httpx.AsyncClient,
+    base_url: str,
+    region_url: str,
+    api_key: str,
+    game_name: str,
+    tag_line: str,
+) -> RankData:
+    headers = {"X-Riot-Token": api_key}
+    account = await get_account_by_riot_id(
+        client=client,
+        base_url=base_url,
+        api_key=api_key,
+        game_name=game_name,
+        tag_line=tag_line,
+    )
+    puuid = account.puuid
 
     summoner_resp = await client.get(
         f"{region_url}/lol/summoner/v4/summoners/by-puuid/{puuid}",
