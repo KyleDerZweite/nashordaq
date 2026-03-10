@@ -8,6 +8,7 @@ export {
   useOrders,
   useRecentOrders,
   useLeaderboard,
+  useSystemStatus,
   usePlaceOrder,
   useCancelOrder,
   useCompleteOnboarding,

@@ -35,10 +35,42 @@ logger = logging.getLogger(__name__)
 scheduler = AsyncIOScheduler()
 _app: FastAPI | None = None
 _last_market_update_at: datetime | None = None
+MARKET_UPDATE_JOB_INTERVAL_SECONDS = 30
+MARKET_STATUS_GRACE_SECONDS = 90
 
 
 def get_last_market_update_at() -> datetime | None:
     return _last_market_update_at
+
+
+def is_scheduler_running() -> bool:
+    return scheduler.running
+
+
+def get_required_market_update_interval(player_count: int) -> timedelta:
+    return timedelta(minutes=max(1, player_count))
+
+
+def classify_market_status(
+    *,
+    now: datetime,
+    last_market_update_at: datetime | None,
+    tracked_player_count: int,
+    scheduler_running: bool,
+) -> str:
+    if tracked_player_count == 0 or last_market_update_at is None:
+        return "idle"
+
+    if not scheduler_running:
+        return "degraded"
+
+    freshness_window = get_required_market_update_interval(
+        tracked_player_count
+    ) + timedelta(seconds=MARKET_STATUS_GRACE_SECONDS)
+    if now - last_market_update_at <= freshness_window:
+        return "healthy"
+
+    return "degraded"
 
 
 async def _get_or_create_holding(
@@ -75,19 +107,15 @@ async def market_update_job() -> None:
             logger.info("Skipping market update; no tracked players exist yet")
             return
 
-        required_interval_minutes = max(1, len(players))
+        required_interval = get_required_market_update_interval(len(players))
         now = datetime.now(UTC)
         if (
             _last_market_update_at is not None
-            and now - _last_market_update_at
-            < timedelta(minutes=required_interval_minutes)
+            and now - _last_market_update_at < required_interval
         ):
             logger.info(
                 "Skipping market update; next run in %.1f min",
-                (
-                    timedelta(minutes=required_interval_minutes)
-                    - (now - _last_market_update_at)
-                ).total_seconds()
+                (required_interval - (now - _last_market_update_at)).total_seconds()
                 / 60,
             )
             return
@@ -265,7 +293,7 @@ def start_scheduler(app: FastAPI) -> None:
     _last_market_update_at = None
     scheduler.add_job(
         market_update_job,
-        IntervalTrigger(seconds=30),
+        IntervalTrigger(seconds=MARKET_UPDATE_JOB_INTERVAL_SECONDS),
         id="market_update",
         replace_existing=True,
         max_instances=1,

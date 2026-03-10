@@ -10,6 +10,7 @@ import type {
   UserProfileUpdate,
   PortfolioResponse,
   LeaderboardEntry,
+  SystemStatusResponse,
 } from "../types";
 
 // ---- Keys ----
@@ -23,6 +24,7 @@ export const queryKeys = {
   orders: ["orders"] as const,
   recentOrders: ["recentOrders"] as const,
   leaderboard: ["leaderboard"] as const,
+  systemStatus: ["systemStatus"] as const,
 };
 
 // ---- Queries ----
@@ -84,6 +86,14 @@ export function useLeaderboard() {
     queryKey: queryKeys.leaderboard,
     queryFn: () => get<LeaderboardEntry[]>("/leaderboard"),
     refetchInterval: 60_000,
+  });
+}
+
+export function useSystemStatus() {
+  return useQuery<SystemStatusResponse>({
+    queryKey: queryKeys.systemStatus,
+    queryFn: () => get<SystemStatusResponse>("/system/status"),
+    refetchInterval: 30_000,
   });
 }
 

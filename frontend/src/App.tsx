@@ -9,7 +9,7 @@ import PlayerDetailsModal from "./components/PlayerDetailsModal";
 import TradeTerminal from "./components/TradeTerminal";
 import OnboardingModal from "./components/OnboardingModal";
 import type { OrderSide } from "./types";
-import { formatAmount } from "./utils/format";
+import { formatAmount, formatLocalDateTime } from "./utils/format";
 
 import {
   useUser,
@@ -18,6 +18,7 @@ import {
   useOrders,
   useRecentOrders,
   useLeaderboard,
+  useSystemStatus,
   useUpdateUserProfile,
 } from "./api";
 
@@ -42,6 +43,7 @@ export default function App() {
   const { data: orders } = useOrders(Boolean(user));
   const { data: recentOrders } = useRecentOrders(Boolean(user));
   const { data: leaderboard } = useLeaderboard();
+  const { data: systemStatus } = useSystemStatus();
   const updateUserProfile = useUpdateUserProfile();
 
   const balance = user?.balance ?? 0;
@@ -82,6 +84,33 @@ export default function App() {
       });
     });
   }, [players, tickerSortMode]);
+
+  const marketStatusTone = systemStatus?.market_status ?? "idle";
+  const marketStatusLabel =
+    marketStatusTone === "healthy"
+      ? "Healthy"
+      : marketStatusTone === "degraded"
+        ? "Delayed"
+        : "Idle";
+  const marketStatusBeaconClass =
+    marketStatusTone === "healthy"
+      ? "border-hex-gold-dim bg-hex-gold shadow-[0_0_10px_rgba(200,170,110,0.45)]"
+      : marketStatusTone === "degraded"
+        ? "border-red-700 bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.35)]"
+        : "border-hex-border bg-hex-bronze shadow-none";
+
+  let marketStatusDetail = "Checking market service...";
+  if (systemStatus) {
+    if (systemStatus.last_market_update_at) {
+      marketStatusDetail = `Last successful market refresh ${formatLocalDateTime(systemStatus.last_market_update_at)}. Expected cadence about every ${systemStatus.expected_update_interval_minutes} min.`;
+    } else if (systemStatus.tracked_player_count === 0) {
+      marketStatusDetail =
+        "No tracked players yet. Market polling will begin once the first player is onboarded.";
+    } else {
+      marketStatusDetail =
+        "Awaiting the first successful market refresh from Riot.";
+    }
+  }
 
   return (
     <div className="flex min-h-screen flex-col bg-hex-bg">
@@ -203,8 +232,25 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t-2 border-hex-border py-4 text-center font-mono text-xs text-hex-bronze">
-        NASHORDAQ v0.1.0 &mdash; Fantasy League Market
+      <footer className="border-t border-hex-border bg-hex-bg-alt py-2 font-mono text-[10px] text-hex-bronze">
+        <div className="mx-auto flex max-w-[88rem] flex-col gap-2 px-6 sm:flex-row sm:items-center sm:justify-between">
+          <div className="uppercase tracking-[0.16em] text-hex-gold/85">
+            NASHORDAQ v0.1.0
+          </div>
+
+          <div className="flex items-center gap-2 sm:max-w-2xl sm:justify-end sm:text-right">
+            <div className="flex items-center gap-2 uppercase tracking-[0.18em] text-hex-white/90">
+              <span
+                aria-hidden="true"
+                className={`inline-block h-2 w-2 border ${marketStatusBeaconClass}`}
+              />
+              <span>
+                {marketStatusLabel}
+              </span>
+            </div>
+            <div className="leading-4 text-hex-bronze/90">{marketStatusDetail}</div>
+          </div>
+        </div>
       </footer>
 
       {/* Trade modal */}

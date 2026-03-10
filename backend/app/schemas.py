@@ -7,6 +7,7 @@ from app.models import OrderSide, OrderStatus
 
 UserRole = Literal["player", "spectator"]
 PlayerTrend = Literal["up", "down", "flat"]
+MarketStatus = Literal["healthy", "degraded", "idle"]
 
 
 class UserResponse(BaseModel):
@@ -95,3 +96,12 @@ class LeaderboardEntry(BaseModel):
     display_name: str
     total_value: float
     rank: int
+
+
+class SystemStatusResponse(BaseModel):
+    service_status: Literal["ok"]
+    scheduler_running: bool
+    market_status: MarketStatus
+    tracked_player_count: int
+    expected_update_interval_minutes: int
+    last_market_update_at: datetime | None

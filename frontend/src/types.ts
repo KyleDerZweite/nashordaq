@@ -6,6 +6,7 @@
 export type OrderSide = "BUY" | "SELL";
 export type OrderStatus = "PENDING" | "EXECUTED" | "CANCELLED" | "REVERTED";
 export type PlayerTrend = "up" | "down" | "flat";
+export type MarketStatus = "healthy" | "degraded" | "idle";
 
 export interface UserResponse {
   id: number;
@@ -93,4 +94,13 @@ export interface LeaderboardEntry {
   display_name: string;
   total_value: number;
   rank: number;
+}
+
+export interface SystemStatusResponse {
+  service_status: "ok";
+  scheduler_running: boolean;
+  market_status: MarketStatus;
+  tracked_player_count: number;
+  expected_update_interval_minutes: number;
+  last_market_update_at: string | null;
 }

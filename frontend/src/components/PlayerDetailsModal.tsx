@@ -728,7 +728,7 @@ export default function PlayerDetailsModal({
 
                 <section className="border-2 border-hex-border bg-hex-bg p-5">
                   <div className="font-mono text-[11px] uppercase tracking-[0.2em] text-hex-bronze">
-                    Latest Update
+                    Last Market Change
                   </div>
                   <div className="mt-3 font-mono text-sm font-bold uppercase tracking-[0.16em] text-hex-white">
                     {player.last_updated
@@ -736,8 +736,8 @@ export default function PlayerDetailsModal({
                       : "Awaiting first live update"}
                   </div>
                   <div className="mt-2 font-mono text-xs leading-5 text-hex-bronze">
-                    This view recalculates ATH, ATL, trend direction, and chart
-                    slices from the stored market history.
+                    This reflects the last stored player price change. Global
+                    market service freshness is shown in the footer.
                   </div>
                 </section>
               </aside>
