@@ -116,7 +116,7 @@ async def test_market_update_job_settles_due_gamba_position(db_engine, monkeypat
             quantity=4.0,
             entry_price=25.0,
             scheduled_settlement_at=due_time,
-            settlement_multiplier=1.5,
+            settlement_multiplier=2.0,
             status=GambaStatus.ACTIVE,
         )
         session.add(position)
@@ -164,9 +164,9 @@ async def test_market_update_job_settles_due_gamba_position(db_engine, monkeypat
     assert user is not None
     assert position is not None
     assert sell_order is not None
-    assert user.balance == pytest.approx(1030.0)
+    assert user.balance == pytest.approx(1040.0)
     assert position.status == GambaStatus.SETTLED
     assert position.raw_pnl == pytest.approx(20.0)
-    assert position.settled_pnl == pytest.approx(30.0)
+    assert position.settled_pnl == pytest.approx(40.0)
     assert sell_order.quantity_value == pytest.approx(4.0)
-    assert sell_order.execution_price == pytest.approx(32.5)
+    assert sell_order.execution_price == pytest.approx(35.0)

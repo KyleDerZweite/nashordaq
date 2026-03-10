@@ -118,3 +118,33 @@ Orders are validated and executed in the same request.
 
 - **BUY:** `current_price * quantity` must not exceed user balance.
 - **SELL:** Available shares must be sufficient.
+
+## 6. Bank Credit
+
+Bank debt is a separate account-level liability. Borrowing adds cash immediately, but debt-adjusted net worth does not increase because the borrowed principal is offset by the new liability.
+
+### Credit Limit
+
+```
+credit_limit = min(2500, floor_to_50(0.25 * debt_adjusted_net_worth))
+```
+
+Where:
+
+```
+debt_adjusted_net_worth = cash_balance + holdings_value + active_gamba_mark_value - outstanding_debt
+```
+
+### Interest Accrual
+
+Outstanding debt compounds every 72 hours at 2.15%.
+
+```
+Debt_next = Debt_current + (Debt_current * 0.0215)
+```
+
+- Interest capitalizes on the full outstanding debt, including prior accrued interest.
+- Repayments always clear accrued interest before principal.
+- If the scheduler misses one or more rollover windows, the backend catches up one 72-hour interval at a time.
+
+Implementation: `app/banking.py`, `app/routers/bank.py`, `app/scheduler.py`

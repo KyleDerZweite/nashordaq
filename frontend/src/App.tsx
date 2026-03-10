@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import Header from "./components/Header";
+import BankModal from "./components/BankModal";
 import MarketGrid from "./components/MarketGrid";
 import Portfolio from "./components/Portfolio";
 import Leaderboard from "./components/Leaderboard";
@@ -13,6 +14,7 @@ import type { OrderSide } from "./types";
 import { formatAmount, formatLocalDateTime } from "./utils/format";
 
 import {
+  useBankSummary,
   useUser,
   usePlayers,
   usePortfolio,
@@ -35,6 +37,7 @@ export default function App() {
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
   const [tickerSortMode, setTickerSortMode] = useState<TickerSortMode>("value");
   const [isProfileEditorOpen, setIsProfileEditorOpen] = useState(false);
+  const [isBankModalOpen, setIsBankModalOpen] = useState(false);
 
   const { data: user } = useUser();
   const onboardingComplete = user?.onboarding_complete ?? false;
@@ -50,6 +53,8 @@ export default function App() {
   const balance = user?.balance ?? 0;
   const canTrade =
     Boolean(user) && user?.role === "player" && onboardingComplete;
+  const canManageBank = canTrade;
+  const { data: bankSummary } = useBankSummary(canManageBank);
 
   const tradePlayer =
     trade && players ? players.find((p) => p.id === trade.playerId) : null;
@@ -117,9 +122,11 @@ export default function App() {
     <div className="flex min-h-screen flex-col bg-hex-bg">
       <Header
         balance={balance}
+        debtOutstanding={bankSummary?.debt_outstanding ?? 0}
         username={user?.username}
         playerDisplayName={linkedPlayer?.display_name}
         canEditProfile={Boolean(linkedPlayer) && !isSpectator}
+        onOpenBank={() => setIsBankModalOpen(true)}
         onEditProfile={() => setIsProfileEditorOpen(true)}
       />
 
@@ -217,7 +224,7 @@ export default function App() {
 
           {/* Sidebar */}
           <div className="flex flex-col gap-6">
-            <Portfolio holdings={portfolio?.holdings ?? []} balance={balance} />
+            <Portfolio portfolio={portfolio} />
             <Leaderboard entries={leaderboard ?? []} />
             <GambaWidget balance={balance} canTrade={canTrade} />
           </div>
@@ -277,6 +284,13 @@ export default function App() {
             setTrade({ playerId: selectedPlayerId, side });
           }}
           onClose={() => setSelectedPlayerId(null)}
+        />
+      )}
+
+      {isBankModalOpen && (
+        <BankModal
+          canManageBank={canManageBank}
+          onClose={() => setIsBankModalOpen(false)}
         />
       )}
 

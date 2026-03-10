@@ -1,14 +1,17 @@
-import type { HoldingResponse } from "../types";
+import type { PortfolioResponse } from "../types";
 import { formatAmount } from "../utils/format";
 
 interface Props {
-  holdings: HoldingResponse[];
-  balance: number;
+  portfolio?: PortfolioResponse | null;
 }
 
-export default function Portfolio({ holdings, balance }: Props) {
-  const holdingsTotal = holdings.reduce((s, h) => s + h.market_value, 0);
-  const totalValue = balance + holdingsTotal;
+export default function Portfolio({ portfolio }: Props) {
+  const holdings = portfolio?.holdings ?? [];
+  const balance = portfolio?.balance ?? 0;
+  const holdingsValue = portfolio?.holdings_value ?? 0;
+  const gambaValue = portfolio?.active_gamba_value ?? 0;
+  const totalValue =
+    portfolio?.total_value ?? balance + holdingsValue + gambaValue;
 
   return (
     <section className="border-2 border-hex-gold-dim bg-hex-panel">
@@ -19,10 +22,11 @@ export default function Portfolio({ holdings, balance }: Props) {
       </div>
 
       {/* Summary numbers */}
-      <div className="grid grid-cols-3 divide-x-2 divide-hex-border border-b-2 border-hex-border">
+      <div className="grid grid-cols-4 divide-x-2 divide-hex-border border-b-2 border-hex-border">
         {[
           { label: "Poro", value: balance },
-          { label: "Holdings", value: holdingsTotal },
+          { label: "Holdings", value: holdingsValue },
+          { label: "Gamba", value: gambaValue },
           { label: "Total", value: totalValue },
         ].map((item) => (
           <div key={item.label} className="px-4 py-3 text-center">

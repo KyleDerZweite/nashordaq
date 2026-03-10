@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.banking import apply_due_interest
 from app.config import settings
 from app.database import SessionLocal
 from app.models import (
@@ -328,6 +329,15 @@ async def market_update_job() -> None:
             session.add(sell_order)
             await session.flush()
             position.sell_order_id = sell_order.id
+
+        indebted_users_result = await session.execute(
+            select(User).where(
+                (User.debt_principal > 0) | (User.debt_accrued_interest > 0)
+            )
+        )
+        indebted_users = indebted_users_result.scalars().all()
+        for user in indebted_users:
+            await apply_due_interest(session, user, as_of=datetime.now(UTC))
 
         await session.commit()
         if successful_player_refreshes > 0:

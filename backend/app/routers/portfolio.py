@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import CurrentOnboardedUser
+from app.banking import build_account_snapshot
 from app.database import get_session
 from app.models import Holding, HoldingLot, Order, TrackedPlayer
 from app.schemas import HoldingResponse, PortfolioResponse
@@ -19,6 +20,7 @@ async def get_portfolio(
     user: CurrentOnboardedUser,
     session: SessionDep,
 ) -> PortfolioResponse:
+    snapshot = await build_account_snapshot(session, user)
     result = await session.execute(
         select(Holding, TrackedPlayer)
         .join(TrackedPlayer, Holding.player_id == TrackedPlayer.id)
@@ -80,6 +82,9 @@ async def get_portfolio(
 
     return PortfolioResponse(
         balance=user.balance,
+        holdings_value=total_holdings_value,
+        active_gamba_value=snapshot.active_gamba_value,
+        debt_outstanding=snapshot.debt_outstanding,
         holdings=holdings,
-        total_value=user.balance + total_holdings_value,
+        total_value=snapshot.debt_adjusted_net_worth,
     )

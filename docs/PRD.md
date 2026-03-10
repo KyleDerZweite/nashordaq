@@ -10,15 +10,17 @@ A closed, trusted friend group. Public registration and email verification are o
 
 ## Core User Flows
 
-1. **Authentication:** User access is gated by an external Identity-Aware Proxy (e.g., Zitadel/Pangolin). Upon successful proxy authentication, the user is seamlessly passed to the Nashordaq interface. The backend automatically provisions a starting balance of 10,000 virtual currency the first time it detects a new `Remote-User` header.
+1. **Authentication:** User access is gated by an external Identity-Aware Proxy (e.g., Zitadel/Pangolin). Upon successful proxy authentication, the user is seamlessly passed to the Nashordaq interface. The backend automatically provisions a configured starting balance the first time it detects a new `Remote-User` header.
 
 2. **Market Overview:** Users can view a dashboard listing all tracked LoL accounts with their current share price and last update time.
 
 3. **Trading:** Users can place buy or sell market orders for whole shares of tracked players. Orders execute immediately at the currently visible market price. Sell proceeds are adjusted by holding time (short-hold reduction and long-hold bonus). Executed buy orders can be reverted for full refund within a short grace period (configurable, default 60 seconds), as long as none of those shares were sold.
 
-4. **Portfolio Management:** Users can view their cash balance, owned shares with current market values, and total net worth.
+4. **Portfolio Management:** Users can view their cash balance, owned shares with current market values, active Gamba exposure, outstanding bank debt, and total net worth.
 
-5. **Leaderboard:** Users can view a ranked list of all participants ordered by total net worth (cash + holdings value).
+5. **Leaderboard:** Users can view a ranked list of all participants ordered by total net worth (cash + holdings value + active Gamba mark value - outstanding bank debt).
+
+6. **Bank Credit:** Clicking the balance card opens a bank modal where onboarded player accounts can borrow virtual currency. Borrowing increases cash immediately, outstanding debt compounds by 2.15% every 72 hours, and repayment is allowed at any time.
 
 ## Constraints
 
@@ -36,3 +38,5 @@ A closed, trusted friend group. Public registration and email verification are o
 3. **Immediate Execution + Hold Adjustment:** Orders execute at the visible market price at submission time. Sell proceeds are adjusted by holding duration to discourage rapid flips and reward longer holds.
 
 4. **Transaction Ledger:** Every executed order produces an immutable transaction record. Balances and holdings are updated atomically within the same database transaction as price updates.
+
+5. **Bank Debt Ledger:** Borrowing, interest capitalization, and repayments are stored as immutable bank-ledger entries. Outstanding debt is account-level and is not represented as a trade order.

@@ -9,6 +9,7 @@ export type OrderSource = "MANUAL" | "GAMBA";
 export type PlayerTrend = "up" | "down" | "flat";
 export type MarketStatus = "healthy" | "degraded" | "idle";
 export type GambaStatus = "ACTIVE" | "SETTLED";
+export type BankLedgerEntryType = "BORROW" | "INTEREST" | "REPAYMENT";
 
 export interface UserResponse {
   id: number;
@@ -18,6 +19,37 @@ export interface UserResponse {
   linked_player_id: number | null;
   onboarding_complete: boolean;
   created_at: string;
+}
+
+export interface BankActionRequest {
+  amount: number;
+}
+
+export interface BankLedgerEntryResponse {
+  id: number;
+  entry_type: BankLedgerEntryType;
+  amount: number;
+  principal_change: number;
+  interest_change: number;
+  outstanding_debt: number;
+  created_at: string;
+}
+
+export interface BankSummaryResponse {
+  cash_balance: number;
+  holdings_value: number;
+  active_gamba_value: number;
+  debt_principal: number;
+  debt_accrued_interest: number;
+  debt_outstanding: number;
+  debt_adjusted_net_worth: number;
+  credit_limit: number;
+  available_credit: number;
+  next_interest_accrual_at: string | null;
+  next_interest_amount: number;
+  interest_rate_per_interval: number;
+  interest_interval_hours: number;
+  recent_entries: BankLedgerEntryResponse[];
 }
 
 export interface UserOnboardingCreate {
@@ -119,6 +151,9 @@ export interface HoldingResponse {
 
 export interface PortfolioResponse {
   balance: number;
+  holdings_value: number;
+  active_gamba_value: number;
+  debt_outstanding: number;
   holdings: HoldingResponse[];
   total_value: number;
 }

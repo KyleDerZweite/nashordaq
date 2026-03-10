@@ -28,10 +28,10 @@ async def test_place_buy_order(auth_client, tradable_player):
 
 
 async def test_place_buy_insufficient_balance(auth_client, tradable_player):
-    # Price is 25.0, balance is 10000.0, so 401 shares = 10025.0 > 10000.0
+    # Price is 25.0, balance is 1000.0, so 41 shares = 1025.0 > 1000.0
     resp = await auth_client.post(
         "/api/orders",
-        json={"player_id": tradable_player.id, "side": "BUY", "quantity": 401},
+        json={"player_id": tradable_player.id, "side": "BUY", "quantity": 41},
     )
     assert resp.status_code == 400
     assert "Insufficient balance" in resp.json()["detail"]

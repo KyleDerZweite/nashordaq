@@ -30,7 +30,7 @@ NEWT_SECRET=your-newt-secret
 |---|---|---|
 | `NASHORDAQ_AUTH_HEADER` | `Remote-User` | Header containing the authenticated username |
 | `NASHORDAQ_SPECTATOR_REMOTE_USER` | unset | Authenticated username that should be treated as spectator-only |
-| `NASHORDAQ_STARTING_BALANCE` | `10000.0` | Initial balance for new users |
+| `NASHORDAQ_STARTING_BALANCE` | `1000.0` | Initial balance for new users |
 | `NASHORDAQ_ENFORCE_TRUSTED_PROXY` | `false` | Reject auth headers from non-trusted source IPs |
 | `NASHORDAQ_TRUSTED_PROXY_CIDRS` | `127.0.0.1/32,::1/128` | Allowed proxy CIDR ranges (when enforcement is on) |
 | `NASHORDAQ_RIOT_API_BASE_URL` | `https://europe.api.riotgames.com` | Riot account/match API region |

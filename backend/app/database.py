@@ -35,6 +35,25 @@ async def init_db() -> None:
             await conn.execute(
                 text("ALTER TABLE users ADD COLUMN linked_player_id INTEGER")
             )
+        if "debt_principal" not in user_columns:
+            await conn.execute(
+                text("ALTER TABLE users ADD COLUMN debt_principal FLOAT DEFAULT 0.0")
+            )
+        if "debt_accrued_interest" not in user_columns:
+            await conn.execute(
+                text(
+                    "ALTER TABLE users ADD COLUMN debt_accrued_interest "
+                    "FLOAT DEFAULT 0.0"
+                )
+            )
+        if "debt_last_accrued_at" not in user_columns:
+            await conn.execute(
+                text("ALTER TABLE users ADD COLUMN debt_last_accrued_at DATETIME")
+            )
+        if "debt_next_accrual_at" not in user_columns:
+            await conn.execute(
+                text("ALTER TABLE users ADD COLUMN debt_next_accrual_at DATETIME")
+            )
 
         result = await conn.execute(text("PRAGMA table_info(holding_lots)"))
         columns = {row[1] for row in result.fetchall()}

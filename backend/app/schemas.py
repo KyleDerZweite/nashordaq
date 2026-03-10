@@ -3,7 +3,13 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from app.models import GambaStatus, OrderSide, OrderSource, OrderStatus
+from app.models import (
+    BankLedgerEntryType,
+    GambaStatus,
+    OrderSide,
+    OrderSource,
+    OrderStatus,
+)
 
 UserRole = Literal["player", "spectator"]
 PlayerTrend = Literal["up", "down", "flat"]
@@ -18,6 +24,37 @@ class UserResponse(BaseModel):
     linked_player_id: int | None
     onboarding_complete: bool
     created_at: datetime
+
+
+class BankLedgerEntryResponse(BaseModel):
+    id: int
+    entry_type: BankLedgerEntryType
+    amount: float
+    principal_change: float
+    interest_change: float
+    outstanding_debt: float
+    created_at: datetime
+
+
+class BankActionRequest(BaseModel):
+    amount: float = Field(gt=0)
+
+
+class BankSummaryResponse(BaseModel):
+    cash_balance: float
+    holdings_value: float
+    active_gamba_value: float
+    debt_principal: float
+    debt_accrued_interest: float
+    debt_outstanding: float
+    debt_adjusted_net_worth: float
+    credit_limit: float
+    available_credit: float
+    next_interest_accrual_at: datetime | None
+    next_interest_amount: float
+    interest_rate_per_interval: float
+    interest_interval_hours: float
+    recent_entries: list[BankLedgerEntryResponse]
 
 
 class UserOnboardingCreate(BaseModel):
@@ -119,6 +156,9 @@ class HoldingResponse(BaseModel):
 
 class PortfolioResponse(BaseModel):
     balance: float
+    holdings_value: float
+    active_gamba_value: float
+    debt_outstanding: float
     holdings: list[HoldingResponse]
     total_value: float
 

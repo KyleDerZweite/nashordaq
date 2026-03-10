@@ -31,12 +31,25 @@ class GambaStatus(enum.StrEnum):
     SETTLED = "SETTLED"
 
 
+class BankLedgerEntryType(enum.StrEnum):
+    BORROW = "BORROW"
+    INTEREST = "INTEREST"
+    REPAYMENT = "REPAYMENT"
+
+
 class User(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     username: Mapped[str] = mapped_column(String(255), unique=True, index=True)
-    balance: Mapped[float] = mapped_column(Float, default=10000.0)
+    balance: Mapped[float] = mapped_column(Float, default=1000.0)
+    debt_principal: Mapped[float] = mapped_column(Float, default=0.0)
+    debt_accrued_interest: Mapped[float] = mapped_column(Float, default=0.0)
+    debt_last_accrued_at: Mapped[datetime | None] = mapped_column(default=None)
+    debt_next_accrual_at: Mapped[datetime | None] = mapped_column(
+        default=None,
+        index=True,
+    )
     linked_player_id: Mapped[int | None] = mapped_column(
         ForeignKey("tracked_players.id"), unique=True, default=None
     )
@@ -46,6 +59,9 @@ class User(Base):
     holding_lots: Mapped[list["HoldingLot"]] = relationship(back_populates="user")
     orders: Mapped[list["Order"]] = relationship(back_populates="user")
     gamba_positions: Mapped[list["GambaPosition"]] = relationship(back_populates="user")
+    bank_ledger_entries: Mapped[list["BankLedgerEntry"]] = relationship(
+        back_populates="user"
+    )
     linked_player: Mapped["TrackedPlayer | None"] = relationship(
         foreign_keys=[linked_player_id],
         back_populates="linked_users",
@@ -190,6 +206,21 @@ class GambaPosition(Base):
 
     user: Mapped["User"] = relationship(back_populates="gamba_positions")
     player: Mapped["TrackedPlayer"] = relationship(back_populates="gamba_positions")
+
+
+class BankLedgerEntry(Base):
+    __tablename__ = "bank_ledger_entries"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    entry_type: Mapped[BankLedgerEntryType] = mapped_column(Enum(BankLedgerEntryType))
+    amount: Mapped[float] = mapped_column(Float)
+    principal_change: Mapped[float] = mapped_column(Float, default=0.0)
+    interest_change: Mapped[float] = mapped_column(Float, default=0.0)
+    outstanding_debt: Mapped[float] = mapped_column(Float)
+    created_at: Mapped[datetime] = mapped_column(insert_default=func.now(), index=True)
+
+    user: Mapped["User"] = relationship(back_populates="bank_ledger_entries")
 
 
 class PriceHistory(Base):

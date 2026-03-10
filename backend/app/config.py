@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     trusted_proxy_cidrs: str = "127.0.0.1/32,::1/128"
 
     # Economy
-    starting_balance: float = 10000.0
+    starting_balance: float = 1000.0
     short_hold_fee_rate: float = 0.02
     short_hold_fee_window_hours: float = 6.0
     long_hold_bonus_rate: float = 0.02
@@ -43,8 +43,13 @@ class Settings(BaseSettings):
     buy_revert_grace_seconds: int = 60
     gamba_min_hold_hours: float = 24.0
     gamba_max_hold_hours: float = 168.0
-    gamba_settlement_multiplier: float = 1.5
+    gamba_settlement_multiplier: float = 2.0
     gamba_max_active_positions_per_user: int = 1
+    bank_interest_rate_per_interval: float = 0.0215
+    bank_interest_interval_hours: float = 72.0
+    bank_max_borrow_absolute: float = 2500.0
+    bank_max_borrow_net_worth_ratio: float = 0.25
+    bank_credit_limit_rounding_increment: float = 50.0
 
 
 settings = Settings()

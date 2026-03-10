@@ -3,15 +3,19 @@ import { formatAmount } from "../utils/format";
 
 export default function Header({
   balance,
+  debtOutstanding = 0,
   username,
   playerDisplayName,
   canEditProfile = false,
+  onOpenBank,
   onEditProfile,
 }: {
   balance: number;
+  debtOutstanding?: number;
   username?: string;
   playerDisplayName?: string;
   canEditProfile?: boolean;
+  onOpenBank?: () => void;
   onEditProfile?: () => void;
 }) {
   const initial = username ? username[0].toUpperCase() : "?";
@@ -37,15 +41,37 @@ export default function Header({
 
         {/* Account bar */}
         <div className="flex items-center gap-6">
-          <div className="border-2 border-hex-gold-dim px-4 py-2 shadow-brutal-sm">
-            <span className="text-xs uppercase tracking-wider text-hex-bronze">
-              Balance
-            </span>
-            <p className="font-mono text-lg font-bold text-hex-gold">
-              {formatAmount(balance)}
-              <span className="ml-1 text-xs text-hex-bronze">P</span>
-            </p>
-          </div>
+          <button
+            type="button"
+            onClick={onOpenBank}
+            className="min-w-52 border-2 border-hex-gold-dim px-3.5 py-1.5 text-left shadow-brutal-sm transition-colors hover:border-hex-gold hover:bg-hex-bg-alt/70"
+          >
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <div className="text-xs uppercase tracking-wider text-hex-bronze">
+                  Balance
+                </div>
+                <p className="font-mono text-lg font-bold text-hex-gold">
+                  {formatAmount(balance)}
+                  <span className="ml-1 text-xs text-hex-bronze">P</span>
+                </p>
+              </div>
+              <div className="text-right">
+                <div className="text-xs uppercase tracking-wider text-hex-bronze">
+                  Debt
+                </div>
+                <p
+                  className={`font-mono text-sm font-bold ${
+                    debtOutstanding > 0 ? "text-red-400" : "text-hex-bronze"
+                  }`}
+                >
+                  {debtOutstanding > 0 ? "-" : ""}
+                  {formatAmount(debtOutstanding)}
+                  <span className="ml-1 text-[10px] text-hex-bronze">P</span>
+                </p>
+              </div>
+            </div>
+          </button>
           <div className="relative">
             <button
               type="button"

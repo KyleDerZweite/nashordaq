@@ -17,6 +17,9 @@ async def test_empty_portfolio(auth_client):
     assert resp.status_code == 200
     data = resp.json()
     assert data["balance"] == settings.starting_balance
+    assert data["holdings_value"] == 0.0
+    assert data["active_gamba_value"] == 0.0
+    assert data["debt_outstanding"] == 0.0
     assert data["holdings"] == []
     assert data["total_value"] == settings.starting_balance
 
@@ -42,6 +45,9 @@ async def test_portfolio_with_holdings(auth_client, seeded_player, db_session):
     assert data["holdings"][0]["market_value"] == 250.0
     assert data["holdings"][0]["unrealized_pnl"] == 250.0
     assert data["holdings"][0]["unrealized_pnl_pct"] == 0.0
+    assert data["holdings_value"] == 250.0
+    assert data["active_gamba_value"] == 0.0
+    assert data["debt_outstanding"] == 0.0
     assert data["total_value"] == settings.starting_balance + 250.0
 
 
@@ -68,3 +74,4 @@ async def test_portfolio_shows_buy_price_vs_current(
     assert data["holdings"][0]["market_value"] == 60.0
     assert data["holdings"][0]["unrealized_pnl"] == 10.0
     assert data["holdings"][0]["unrealized_pnl_pct"] == 20.0
+    assert data["holdings_value"] == 60.0

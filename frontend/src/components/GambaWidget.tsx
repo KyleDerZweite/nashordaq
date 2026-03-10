@@ -20,6 +20,7 @@ export default function GambaWidget({ balance, canTrade }: Props) {
     () => positions?.find((position) => position.status === "ACTIVE") ?? null,
     [positions],
   );
+  const displayMultiplier = activePosition?.settlement_multiplier ?? 2;
 
   const parsedCashAmount = Number(cashAmount);
   const hasValidAmount =
@@ -69,7 +70,7 @@ export default function GambaWidget({ balance, canTrade }: Props) {
               Multiplier
             </div>
             <div className="font-mono text-sm font-bold text-hex-gold">
-              x1.5
+              x{Number.isInteger(displayMultiplier) ? displayMultiplier.toFixed(0) : displayMultiplier}
             </div>
           </div>
         </div>

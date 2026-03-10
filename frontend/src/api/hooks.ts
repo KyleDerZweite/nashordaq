@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { get, post, put, del } from "./client";
 import type {
+  BankActionRequest,
+  BankSummaryResponse,
   GambaCreate,
   GambaPositionResponse,
   OrderDetailResponse,
@@ -29,6 +31,7 @@ export const queryKeys = {
   leaderboard: ["leaderboard"] as const,
   systemStatus: ["systemStatus"] as const,
   gamba: ["gamba"] as const,
+  bank: ["bank"] as const,
 };
 
 // ---- Queries ----
@@ -118,6 +121,15 @@ export function useGambaPositions(enabled = true) {
   });
 }
 
+export function useBankSummary(enabled = true) {
+  return useQuery<BankSummaryResponse>({
+    queryKey: queryKeys.bank,
+    queryFn: () => get<BankSummaryResponse>("/bank"),
+    enabled,
+    refetchInterval: 30_000,
+  });
+}
+
 // ---- Mutations ----
 
 export function usePlaceOrder() {
@@ -187,6 +199,33 @@ export function useCreateGambaPosition() {
       void qc.invalidateQueries({ queryKey: queryKeys.user });
       void qc.invalidateQueries({ queryKey: queryKeys.orders });
       void qc.invalidateQueries({ queryKey: queryKeys.recentOrders });
+    },
+  });
+}
+
+function invalidateBankRelatedQueries(qc: ReturnType<typeof useQueryClient>) {
+  void qc.invalidateQueries({ queryKey: queryKeys.bank });
+  void qc.invalidateQueries({ queryKey: queryKeys.user });
+  void qc.invalidateQueries({ queryKey: queryKeys.portfolio });
+  void qc.invalidateQueries({ queryKey: queryKeys.leaderboard });
+}
+
+export function useBorrowFromBank() {
+  const qc = useQueryClient();
+  return useMutation<BankSummaryResponse, Error, BankActionRequest>({
+    mutationFn: (body) => post<BankSummaryResponse>("/bank/borrow", body),
+    onSuccess: () => {
+      invalidateBankRelatedQueries(qc);
+    },
+  });
+}
+
+export function useRepayBankDebt() {
+  const qc = useQueryClient();
+  return useMutation<BankSummaryResponse, Error, BankActionRequest>({
+    mutationFn: (body) => post<BankSummaryResponse>("/bank/repay", body),
+    onSuccess: () => {
+      invalidateBankRelatedQueries(qc);
     },
   });
 }

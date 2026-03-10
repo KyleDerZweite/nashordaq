@@ -80,7 +80,7 @@ All endpoints are prefixed with `/api` except the health check.
 
 ## Authentication
 
-Authentication is handled by Pangolin, which acts as an Identity-Aware Proxy. When SSO authentication is configured, Pangolin forwards identity headers to downstream services (`Remote-User`, `Remote-Email`, `Remote-Name`, `Remote-Role`). The backend reads the `Remote-User` header (configurable via `NASHORDAQ_AUTH_HEADER`) and auto-provisions new users with a starting balance of 10,000. Each user then completes a one-time self-onboarding step to link their Riot account. No passwords, JWTs, or login forms exist in the application.
+Authentication is handled by Pangolin, which acts as an Identity-Aware Proxy. When SSO authentication is configured, Pangolin forwards identity headers to downstream services (`Remote-User`, `Remote-Email`, `Remote-Name`, `Remote-Role`). The backend reads the `Remote-User` header (configurable via `NASHORDAQ_AUTH_HEADER`) and auto-provisions new users with a starting balance of 1,000. Each user then completes a one-time self-onboarding step to link their Riot account. No passwords, JWTs, or login forms exist in the application.
 
 ## Security Boundary and Hardening
 
