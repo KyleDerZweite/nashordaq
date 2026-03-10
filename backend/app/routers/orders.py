@@ -13,13 +13,14 @@ from app.models import (
     HoldingLot,
     Order,
     OrderSide,
+    OrderSource,
     OrderStatus,
     TrackedPlayer,
     Transaction,
     User,
 )
 from app.pricing import calculate_sell_multiplier
-from app.schemas import OrderCreate, OrderResponse
+from app.schemas import OrderCreate, OrderDetailResponse, OrderResponse
 
 router = APIRouter(tags=["orders"])
 
@@ -65,11 +66,51 @@ def _order_response(
         player_name=player_name,
         user_name=user_name,
         side=order.side,
-        quantity=order.quantity,
+        quantity=(
+            order.quantity_value
+            if order.quantity_value is not None
+            else float(order.quantity)
+        ),
         status=order.status,
+        source=order.source,
         execution_price=order.execution_price,
         created_at=order.created_at,
         executed_at=order.executed_at,
+    )
+
+
+def _order_detail_response(
+    order: Order,
+    player_name: str,
+    user_name: str | None = None,
+) -> OrderDetailResponse:
+    quantity = (
+        order.quantity_value
+        if order.quantity_value is not None
+        else float(order.quantity)
+    )
+    total_value = None
+    if order.execution_price is not None:
+        total_value = order.execution_price * quantity
+
+    return OrderDetailResponse(
+        id=order.id,
+        player_id=order.player_id,
+        player_name=player_name,
+        user_name=user_name,
+        side=order.side,
+        quantity=quantity,
+        status=order.status,
+        source=order.source,
+        execution_price=order.execution_price,
+        created_at=order.created_at,
+        executed_at=order.executed_at,
+        total_value=total_value,
+        gross_execution_price=order.gross_execution_price,
+        gross_total_value=order.gross_total_value,
+        entry_total_value=order.entry_total_value,
+        adjustment_value=order.adjustment_value,
+        adjustment_reason=order.adjustment_reason,
     )
 
 
@@ -160,8 +201,15 @@ async def place_order(
             player_id=body.player_id,
             side=body.side,
             quantity=body.quantity,
+            quantity_value=float(body.quantity),
             status=OrderStatus.EXECUTED,
+            source=OrderSource.MANUAL,
             execution_price=execution_price,
+            gross_execution_price=execution_price,
+            gross_total_value=total_cost,
+            entry_total_value=total_cost,
+            adjustment_value=0.0,
+            adjustment_reason=None,
             executed_at=now,
         )
         session.add(order)
@@ -220,7 +268,22 @@ async def place_order(
 
         remaining = body.quantity
         gross_price = player.current_price
+        gross_total = gross_price * body.quantity
         adjusted_total = 0.0
+        entry_total_value = 0.0
+
+        buy_order_ids = [
+            lot.buy_order_id for lot in lots if lot.buy_order_id is not None
+        ]
+        buy_order_price_map: dict[int, float] = {}
+        if buy_order_ids:
+            buy_orders_result = await session.execute(
+                select(Order).where(Order.id.in_(buy_order_ids))
+            )
+            buy_order_price_map = {
+                buy_order.id: (buy_order.execution_price or 0.0)
+                for buy_order in buy_orders_result.scalars()
+            }
 
         for lot in lots:
             if remaining <= 0:
@@ -243,6 +306,11 @@ async def place_order(
             )
 
             adjusted_total += consumed * gross_price * multiplier
+            if lot.buy_order_id is not None:
+                entry_total_value += consumed * buy_order_price_map.get(
+                    lot.buy_order_id,
+                    0.0,
+                )
             lot.quantity -= consumed
             remaining -= consumed
 
@@ -258,8 +326,15 @@ async def place_order(
             player_id=body.player_id,
             side=body.side,
             quantity=body.quantity,
+            quantity_value=float(body.quantity),
             status=OrderStatus.EXECUTED,
+            source=OrderSource.MANUAL,
             execution_price=effective_execution_price,
+            gross_execution_price=gross_price,
+            gross_total_value=gross_total,
+            entry_total_value=entry_total_value,
+            adjustment_value=adjusted_total - gross_total,
+            adjustment_reason="HOLD_DURATION",
             executed_at=now,
         )
         session.add(order)
@@ -321,6 +396,41 @@ async def list_recent_orders(
     return await _build_order_responses(session, orders)
 
 
+@router.get("/orders/{order_id}", response_model=OrderDetailResponse)
+async def get_order_detail(
+    order_id: int,
+    user: CurrentUser,
+    session: SessionDep,
+) -> OrderDetailResponse:
+    del user
+
+    result = await session.execute(select(Order).where(Order.id == order_id))
+    order = result.scalar_one_or_none()
+    if order is None:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    player_result = await session.execute(
+        select(TrackedPlayer).where(TrackedPlayer.id == order.player_id)
+    )
+    player = player_result.scalar_one_or_none()
+    user_result = await session.execute(select(User).where(User.id == order.user_id))
+    order_user = user_result.scalar_one_or_none()
+
+    if player is None or order_user is None:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    user_name = order_user.username
+    if order_user.linked_player_id is not None:
+        linked_player_result = await session.execute(
+            select(TrackedPlayer).where(TrackedPlayer.id == order_user.linked_player_id)
+        )
+        linked_player = linked_player_result.scalar_one_or_none()
+        if linked_player is not None:
+            user_name = linked_player.display_name
+
+    return _order_detail_response(order, player.display_name, user_name)
+
+
 @router.delete("/orders/{order_id}", response_model=OrderResponse)
 async def cancel_order(
     order_id: int,
@@ -345,6 +455,9 @@ async def cancel_order(
         await session.commit()
         await session.refresh(order)
         return _order_response(order, player.display_name)
+
+    if order.source != OrderSource.MANUAL:
+        raise HTTPException(status_code=400, detail="Order cannot be cancelled")
 
     if order.status != OrderStatus.EXECUTED or order.side != OrderSide.BUY:
         raise HTTPException(status_code=400, detail="Order cannot be cancelled")

@@ -5,6 +5,13 @@ export function formatAmount(value: number): string {
   });
 }
 
+export function formatQuantity(value: number): string {
+  return value.toLocaleString("de-DE", {
+    minimumFractionDigits: Number.isInteger(value) ? 0 : 2,
+    maximumFractionDigits: 4,
+  });
+}
+
 const BACKEND_UTC_OFFSET_PATTERN = /(?:Z|[+-]\d{2}:\d{2})$/i;
 
 export function parseBackendUtcTimestamp(value: string): Date {

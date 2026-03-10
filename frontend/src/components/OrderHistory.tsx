@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import type { OrderResponse } from "../types";
 import { useCancelOrder } from "../api";
-import { formatAmount } from "../utils/format";
+import OrderDetailsModal from "./OrderDetailsModal";
+import { formatAmount, formatQuantity } from "../utils/format";
 
 interface Props {
   ownOrders: OrderResponse[];
@@ -18,6 +19,7 @@ export default function OrderHistory({
 }: Props) {
   const cancelOrder = useCancelOrder();
   const [view, setView] = useState<OrderHistoryView>(defaultView);
+  const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
 
   const orders = useMemo(
     () => (view === "own" ? ownOrders : allOrders),
@@ -74,13 +76,19 @@ export default function OrderHistory({
             {orders.map((o) => (
               <tr
                 key={o.id}
-                className="border-b border-hex-border/50 transition-colors hover:bg-hex-bg-alt"
+                className="cursor-pointer border-b border-hex-border/50 transition-colors hover:bg-hex-bg-alt"
+                onClick={() => setSelectedOrderId(o.id)}
               >
                 <td className="px-4 py-2.5 font-mono text-xs text-hex-bronze">
                   #{o.id}
                 </td>
                 <td className="px-4 py-2.5 font-mono text-sm text-hex-white">
                   {o.player_name}
+                  {o.source === "GAMBA" && (
+                    <span className="ml-2 inline-block border border-hex-gold-dim px-1.5 py-0.5 align-middle font-mono text-[10px] font-bold uppercase tracking-wider text-hex-gold">
+                      Gamba
+                    </span>
+                  )}
                 </td>
                 {view === "all" && (
                   <td className="px-4 py-2.5 font-mono text-sm text-hex-bronze">
@@ -99,7 +107,7 @@ export default function OrderHistory({
                   </span>
                 </td>
                 <td className="px-4 py-2.5 text-right font-mono text-sm text-hex-bronze">
-                  {o.quantity}
+                  {formatQuantity(o.quantity)}
                 </td>
                 <td className="px-4 py-2.5 text-right font-mono text-sm text-hex-gold">
                   {o.execution_price != null
@@ -123,10 +131,14 @@ export default function OrderHistory({
                 </td>
                 <td className="px-4 py-2.5">
                   {view === "own" &&
+                    o.source === "MANUAL" &&
                     (o.status === "PENDING" ||
                       (o.status === "EXECUTED" && o.side === "BUY")) && (
                       <button
-                        onClick={() => cancelOrder.mutate(o.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          cancelOrder.mutate(o.id);
+                        }}
                         disabled={cancelOrder.isPending}
                         className="font-mono text-xs font-bold text-hex-zaun transition-colors hover:text-hex-white"
                       >
@@ -155,6 +167,13 @@ export default function OrderHistory({
         <p className="border-t border-hex-border/50 px-4 py-2 font-mono text-xs text-hex-zaun">
           {cancelOrder.error.message}
         </p>
+      )}
+
+      {selectedOrderId !== null && (
+        <OrderDetailsModal
+          orderId={selectedOrderId}
+          onClose={() => setSelectedOrderId(null)}
+        />
       )}
     </section>
   );

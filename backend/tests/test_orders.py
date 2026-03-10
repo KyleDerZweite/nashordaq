@@ -406,6 +406,16 @@ async def test_sell_gets_long_hold_bonus(auth_client, tradable_player, db_sessio
     # >=12h hold gets +2% bonus: 25.0 * 1.02
     assert sell_resp.json()["execution_price"] == 25.5
 
+    order_result = await db_session.execute(
+        select(Order).where(Order.id == sell_resp.json()["id"])
+    )
+    order = order_result.scalar_one()
+    assert order.gross_execution_price == pytest.approx(25.0)
+    assert order.gross_total_value == pytest.approx(250.0)
+    assert order.entry_total_value == pytest.approx(250.0)
+    assert order.adjustment_value == pytest.approx(5.0)
+    assert order.adjustment_reason == "HOLD_DURATION"
+
 
 async def test_buy_lot_links_to_order(auth_client, tradable_player, db_session):
     buy_resp = await auth_client.post(
@@ -442,3 +452,44 @@ async def test_revert_sets_order_status(auth_client, tradable_player, db_session
     order_result = await db_session.execute(select(Order).where(Order.id == order_id))
     order = order_result.scalar_one()
     assert order.status == OrderStatus.REVERTED
+
+
+async def test_get_order_detail_returns_hold_adjustment_value(
+    auth_client,
+    tradable_player,
+    db_session,
+):
+    buy_resp = await auth_client.post(
+        "/api/orders",
+        json={"player_id": tradable_player.id, "side": "BUY", "quantity": 10},
+    )
+    assert buy_resp.status_code == 201
+
+    me_resp = await auth_client.get("/api/user/me")
+    user_id = me_resp.json()["id"]
+
+    lots_result = await db_session.execute(
+        select(HoldingLot).where(
+            HoldingLot.user_id == user_id,
+            HoldingLot.player_id == tradable_player.id,
+        )
+    )
+    lot = lots_result.scalar_one()
+    lot.acquired_at = datetime.now(UTC)
+    await db_session.commit()
+
+    sell_resp = await auth_client.post(
+        "/api/orders",
+        json={"player_id": tradable_player.id, "side": "SELL", "quantity": 10},
+    )
+    assert sell_resp.status_code == 201
+
+    detail_resp = await auth_client.get(f"/api/orders/{sell_resp.json()['id']}")
+    assert detail_resp.status_code == 200
+    data = detail_resp.json()
+    assert data["gross_execution_price"] == pytest.approx(25.0)
+    assert data["gross_total_value"] == pytest.approx(250.0)
+    assert data["entry_total_value"] == pytest.approx(250.0)
+    assert data["adjustment_value"] == pytest.approx(-5.0)
+    assert data["adjustment_reason"] == "HOLD_DURATION"
+    assert data["total_value"] == pytest.approx(245.0)

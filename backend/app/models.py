@@ -21,6 +21,16 @@ class OrderStatus(enum.StrEnum):
     REVERTED = "REVERTED"
 
 
+class OrderSource(enum.StrEnum):
+    MANUAL = "MANUAL"
+    GAMBA = "GAMBA"
+
+
+class GambaStatus(enum.StrEnum):
+    ACTIVE = "ACTIVE"
+    SETTLED = "SETTLED"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -35,6 +45,7 @@ class User(Base):
     holdings: Mapped[list["Holding"]] = relationship(back_populates="user")
     holding_lots: Mapped[list["HoldingLot"]] = relationship(back_populates="user")
     orders: Mapped[list["Order"]] = relationship(back_populates="user")
+    gamba_positions: Mapped[list["GambaPosition"]] = relationship(back_populates="user")
     linked_player: Mapped["TrackedPlayer | None"] = relationship(
         foreign_keys=[linked_player_id],
         back_populates="linked_users",
@@ -64,6 +75,9 @@ class TrackedPlayer(Base):
     holdings: Mapped[list["Holding"]] = relationship(back_populates="player")
     holding_lots: Mapped[list["HoldingLot"]] = relationship(back_populates="player")
     orders: Mapped[list["Order"]] = relationship(back_populates="player")
+    gamba_positions: Mapped[list["GambaPosition"]] = relationship(
+        back_populates="player"
+    )
     price_history: Mapped[list["PriceHistory"]] = relationship(back_populates="player")
     linked_users: Mapped[list["User"]] = relationship(
         back_populates="linked_player",
@@ -109,10 +123,19 @@ class Order(Base):
     player_id: Mapped[int] = mapped_column(ForeignKey("tracked_players.id"), index=True)
     side: Mapped[OrderSide] = mapped_column(Enum(OrderSide))
     quantity: Mapped[int] = mapped_column(Integer)
+    quantity_value: Mapped[float | None] = mapped_column(Float, default=None)
     status: Mapped[OrderStatus] = mapped_column(
         Enum(OrderStatus), default=OrderStatus.PENDING
     )
+    source: Mapped[OrderSource] = mapped_column(
+        Enum(OrderSource), default=OrderSource.MANUAL
+    )
     execution_price: Mapped[float | None] = mapped_column(Float, default=None)
+    gross_execution_price: Mapped[float | None] = mapped_column(Float, default=None)
+    gross_total_value: Mapped[float | None] = mapped_column(Float, default=None)
+    entry_total_value: Mapped[float | None] = mapped_column(Float, default=None)
+    adjustment_value: Mapped[float | None] = mapped_column(Float, default=None)
+    adjustment_reason: Mapped[str | None] = mapped_column(String(32), default=None)
     created_at: Mapped[datetime] = mapped_column(insert_default=func.now())
     executed_at: Mapped[datetime | None] = mapped_column(default=None)
 
@@ -137,6 +160,36 @@ class Transaction(Base):
     created_at: Mapped[datetime] = mapped_column(insert_default=func.now())
 
     order: Mapped["Order"] = relationship(back_populates="transaction")
+
+
+class GambaPosition(Base):
+    __tablename__ = "gamba_positions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    player_id: Mapped[int] = mapped_column(ForeignKey("tracked_players.id"), index=True)
+    buy_order_id: Mapped[int | None] = mapped_column(
+        ForeignKey("orders.id"), default=None
+    )
+    sell_order_id: Mapped[int | None] = mapped_column(
+        ForeignKey("orders.id"), default=None
+    )
+    cash_amount: Mapped[float] = mapped_column(Float)
+    quantity: Mapped[float] = mapped_column(Float)
+    entry_price: Mapped[float] = mapped_column(Float)
+    scheduled_settlement_at: Mapped[datetime] = mapped_column(index=True)
+    settlement_multiplier: Mapped[float] = mapped_column(Float)
+    status: Mapped[GambaStatus] = mapped_column(
+        Enum(GambaStatus), default=GambaStatus.ACTIVE, index=True
+    )
+    exit_price: Mapped[float | None] = mapped_column(Float, default=None)
+    settled_at: Mapped[datetime | None] = mapped_column(default=None)
+    raw_pnl: Mapped[float | None] = mapped_column(Float, default=None)
+    settled_pnl: Mapped[float | None] = mapped_column(Float, default=None)
+    created_at: Mapped[datetime] = mapped_column(insert_default=func.now())
+
+    user: Mapped["User"] = relationship(back_populates="gamba_positions")
+    player: Mapped["TrackedPlayer"] = relationship(back_populates="gamba_positions")
 
 
 class PriceHistory(Base):

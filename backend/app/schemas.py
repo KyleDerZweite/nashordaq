@@ -3,7 +3,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from app.models import OrderSide, OrderStatus
+from app.models import GambaStatus, OrderSide, OrderSource, OrderStatus
 
 UserRole = Literal["player", "spectator"]
 PlayerTrend = Literal["up", "down", "flat"]
@@ -67,11 +67,42 @@ class OrderResponse(BaseModel):
     player_name: str
     user_name: str | None = None
     side: OrderSide
-    quantity: int
+    quantity: float
     status: OrderStatus
+    source: OrderSource
     execution_price: float | None
     created_at: datetime
     executed_at: datetime | None
+
+
+class OrderDetailResponse(OrderResponse):
+    total_value: float | None
+    gross_execution_price: float | None
+    gross_total_value: float | None
+    entry_total_value: float | None
+    adjustment_value: float | None
+    adjustment_reason: str | None
+
+
+class GambaCreate(BaseModel):
+    cash_amount: float = Field(gt=0)
+
+
+class GambaPositionResponse(BaseModel):
+    id: int
+    player_id: int
+    player_name: str
+    cash_amount: float
+    quantity: float
+    entry_price: float
+    scheduled_settlement_at: datetime
+    settlement_multiplier: float
+    status: GambaStatus
+    exit_price: float | None
+    settled_at: datetime | None
+    raw_pnl: float | None
+    settled_pnl: float | None
+    created_at: datetime
 
 
 class HoldingResponse(BaseModel):

@@ -43,6 +43,39 @@ async def init_db() -> None:
                 text("ALTER TABLE holding_lots ADD COLUMN buy_order_id INTEGER")
             )
 
+        order_cols_result = await conn.execute(text("PRAGMA table_info(orders)"))
+        order_columns = {row[1] for row in order_cols_result.fetchall()}
+        if "quantity_value" not in order_columns:
+            await conn.execute(
+                text("ALTER TABLE orders ADD COLUMN quantity_value FLOAT")
+            )
+        if "source" not in order_columns:
+            await conn.execute(
+                text(
+                    "ALTER TABLE orders ADD COLUMN source VARCHAR(10) DEFAULT 'MANUAL'"
+                )
+            )
+        if "gross_execution_price" not in order_columns:
+            await conn.execute(
+                text("ALTER TABLE orders ADD COLUMN gross_execution_price FLOAT")
+            )
+        if "gross_total_value" not in order_columns:
+            await conn.execute(
+                text("ALTER TABLE orders ADD COLUMN gross_total_value FLOAT")
+            )
+        if "entry_total_value" not in order_columns:
+            await conn.execute(
+                text("ALTER TABLE orders ADD COLUMN entry_total_value FLOAT")
+            )
+        if "adjustment_value" not in order_columns:
+            await conn.execute(
+                text("ALTER TABLE orders ADD COLUMN adjustment_value FLOAT")
+            )
+        if "adjustment_reason" not in order_columns:
+            await conn.execute(
+                text("ALTER TABLE orders ADD COLUMN adjustment_reason VARCHAR(32)")
+            )
+
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
     async with SessionLocal() as session:

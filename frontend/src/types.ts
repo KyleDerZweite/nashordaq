@@ -5,8 +5,10 @@
 
 export type OrderSide = "BUY" | "SELL";
 export type OrderStatus = "PENDING" | "EXECUTED" | "CANCELLED" | "REVERTED";
+export type OrderSource = "MANUAL" | "GAMBA";
 export type PlayerTrend = "up" | "down" | "flat";
 export type MarketStatus = "healthy" | "degraded" | "idle";
+export type GambaStatus = "ACTIVE" | "SETTLED";
 
 export interface UserResponse {
   id: number;
@@ -67,9 +69,40 @@ export interface OrderResponse {
   side: OrderSide;
   quantity: number;
   status: OrderStatus;
+  source: OrderSource;
   execution_price: number | null;
   created_at: string;
   executed_at: string | null;
+}
+
+export interface OrderDetailResponse extends OrderResponse {
+  total_value: number | null;
+  gross_execution_price: number | null;
+  gross_total_value: number | null;
+  entry_total_value: number | null;
+  adjustment_value: number | null;
+  adjustment_reason: string | null;
+}
+
+export interface GambaCreate {
+  cash_amount: number;
+}
+
+export interface GambaPositionResponse {
+  id: number;
+  player_id: number;
+  player_name: string;
+  cash_amount: number;
+  quantity: number;
+  entry_price: number;
+  scheduled_settlement_at: string;
+  settlement_multiplier: number;
+  status: GambaStatus;
+  exit_price: number | null;
+  settled_at: string | null;
+  raw_pnl: number | null;
+  settled_pnl: number | null;
+  created_at: string;
 }
 
 export interface HoldingResponse {

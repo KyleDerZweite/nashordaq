@@ -1,6 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { get, post, put, del } from "./client";
 import type {
+  GambaCreate,
+  GambaPositionResponse,
+  OrderDetailResponse,
   UserResponse,
   PlayerSummary,
   PlayerDetail,
@@ -25,6 +28,7 @@ export const queryKeys = {
   recentOrders: ["recentOrders"] as const,
   leaderboard: ["leaderboard"] as const,
   systemStatus: ["systemStatus"] as const,
+  gamba: ["gamba"] as const,
 };
 
 // ---- Queries ----
@@ -81,6 +85,14 @@ export function useRecentOrders(enabled = true) {
   });
 }
 
+export function useOrderDetail(orderId: number | null, enabled = true) {
+  return useQuery<OrderDetailResponse>({
+    queryKey: ["orderDetail", orderId],
+    queryFn: () => get<OrderDetailResponse>(`/orders/${orderId}`),
+    enabled: enabled && orderId !== null,
+  });
+}
+
 export function useLeaderboard() {
   return useQuery<LeaderboardEntry[]>({
     queryKey: queryKeys.leaderboard,
@@ -94,6 +106,15 @@ export function useSystemStatus() {
     queryKey: queryKeys.systemStatus,
     queryFn: () => get<SystemStatusResponse>("/system/status"),
     refetchInterval: 30_000,
+  });
+}
+
+export function useGambaPositions(enabled = true) {
+  return useQuery<GambaPositionResponse[]>({
+    queryKey: queryKeys.gamba,
+    queryFn: () => get<GambaPositionResponse[]>("/gamba"),
+    enabled,
+    refetchInterval: 15_000,
   });
 }
 
@@ -153,6 +174,19 @@ export function useUpdateUserProfile() {
       void qc.invalidateQueries({ queryKey: queryKeys.orders });
       void qc.invalidateQueries({ queryKey: queryKeys.recentOrders });
       void qc.invalidateQueries({ queryKey: queryKeys.leaderboard });
+    },
+  });
+}
+
+export function useCreateGambaPosition() {
+  const qc = useQueryClient();
+  return useMutation<GambaPositionResponse, Error, GambaCreate>({
+    mutationFn: (body) => post<GambaPositionResponse>("/gamba", body),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.gamba });
+      void qc.invalidateQueries({ queryKey: queryKeys.user });
+      void qc.invalidateQueries({ queryKey: queryKeys.orders });
+      void qc.invalidateQueries({ queryKey: queryKeys.recentOrders });
     },
   });
 }

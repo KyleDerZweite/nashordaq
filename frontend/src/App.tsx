@@ -3,6 +3,7 @@ import Header from "./components/Header";
 import MarketGrid from "./components/MarketGrid";
 import Portfolio from "./components/Portfolio";
 import Leaderboard from "./components/Leaderboard";
+import GambaWidget from "./components/GambaWidget";
 import OrderHistory from "./components/OrderHistory";
 import PlayerProfileModal from "./components/PlayerProfileModal";
 import PlayerDetailsModal from "./components/PlayerDetailsModal";
@@ -218,6 +219,7 @@ export default function App() {
           <div className="flex flex-col gap-6">
             <Portfolio holdings={portfolio?.holdings ?? []} balance={balance} />
             <Leaderboard entries={leaderboard ?? []} />
+            <GambaWidget balance={balance} canTrade={canTrade} />
           </div>
         </div>
 
