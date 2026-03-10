@@ -19,7 +19,6 @@ const PADDING_RIGHT = 28;
 const PADDING_TOP = 28;
 const PADDING_BOTTOM = 58;
 const GRID_STEPS = 4;
-const MIN_SELECTION_WIDTH = 18;
 
 type MetaValue = string | number | boolean | null | undefined;
 
@@ -212,15 +211,7 @@ export default function TimeSeriesChart({
   xTickFormatter = formatLocalDateShort,
   renderTooltipDetails,
 }: TimeSeriesChartProps) {
-  const [viewport, setViewport] = useState<{
-    start: number;
-    end: number;
-  } | null>(null);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
-  const [selection, setSelection] = useState<{
-    startX: number;
-    currentX: number;
-  } | null>(null);
   const gradientId = useId().replace(/:/g, "");
   const containerRef = useRef<HTMLDivElement>(null);
   const [tooltipState, setTooltipState] = useState<{
@@ -230,45 +221,15 @@ export default function TimeSeriesChart({
     flipY: boolean;
   } | null>(null);
 
-  const effectiveViewport = useMemo(() => {
-    if (data.length === 0) {
-      return { start: 0, end: -1 };
-    }
-
-    if (!viewport) {
-      return { start: 0, end: data.length - 1 };
-    }
-
-    const clampedStart = clamp(viewport.start, 0, data.length - 1);
-    const clampedEnd = clamp(viewport.end, clampedStart, data.length - 1);
-
-    if (clampedEnd - clampedStart < 1) {
-      return { start: 0, end: data.length - 1 };
-    }
-
-    return { start: clampedStart, end: clampedEnd };
-  }, [data.length, viewport]);
-
-  const visibleData = useMemo(() => {
-    if (effectiveViewport.end < effectiveViewport.start) {
-      return [];
-    }
-
-    return data.slice(effectiveViewport.start, effectiveViewport.end + 1);
-  }, [data, effectiveViewport.end, effectiveViewport.start]);
-
   const geometry = useMemo(
-    () => createChartGeometry(visibleData, series),
-    [series, visibleData],
+    () => createChartGeometry(data, series),
+    [data, series],
   );
 
   const activePoint =
     geometry && hoveredIndex !== null
       ? geometry.points[clamp(hoveredIndex, 0, geometry.points.length - 1)]
       : null;
-  const isZoomed =
-    viewport !== null &&
-    (viewport.start !== 0 || viewport.end !== Math.max(0, data.length - 1));
 
   function getSvgX(event: PointerEvent<SVGSVGElement>): number {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -319,84 +280,9 @@ export default function TimeSeriesChart({
     });
   }
 
-  function clearSelection() {
-    setSelection(null);
-  }
-
-  function handlePointerDown(event: PointerEvent<SVGSVGElement>) {
-    if (!geometry || geometry.points.length < 2) {
-      return;
-    }
-
-    event.preventDefault();
-    event.currentTarget.setPointerCapture(event.pointerId);
-    const x = getSvgX(event);
-    setSelection({ startX: x, currentX: x });
-    updateHoverState(event);
-  }
-
-  function handlePointerMove(event: PointerEvent<SVGSVGElement>) {
-    updateHoverState(event);
-
-    if (!selection) {
-      return;
-    }
-
-    setSelection((current) =>
-      current
-        ? {
-            ...current,
-            currentX: getSvgX(event),
-          }
-        : current,
-    );
-  }
-
-  function handlePointerUp(event: PointerEvent<SVGSVGElement>) {
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-
-    if (!geometry || !selection) {
-      clearSelection();
-      return;
-    }
-
-    const endX = getSvgX(event);
-    const selectionWidth = Math.abs(endX - selection.startX);
-
-    if (selectionWidth >= MIN_SELECTION_WIDTH) {
-      const fromX = Math.min(selection.startX, endX);
-      const toX = Math.max(selection.startX, endX);
-      const startIndex = getNearestPointIndex(geometry.points, fromX);
-      const endIndex = getNearestPointIndex(geometry.points, toX);
-      const nextStart =
-        effectiveViewport.start + Math.min(startIndex, endIndex);
-      const nextEnd = effectiveViewport.start + Math.max(startIndex, endIndex);
-
-      if (nextEnd > nextStart) {
-        setViewport({ start: nextStart, end: nextEnd });
-        setHoveredIndex(Math.min(startIndex, endIndex));
-      }
-    }
-
-    clearSelection();
-  }
-
-  function handlePointerCancel(event: PointerEvent<SVGSVGElement>) {
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-    clearSelection();
+  function handlePointerLeave() {
     setHoveredIndex(null);
     setTooltipState(null);
-  }
-
-  function handlePointerLeave() {
-    if (!selection) {
-      setHoveredIndex(null);
-      setTooltipState(null);
-    }
   }
 
   if (data.length < 2 || !geometry) {
@@ -407,238 +293,194 @@ export default function TimeSeriesChart({
     );
   }
 
-  const selectionStart = selection
-    ? Math.min(selection.startX, selection.currentX)
-    : null;
-  const selectionWidth = selection
-    ? Math.abs(selection.currentX - selection.startX)
-    : null;
   return (
-    <div className="space-y-3">
-      <div
-        ref={containerRef}
-        className={`relative border border-hex-border/70 bg-hex-bg-alt ${className ?? ""}`}
+    <div
+      ref={containerRef}
+      className={`relative border border-hex-border/70 bg-hex-bg-alt ${className ?? ""}`}
+    >
+      <svg
+        viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
+        className="h-[22rem] w-full select-none"
+        onPointerMove={updateHoverState}
+        onPointerLeave={handlePointerLeave}
       >
-        <svg
-          viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
-          className="h-[22rem] w-full select-none touch-none"
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onPointerCancel={handlePointerCancel}
-          onPointerLeave={handlePointerLeave}
-        >
-          <defs>
-            {series
-              .filter((item) => item.fillOpacity)
-              .map((item) => (
-                <linearGradient
-                  key={item.key}
-                  id={`${gradientId}-${item.key}`}
-                  x1="0"
-                  x2="0"
-                  y1="0"
-                  y2="1"
-                >
-                  <stop
-                    offset="0%"
-                    stopColor={item.color}
-                    stopOpacity={item.fillOpacity}
-                  />
-                  <stop
-                    offset="100%"
-                    stopColor={item.color}
-                    stopOpacity="0.02"
-                  />
-                </linearGradient>
-              ))}
-          </defs>
-
-          <rect
-            x="0"
-            y="0"
-            width={CHART_WIDTH}
-            height={CHART_HEIGHT}
-            fill="#0a1a32"
-          />
-
-          {geometry.tickValues.map((tick) => (
-            <g key={`${tick.y}-${tick.value}`}>
-              <line
-                x1={PADDING_LEFT}
-                x2={CHART_WIDTH - PADDING_RIGHT}
-                y1={tick.y}
-                y2={tick.y}
-                stroke="rgba(160,155,140,0.16)"
-                strokeDasharray="5 8"
-              />
-              <text
-                x={PADDING_LEFT - 14}
-                y={tick.y + 5}
-                textAnchor="end"
-                fill="#a09b8c"
-                fontSize="14"
-                fontFamily="JetBrains Mono, monospace"
-              >
-                {formatAxisValue
-                  ? formatAxisValue(tick.value)
-                  : tick.value.toFixed(2)}
-              </text>
-            </g>
-          ))}
-
-          {geometry.xTickIndexes.map((index) => {
-            const point = geometry.points[index];
-            return (
-              <g key={`${point.datum.id}-tick`}>
-                <line
-                  x1={point.x}
-                  x2={point.x}
-                  y1={PADDING_TOP}
-                  y2={geometry.baselineY}
-                  stroke="rgba(30,45,61,0.42)"
-                  strokeDasharray="2 8"
-                />
-                <text
-                  x={point.x}
-                  y={CHART_HEIGHT - 16}
-                  textAnchor="middle"
-                  fill="#a09b8c"
-                  fontSize="13"
-                  fontFamily="JetBrains Mono, monospace"
-                >
-                  {xTickFormatter(point.datum.timestamp)}
-                </text>
-              </g>
-            );
-          })}
-
+        <defs>
           {series
             .filter((item) => item.fillOpacity)
             .map((item) => (
-              <path
-                key={`${item.key}-fill`}
-                d={buildAreaPath(geometry.points, item.key, geometry.baselineY)}
-                fill={`url(#${gradientId}-${item.key})`}
-              />
+              <linearGradient
+                key={item.key}
+                id={`${gradientId}-${item.key}`}
+                x1="0"
+                x2="0"
+                y1="0"
+                y2="1"
+              >
+                <stop
+                  offset="0%"
+                  stopColor={item.color}
+                  stopOpacity={item.fillOpacity}
+                />
+                <stop
+                  offset="100%"
+                  stopColor={item.color}
+                  stopOpacity="0.02"
+                />
+              </linearGradient>
             ))}
+        </defs>
 
-          {series.map((item) => (
+        <rect
+          x="0"
+          y="0"
+          width={CHART_WIDTH}
+          height={CHART_HEIGHT}
+          fill="#0a1a32"
+        />
+
+        {geometry.tickValues.map((tick) => (
+          <g key={`${tick.y}-${tick.value}`}>
+            <line
+              x1={PADDING_LEFT}
+              x2={CHART_WIDTH - PADDING_RIGHT}
+              y1={tick.y}
+              y2={tick.y}
+              stroke="rgba(160,155,140,0.16)"
+              strokeDasharray="5 8"
+            />
+            <text
+              x={PADDING_LEFT - 14}
+              y={tick.y + 5}
+              textAnchor="end"
+              fill="#a09b8c"
+              fontSize="14"
+              fontFamily="JetBrains Mono, monospace"
+            >
+              {formatAxisValue
+                ? formatAxisValue(tick.value)
+                : tick.value.toFixed(2)}
+            </text>
+          </g>
+        ))}
+
+        {geometry.xTickIndexes.map((index) => {
+          const point = geometry.points[index];
+          return (
+            <g key={`${point.datum.id}-tick`}>
+              <line
+                x1={point.x}
+                x2={point.x}
+                y1={PADDING_TOP}
+                y2={geometry.baselineY}
+                stroke="rgba(30,45,61,0.42)"
+                strokeDasharray="2 8"
+              />
+              <text
+                x={point.x}
+                y={CHART_HEIGHT - 16}
+                textAnchor="middle"
+                fill="#a09b8c"
+                fontSize="13"
+                fontFamily="JetBrains Mono, monospace"
+              >
+                {xTickFormatter(point.datum.timestamp)}
+              </text>
+            </g>
+          );
+        })}
+
+        {series
+          .filter((item) => item.fillOpacity)
+          .map((item) => (
             <path
-              key={item.key}
-              d={buildLinePath(geometry.points, item.key)}
-              fill="none"
-              stroke={item.color}
-              strokeWidth={item.strokeWidth ?? 3}
-              strokeDasharray={item.dashArray}
-              strokeLinejoin="round"
-              strokeLinecap="round"
+              key={`${item.key}-fill`}
+              d={buildAreaPath(geometry.points, item.key, geometry.baselineY)}
+              fill={`url(#${gradientId}-${item.key})`}
             />
           ))}
 
-          {activePoint && (
-            <line
-              x1={activePoint.x}
-              x2={activePoint.x}
-              y1={PADDING_TOP}
-              y2={geometry.baselineY}
-              stroke="rgba(200,170,110,0.4)"
-              strokeDasharray="5 5"
+        {series.map((item) => (
+          <path
+            key={item.key}
+            d={buildLinePath(geometry.points, item.key)}
+            fill="none"
+            stroke={item.color}
+            strokeWidth={item.strokeWidth ?? 3}
+            strokeDasharray={item.dashArray}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+        ))}
+
+        {activePoint && (
+          <line
+            x1={activePoint.x}
+            x2={activePoint.x}
+            y1={PADDING_TOP}
+            y2={geometry.baselineY}
+            stroke="rgba(200,170,110,0.4)"
+            strokeDasharray="5 5"
+          />
+        )}
+
+        {activePoint &&
+          series.map((item) => (
+            <circle
+              key={`${item.key}-${activePoint.datum.id}`}
+              cx={activePoint.x}
+              cy={activePoint.yByKey[item.key]}
+              r="4.5"
+              fill="#091428"
+              stroke={item.color}
+              strokeWidth="2.5"
             />
-          )}
+          ))}
+      </svg>
 
-          {activePoint &&
-            series.map((item) => (
-              <circle
-                key={`${item.key}-${activePoint.datum.id}`}
-                cx={activePoint.x}
-                cy={activePoint.yByKey[item.key]}
-                r="4.5"
-                fill="#091428"
-                stroke={item.color}
-                strokeWidth="2.5"
-              />
-            ))}
-
-          {selectionStart !== null &&
-            selectionWidth !== null &&
-            selectionWidth > 0 && (
-              <rect
-                x={selectionStart}
-                y={PADDING_TOP}
-                width={selectionWidth}
-                height={geometry.baselineY - PADDING_TOP}
-                fill="rgba(200,170,110,0.16)"
-                stroke="rgba(200,170,110,0.5)"
-                strokeDasharray="5 4"
-              />
-            )}
-        </svg>
-
-        {activePoint && tooltipState && (
-          <div
-            className="pointer-events-none absolute w-56 border-2 border-hex-gold/80 bg-hex-panel/97 px-4 py-3 shadow-brutal-sm"
-            style={{
-              left: `${tooltipState.x}px`,
-              top: `${tooltipState.y}px`,
-              transform: `translate(${tooltipState.flipX ? "calc(-100% - 14px)" : "14px"}, ${tooltipState.flipY ? "14px" : "calc(-100% - 14px)"})`,
-            }}
-          >
-            <div className="font-mono text-[13px] uppercase tracking-[0.12em] text-hex-bronze">
-              {tooltipTitleFormatter(activePoint.datum.timestamp)}
-            </div>
-            <div className="mt-3 space-y-2">
-              {series.map((item) => {
-                const value = activePoint.datum.values[item.key];
-                return (
-                  <div
-                    key={`${activePoint.datum.id}-${item.key}`}
-                    className="flex items-start justify-between gap-4 font-mono text-sm text-hex-white"
-                  >
-                    <span
-                      className="uppercase tracking-[0.12em]"
-                      style={{ color: item.color }}
-                    >
-                      {item.label}
-                    </span>
-                    <span>
-                      {(
-                        item.formatValue ??
-                        formatAxisValue ??
-                        ((nextValue: number) => nextValue.toFixed(2))
-                      )(value)}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-            {renderTooltipDetails && (
-              <div className="mt-3 border-t border-hex-border pt-3 font-mono text-[13px] leading-6 text-hex-bronze">
-                {renderTooltipDetails(activePoint.datum)}
-              </div>
-            )}
+      {activePoint && tooltipState && (
+        <div
+          className="pointer-events-none absolute w-56 border-2 border-hex-gold/80 bg-hex-panel/97 px-4 py-3 shadow-brutal-sm"
+          style={{
+            left: `${tooltipState.x}px`,
+            top: `${tooltipState.y}px`,
+            transform: `translate(${tooltipState.flipX ? "calc(-100% - 14px)" : "14px"}, ${tooltipState.flipY ? "14px" : "calc(-100% - 14px)"})`,
+          }}
+        >
+          <div className="font-mono text-[13px] uppercase tracking-[0.12em] text-hex-bronze">
+            {tooltipTitleFormatter(activePoint.datum.timestamp)}
           </div>
-        )}
-      </div>
-
-      <div className="flex flex-wrap items-center justify-between gap-3 font-mono text-[13px] uppercase tracking-[0.12em] text-hex-bronze">
-        <span>
-          Hover to inspect exact values. Drag across the plot to zoom.
-        </span>
-        {isZoomed && (
-          <button
-            type="button"
-            onClick={() => {
-              setViewport(null);
-              setHoveredIndex(null);
-              clearSelection();
-            }}
-            className="border border-hex-border px-3 py-1.5 text-hex-gold transition-colors hover:border-hex-gold hover:text-hex-white"
-          >
-            Reset Zoom
-          </button>
-        )}
-      </div>
+          <div className="mt-3 space-y-2">
+            {series.map((item) => {
+              const value = activePoint.datum.values[item.key];
+              return (
+                <div
+                  key={`${activePoint.datum.id}-${item.key}`}
+                  className="flex items-start justify-between gap-4 font-mono text-sm text-hex-white"
+                >
+                  <span
+                    className="uppercase tracking-[0.12em]"
+                    style={{ color: item.color }}
+                  >
+                    {item.label}
+                  </span>
+                  <span>
+                    {(
+                      item.formatValue ??
+                      formatAxisValue ??
+                      ((nextValue: number) => nextValue.toFixed(2))
+                    )(value)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          {renderTooltipDetails && (
+            <div className="mt-3 border-t border-hex-border pt-3 font-mono text-[13px] leading-6 text-hex-bronze">
+              {renderTooltipDetails(activePoint.datum)}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

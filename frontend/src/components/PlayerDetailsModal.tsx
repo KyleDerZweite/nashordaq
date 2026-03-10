@@ -13,6 +13,8 @@ import {
   type ChartRange,
   filterItemsByRange,
 } from "../utils/timeSeries";
+
+type ChartResolution = "daily" | "all";
 type TrendDirection = "up" | "down" | "flat";
 
 interface Props {
@@ -114,6 +116,7 @@ export default function PlayerDetailsModal({
   onClose,
 }: Props) {
   const [range, setRange] = useState<ChartRange>(30);
+  const [resolution, setResolution] = useState<ChartResolution>("daily");
   const { data: player, isLoading, isError, error } = usePlayer(playerId);
 
   const fallbackEntry = useMemo<PriceHistoryEntry | null>(() => {
@@ -141,8 +144,13 @@ export default function PlayerDetailsModal({
     [rawHistory],
   );
   const chartHistory = useMemo(
-    () => filterItemsByRange(dailyHistory, range, (entry) => entry.recorded_at),
-    [dailyHistory, range],
+    () =>
+      filterItemsByRange(
+        resolution === "daily" ? dailyHistory : rawHistory,
+        range,
+        (entry) => entry.recorded_at,
+      ),
+    [dailyHistory, rawHistory, range, resolution],
   );
 
   const chartData = useMemo<TimeSeriesChartDatum[]>(
@@ -368,26 +376,51 @@ export default function PlayerDetailsModal({
                         Price History
                       </h3>
                       <p className="font-mono text-xs uppercase tracking-[0.18em] text-hex-bronze">
-                        Daily close view for 30 days, 90 days, or all available
-                        history
+                        {resolution === "daily"
+                          ? "Daily close prices"
+                          : "Every recorded data point"}{" "}
+                        · {chartHistory.length} entries in view
                       </p>
                     </div>
 
-                    <div className="flex border border-hex-border">
-                      {CHART_RANGE_OPTIONS.map((option) => (
-                        <button
-                          key={option.label}
-                          type="button"
-                          onClick={() => setRange(option.value)}
-                          className={`border-l border-hex-border px-4 py-2 font-mono text-xs font-bold uppercase tracking-[0.18em] transition-colors first:border-l-0 ${
-                            range === option.value
-                              ? "bg-hex-gold text-hex-bg"
-                              : "text-hex-bronze hover:bg-hex-panel hover:text-hex-white"
-                          }`}
-                        >
-                          {option.label}
-                        </button>
-                      ))}
+                    <div className="flex items-center gap-3">
+                      <div className="flex border border-hex-border">
+                        {(
+                          [
+                            { label: "Daily", value: "daily" },
+                            { label: "All", value: "all" },
+                          ] as const
+                        ).map((option) => (
+                          <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => setResolution(option.value)}
+                            className={`border-l border-hex-border px-3 py-2 font-mono text-xs font-bold uppercase tracking-[0.18em] transition-colors first:border-l-0 ${
+                              resolution === option.value
+                                ? "bg-hex-gold text-hex-bg"
+                                : "text-hex-bronze hover:bg-hex-panel hover:text-hex-white"
+                            }`}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="flex border border-hex-border">
+                        {CHART_RANGE_OPTIONS.map((option) => (
+                          <button
+                            key={option.label}
+                            type="button"
+                            onClick={() => setRange(option.value)}
+                            className={`border-l border-hex-border px-4 py-2 font-mono text-xs font-bold uppercase tracking-[0.18em] transition-colors first:border-l-0 ${
+                              range === option.value
+                                ? "bg-hex-gold text-hex-bg"
+                                : "text-hex-bronze hover:bg-hex-panel hover:text-hex-white"
+                            }`}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
 
@@ -431,7 +464,9 @@ export default function PlayerDetailsModal({
                         {metrics.dayCount}
                       </div>
                       <div className="font-mono text-xs text-hex-bronze">
-                        Daily closes in this view
+                        {resolution === "daily"
+                          ? "Daily closes in this view"
+                          : "Data points in this view"}
                       </div>
                     </div>
                   </div>
