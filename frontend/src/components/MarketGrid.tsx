@@ -46,12 +46,16 @@ export default function MarketGrid({
 
   return (
     <section>
-      <div className="mb-4 flex items-baseline justify-between border-b-2 border-hex-border pb-2">
-        <h2 className="font-serif text-2xl font-bold text-hex-gold">Market</h2>
-        <div className="flex items-center gap-3">
+      <div className="mb-4 flex flex-col gap-3 border-b-2 border-hex-border pb-2 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex flex-col items-start gap-1 sm:flex-row sm:items-baseline sm:gap-3">
+          <h2 className="font-serif text-2xl font-bold text-hex-gold">
+            Market
+          </h2>
           <span className="font-mono text-xs text-hex-bronze">
             {players.length} tracked players
           </span>
+        </div>
+        <div className="flex flex-wrap items-center gap-3 sm:justify-end">
           <div className="flex items-center gap-2">
             <span className="font-mono text-xs uppercase tracking-wider text-hex-bronze">
               Sort
