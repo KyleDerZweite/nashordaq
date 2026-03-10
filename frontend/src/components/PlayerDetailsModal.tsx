@@ -1,15 +1,18 @@
 import { useMemo, useState } from "react";
+import TimeSeriesChart, { type TimeSeriesChartDatum } from "./TimeSeriesChart";
 import { usePlayer } from "../api";
 import type { OrderSide, PriceHistoryEntry } from "../types";
 import {
   formatAmount,
   formatLocalDate,
-  formatLocalDateShort,
   formatLocalDateTime,
   parseBackendUtcTimestamp,
 } from "../utils/format";
-
-type ChartRange = 30 | 90 | "all";
+import {
+  CHART_RANGE_OPTIONS,
+  type ChartRange,
+  filterItemsByRange,
+} from "../utils/timeSeries";
 type TrendDirection = "up" | "down" | "flat";
 
 interface Props {
@@ -26,12 +29,6 @@ interface MomentumSummary {
   recentChange: number;
   previousChange: number;
 }
-
-const RANGE_OPTIONS: Array<{ label: string; value: ChartRange }> = [
-  { label: "30D", value: 30 },
-  { label: "90D", value: 90 },
-  { label: "All", value: "all" },
-];
 
 function formatSignedAmount(value: number): string {
   return `${value > 0 ? "+" : value < 0 ? "-" : ""}${formatAmount(Math.abs(value))}`;
@@ -75,26 +72,6 @@ function buildDailySeries(history: PriceHistoryEntry[]): PriceHistoryEntry[] {
   );
 }
 
-function filterSeriesByRange(
-  history: PriceHistoryEntry[],
-  range: ChartRange,
-): PriceHistoryEntry[] {
-  if (range === "all" || history.length === 0) {
-    return history;
-  }
-
-  const latestTime = parseBackendUtcTimestamp(
-    history[history.length - 1].recorded_at,
-  ).getTime();
-  const cutoffTime = latestTime - range * 24 * 60 * 60 * 1000;
-  const filtered = history.filter(
-    (entry) =>
-      parseBackendUtcTimestamp(entry.recorded_at).getTime() >= cutoffTime,
-  );
-
-  return filtered.length > 0 ? filtered : history;
-}
-
 function getTrendDirection(change: number): TrendDirection {
   if (change > 0) {
     return "up";
@@ -126,57 +103,6 @@ function calculateMomentum(
     delta: recentChange - previousChange,
     recentChange,
     previousChange,
-  };
-}
-
-function buildChartGeometry(history: PriceHistoryEntry[]) {
-  const width = 820;
-  const height = 340;
-  const paddingLeft = 30;
-  const paddingRight = 42;
-  const paddingTop = 28;
-  const paddingBottom = 54;
-  const prices = history.map((entry) => entry.price);
-  const minPrice = Math.min(...prices);
-  const maxPrice = Math.max(...prices);
-  const priceSpan = maxPrice - minPrice || 1;
-  const usableWidth = width - paddingLeft - paddingRight;
-  const usableHeight = height - paddingTop - paddingBottom;
-
-  const points = history.map((entry, index) => {
-    const x =
-      history.length === 1
-        ? width / 2
-        : paddingLeft + (usableWidth * index) / (history.length - 1);
-    const y =
-      height -
-      paddingBottom -
-      ((entry.price - minPrice) / priceSpan) * usableHeight;
-
-    return { x, y, entry };
-  });
-
-  const linePath = points
-    .map((point, index) => `${index === 0 ? "M" : "L"}${point.x} ${point.y}`)
-    .join(" ");
-  const areaPath = `${linePath} L ${points[points.length - 1].x} ${height - paddingBottom} L ${points[0].x} ${height - paddingBottom} Z`;
-  const tickIndexes = Array.from(
-    new Set([0, Math.floor((points.length - 1) / 2), points.length - 1]),
-  );
-
-  return {
-    width,
-    height,
-    paddingLeft,
-    paddingRight,
-    paddingTop,
-    paddingBottom,
-    minPrice,
-    maxPrice,
-    points,
-    linePath,
-    areaPath,
-    tickIndexes,
   };
 }
 
@@ -215,17 +141,20 @@ export default function PlayerDetailsModal({
     [rawHistory],
   );
   const chartHistory = useMemo(
-    () => filterSeriesByRange(dailyHistory, range),
+    () => filterItemsByRange(dailyHistory, range, (entry) => entry.recorded_at),
     [dailyHistory, range],
   );
 
-  const chartGeometry = useMemo(() => {
-    if (chartHistory.length < 2) {
-      return null;
-    }
-
-    return buildChartGeometry(chartHistory);
-  }, [chartHistory]);
+  const chartData = useMemo<TimeSeriesChartDatum[]>(
+    () =>
+      chartHistory.map((entry) => ({
+        id: entry.recorded_at,
+        timestamp: entry.recorded_at,
+        values: { price: entry.price },
+        meta: { lpAbs: entry.lp_abs },
+      })),
+    [chartHistory],
+  );
 
   const metrics = useMemo(() => {
     if (!player || rawHistory.length === 0) {
@@ -432,7 +361,7 @@ export default function PlayerDetailsModal({
           {player && metrics && trendCopy && (
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1.7fr)_minmax(18rem,1fr)]">
               <div className="space-y-6">
-                <section className="overflow-hidden border-2 border-hex-border bg-hex-bg-alt">
+                <section className="border-2 border-hex-border bg-hex-bg-alt">
                   <div className="flex flex-wrap items-center justify-between gap-3 border-b-2 border-hex-border px-5 py-4">
                     <div>
                       <h3 className="font-serif text-2xl font-bold text-hex-white">
@@ -445,7 +374,7 @@ export default function PlayerDetailsModal({
                     </div>
 
                     <div className="flex border border-hex-border">
-                      {RANGE_OPTIONS.map((option) => (
+                      {CHART_RANGE_OPTIONS.map((option) => (
                         <button
                           key={option.label}
                           type="button"
@@ -508,142 +437,27 @@ export default function PlayerDetailsModal({
                   </div>
 
                   <div className="px-5 py-5">
-                    {chartGeometry ? (
-                      <div className="overflow-hidden rounded-sm border border-hex-border bg-[linear-gradient(180deg,rgba(14,17,22,0.88)_0%,rgba(8,10,14,0.95)_100%)] p-4">
-                        <svg
-                          viewBox={`0 0 ${chartGeometry.width} ${chartGeometry.height}`}
-                          className="h-96 w-full"
-                        >
-                          <defs>
-                            <linearGradient
-                              id="player-detail-fill"
-                              x1="0"
-                              x2="0"
-                              y1="0"
-                              y2="1"
-                            >
-                              <stop
-                                offset="0%"
-                                stopColor="rgba(219,170,68,0.45)"
-                              />
-                              <stop
-                                offset="100%"
-                                stopColor="rgba(219,170,68,0.04)"
-                              />
-                            </linearGradient>
-                          </defs>
-
-                          {[0, 0.25, 0.5, 0.75, 1].map((step) => {
-                            const y =
-                              chartGeometry.paddingTop +
-                              (chartGeometry.height -
-                                chartGeometry.paddingTop -
-                                chartGeometry.paddingBottom) *
-                                step;
-
-                            return (
-                              <line
-                                key={step}
-                                x1={chartGeometry.paddingLeft}
-                                x2={
-                                  chartGeometry.width -
-                                  chartGeometry.paddingRight
-                                }
-                                y1={y}
-                                y2={y}
-                                stroke="rgba(162,140,87,0.18)"
-                                strokeDasharray="4 8"
-                              />
-                            );
-                          })}
-
-                          <path
-                            d={chartGeometry.areaPath}
-                            fill="url(#player-detail-fill)"
-                          />
-                          <path
-                            d={chartGeometry.linePath}
-                            fill="none"
-                            stroke="#dbab44"
-                            strokeWidth="4"
-                            strokeLinejoin="round"
-                            strokeLinecap="round"
-                          />
-
-                          {chartGeometry.points.map((point, index) =>
-                            index === 0 ||
-                            index === chartGeometry.points.length - 1 ? (
-                              <g key={`${point.entry.recorded_at}-${index}`}>
-                                <circle
-                                  cx={point.x}
-                                  cy={point.y}
-                                  r="5"
-                                  fill="#0b0d11"
-                                  stroke="#dbab44"
-                                  strokeWidth="3"
-                                />
-                              </g>
-                            ) : null,
-                          )}
-
-                          <text
-                            x={chartGeometry.paddingLeft}
-                            y={18}
-                            fill="#d4b06a"
-                            fontSize="12"
-                            fontFamily="monospace"
-                          >
-                            High {formatAmount(chartGeometry.maxPrice)}
-                          </text>
-                          <text
-                            x={chartGeometry.paddingLeft}
-                            y={chartGeometry.height - 26}
-                            fill="#8f7a52"
-                            fontSize="12"
-                            fontFamily="monospace"
-                          >
-                            Low {formatAmount(chartGeometry.minPrice)}
-                          </text>
-
-                          {chartGeometry.tickIndexes.map((tickIndex) => {
-                            const point = chartGeometry.points[tickIndex];
-
-                            return (
-                              <text
-                                key={`${point.entry.recorded_at}-label`}
-                                x={
-                                  tickIndex === 0
-                                    ? point.x + 8
-                                    : tickIndex ===
-                                        chartGeometry.points.length - 1
-                                      ? point.x - 8
-                                      : point.x
-                                }
-                                y={chartGeometry.height - 10}
-                                textAnchor={
-                                  tickIndex === 0
-                                    ? "start"
-                                    : tickIndex ===
-                                        chartGeometry.points.length - 1
-                                      ? "end"
-                                      : "middle"
-                                }
-                                fill="#8f7a52"
-                                fontSize="11"
-                                fontFamily="monospace"
-                              >
-                                {formatLocalDateShort(point.entry.recorded_at)}
-                              </text>
-                            );
-                          })}
-                        </svg>
-                      </div>
-                    ) : (
-                      <div className="flex h-80 items-center justify-center border border-dashed border-hex-border bg-hex-bg text-center font-mono text-sm text-hex-bronze">
-                        More history is needed before the chart can draw a real
-                        trend line.
-                      </div>
-                    )}
+                    <TimeSeriesChart
+                      data={chartData}
+                      series={[
+                        {
+                          key: "price",
+                          label: "Price",
+                          color: "#d8c48a",
+                          strokeWidth: 3.5,
+                          fillOpacity: 0.28,
+                          formatValue: (value) => `${formatAmount(value)} G`,
+                        },
+                      ]}
+                      className="p-4"
+                      emptyMessage="More history is needed before the chart can draw a real trend line."
+                      formatAxisValue={formatAmount}
+                      renderTooltipDetails={(datum) => (
+                        <div className="space-y-1">
+                          <div>LP {datum.meta?.lpAbs}</div>
+                        </div>
+                      )}
+                    />
                   </div>
                 </section>
 

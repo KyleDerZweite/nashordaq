@@ -2,7 +2,7 @@ from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, patch
 
 import app.main as main_module
-from app.models import TrackedPlayer
+from app.models import TrackedPlayer, User, UserWealthSnapshot, UserWealthSnapshotSource
 from app.riot import AccountData, PlayerNotFoundError, RankData
 
 
@@ -182,3 +182,47 @@ async def test_market_account_not_found(client):
 
     assert resp.status_code == 404
     assert "Player not found" in resp.json()["detail"]
+
+
+async def test_balance_insights_returns_current_state_and_history(
+    auth_client, db_session
+):
+    me_resp = await auth_client.get("/api/user/me")
+    user_id = me_resp.json()["id"]
+    user = await db_session.get(User, user_id)
+    assert user is not None
+    user.balance = 1200.0
+    db_session.add_all(
+        [
+            UserWealthSnapshot(
+                user_id=user.id,
+                source=UserWealthSnapshotSource.ONBOARDING,
+                cash_balance=1000.0,
+                holdings_value=0.0,
+                active_gamba_value=0.0,
+                debt_outstanding=0.0,
+                net_worth=1000.0,
+                recorded_at=datetime.now(UTC) - timedelta(hours=3),
+            ),
+            UserWealthSnapshot(
+                user_id=user.id,
+                source=UserWealthSnapshotSource.CREDIT_ACTION,
+                cash_balance=1200.0,
+                holdings_value=50.0,
+                active_gamba_value=25.0,
+                debt_outstanding=10.0,
+                net_worth=1265.0,
+                recorded_at=datetime.now(UTC) - timedelta(hours=1),
+            ),
+        ]
+    )
+    await db_session.commit()
+
+    resp = await auth_client.get("/api/user/balance-insights")
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["cash_balance"] == 1200.0
+    assert len(data["history"]) == 2
+    assert data["history"][0]["source"] == "ONBOARDING"
+    assert data["history"][1]["source"] == "CREDIT_ACTION"

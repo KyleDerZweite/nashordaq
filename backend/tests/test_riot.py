@@ -1,7 +1,12 @@
 import httpx
 import pytest
 
-from app.riot import PlayerNotFoundError, get_rank
+from app.riot import (
+    PlayerNotFoundError,
+    get_match_summary,
+    get_rank,
+    get_recent_match_ids,
+)
 
 PUUID = "test-puuid-1234"
 SUMMONER_ID = "test-summoner-id-5678"
@@ -127,3 +132,56 @@ async def test_get_rank_fallback_to_by_puuid(httpx_mock):
     assert result.puuid == PUUID
     assert result.summoner_id == PUUID
     assert result.fresh_blood is True
+
+
+async def test_get_recent_match_ids_success(httpx_mock):
+    httpx_mock.add_response(
+        url=f"{BASE_URL}/lol/match/v5/matches/by-puuid/{PUUID}/ids?start=0&count=3&queue=420&type=ranked",
+        json=["EUW1_1", "EUW1_2", "EUW1_3"],
+    )
+
+    async with httpx.AsyncClient() as client:
+        result = await get_recent_match_ids(
+            client=client,
+            base_url=BASE_URL,
+            api_key=API_KEY,
+            puuid=PUUID,
+            count=3,
+            queue=420,
+            type="ranked",
+        )
+
+    assert result == ["EUW1_1", "EUW1_2", "EUW1_3"]
+
+
+async def test_get_match_summary_success(httpx_mock):
+    httpx_mock.add_response(
+        url=f"{BASE_URL}/lol/match/v5/matches/EUW1_42",
+        json={
+            "metadata": {"matchId": "EUW1_42"},
+            "info": {
+                "queueId": 420,
+                "gameDuration": 1932,
+                "gameEndTimestamp": 1_710_000_000_000,
+                "participants": [
+                    {"puuid": PUUID, "win": True},
+                    {"puuid": "other", "win": False},
+                ],
+            },
+        },
+    )
+
+    async with httpx.AsyncClient() as client:
+        result = await get_match_summary(
+            client=client,
+            base_url=BASE_URL,
+            api_key=API_KEY,
+            puuid=PUUID,
+            match_id="EUW1_42",
+        )
+
+    assert result.match_id == "EUW1_42"
+    assert result.queue_id == 420
+    assert result.win is True
+    assert result.game_duration_seconds == 1932
+    assert result.game_end_timestamp == 1_710_000_000_000

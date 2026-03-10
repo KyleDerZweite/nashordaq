@@ -10,6 +10,11 @@ export type PlayerTrend = "up" | "down" | "flat";
 export type MarketStatus = "healthy" | "degraded" | "idle";
 export type GambaStatus = "ACTIVE" | "SETTLED";
 export type BankLedgerEntryType = "BORROW" | "INTEREST" | "REPAYMENT";
+export type PlayingIncomeMatchResult = "WIN" | "LOSS";
+export type UserWealthSnapshotSource =
+  | "ONBOARDING"
+  | "MARKET_UPDATE"
+  | "CREDIT_ACTION";
 
 export interface UserResponse {
   id: number;
@@ -49,7 +54,47 @@ export interface BankSummaryResponse {
   next_interest_amount: number;
   interest_rate_per_interval: number;
   interest_interval_hours: number;
+  projected_next_win_income: number;
+  projected_next_loss_income: number;
+  playing_income_last_24h: number;
+  playing_income_lifetime_total: number;
   recent_entries: BankLedgerEntryResponse[];
+  recent_playing_income_entries: PlayingIncomeEntryResponse[];
+}
+
+export interface PlayingIncomeEntryResponse {
+  id: number;
+  match_id: string;
+  match_result: PlayingIncomeMatchResult;
+  match_duration_seconds: number;
+  match_completed_at: string;
+  share_price: number;
+  base_rate: number;
+  outcome_multiplier: number;
+  amount: number;
+  created_at: string;
+}
+
+export interface UserWealthSnapshotResponse {
+  id: number;
+  source: UserWealthSnapshotSource;
+  cash_balance: number;
+  holdings_value: number;
+  active_gamba_value: number;
+  debt_outstanding: number;
+  net_worth: number;
+  recorded_at: string;
+}
+
+export interface BalanceInsightsResponse {
+  cash_balance: number;
+  holdings_value: number;
+  active_gamba_value: number;
+  debt_outstanding: number;
+  net_worth: number;
+  playing_income_last_24h: number;
+  playing_income_lifetime_total: number;
+  history: UserWealthSnapshotResponse[];
 }
 
 export interface UserOnboardingCreate {

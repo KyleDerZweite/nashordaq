@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import BalanceInsightsModal from "./components/BalanceInsightsModal";
 import Header from "./components/Header";
 import BankModal from "./components/BankModal";
 import MarketGrid from "./components/MarketGrid";
@@ -37,6 +38,7 @@ export default function App() {
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
   const [tickerSortMode, setTickerSortMode] = useState<TickerSortMode>("value");
   const [isProfileEditorOpen, setIsProfileEditorOpen] = useState(false);
+  const [isBalanceInsightsOpen, setIsBalanceInsightsOpen] = useState(false);
   const [isBankModalOpen, setIsBankModalOpen] = useState(false);
 
   const { data: user } = useUser();
@@ -122,11 +124,18 @@ export default function App() {
     <div className="flex min-h-screen flex-col bg-hex-bg">
       <Header
         balance={balance}
-        debtOutstanding={bankSummary?.debt_outstanding ?? 0}
+        netWorth={
+          portfolio?.total_value ??
+          bankSummary?.debt_adjusted_net_worth ??
+          balance
+        }
+        creditOutstanding={bankSummary?.debt_outstanding ?? 0}
+        creditAvailable={bankSummary?.available_credit ?? 0}
         username={user?.username}
         playerDisplayName={linkedPlayer?.display_name}
         canEditProfile={Boolean(linkedPlayer) && !isSpectator}
-        onOpenBank={() => setIsBankModalOpen(true)}
+        onOpenBalanceInsights={() => setIsBalanceInsightsOpen(true)}
+        onOpenCredit={() => setIsBankModalOpen(true)}
         onEditProfile={() => setIsProfileEditorOpen(true)}
       />
 
@@ -284,6 +293,13 @@ export default function App() {
             setTrade({ playerId: selectedPlayerId, side });
           }}
           onClose={() => setSelectedPlayerId(null)}
+        />
+      )}
+
+      {isBalanceInsightsOpen && (
+        <BalanceInsightsModal
+          isOpen={isBalanceInsightsOpen}
+          onClose={() => setIsBalanceInsightsOpen(false)}
         />
       )}
 

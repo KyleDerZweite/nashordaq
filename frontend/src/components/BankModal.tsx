@@ -84,7 +84,7 @@ export default function BankModal({ canManageBank, onClose }: Props) {
         <div className="flex items-center justify-between border-b-4 border-hex-zaun px-5 py-3">
           <div>
             <h2 className="font-serif text-xl font-bold text-hex-gold">
-              Bank Credit
+              Credit
             </h2>
             <p className="mt-1 font-mono text-xs uppercase tracking-[0.18em] text-hex-bronze">
               Borrow now, interest compounds every 72 hours
@@ -101,14 +101,14 @@ export default function BankModal({ canManageBank, onClose }: Props) {
         <div className="px-5 py-4">
           {!canManageBank && (
             <p className="font-mono text-sm text-hex-bronze">
-              Complete onboarding as a player to unlock bank borrowing and
+              Complete onboarding as a player to unlock credit borrowing and
               repayment.
             </p>
           )}
 
           {canManageBank && isLoading && (
             <p className="font-mono text-sm text-hex-bronze">
-              Loading bank account...
+              Loading credit account...
             </p>
           )}
 
@@ -118,12 +118,8 @@ export default function BankModal({ canManageBank, onClose }: Props) {
 
           {canManageBank && data && (
             <div className="space-y-5">
-              <div className="grid gap-3 md:grid-cols-5">
+              <div className="grid gap-3 md:grid-cols-4">
                 {[
-                  {
-                    label: "Cash",
-                    value: `${formatAmount(data.cash_balance)} P`,
-                  },
                   {
                     label: "Credit Limit",
                     value: `${formatAmount(data.credit_limit)} P`,
@@ -133,12 +129,12 @@ export default function BankModal({ canManageBank, onClose }: Props) {
                     value: `${formatAmount(data.available_credit)} P`,
                   },
                   {
-                    label: "Debt",
+                    label: "Outstanding",
                     value: `${formatAmount(data.debt_outstanding)} P`,
                   },
                   {
-                    label: "Net Worth",
-                    value: `${formatAmount(data.debt_adjusted_net_worth)} P`,
+                    label: "Next Charge",
+                    value: `${formatAmount(data.next_interest_amount)} P`,
                   },
                 ].map((item) => (
                   <div
@@ -158,7 +154,7 @@ export default function BankModal({ canManageBank, onClose }: Props) {
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2 border border-hex-border px-4 py-3">
                   <h3 className="font-mono text-xs uppercase tracking-[0.18em] text-hex-gold">
-                    Debt Breakdown
+                    Credit Breakdown
                   </h3>
                   <p className="font-mono text-xs text-hex-bronze">
                     Principal: {formatAmount(data.debt_principal)} P
@@ -172,6 +168,9 @@ export default function BankModal({ canManageBank, onClose }: Props) {
                   </p>
                   <p className="font-mono text-xs text-hex-bronze">
                     Active Gamba mark: {formatAmount(data.active_gamba_value)} P
+                  </p>
+                  <p className="font-mono text-xs text-hex-bronze">
+                    Cash available: {formatAmount(data.cash_balance)} P
                   </p>
                 </div>
 
@@ -193,6 +192,10 @@ export default function BankModal({ canManageBank, onClose }: Props) {
                   <p className="font-mono text-xs text-hex-bronze">
                     Estimated next charge:{" "}
                     {formatAmount(data.next_interest_amount)} P
+                  </p>
+                  <p className="font-mono text-xs text-hex-bronze">
+                    Current net worth:{" "}
+                    {formatAmount(data.debt_adjusted_net_worth)} P
                   </p>
                 </div>
               </div>
@@ -263,7 +266,7 @@ export default function BankModal({ canManageBank, onClose }: Props) {
                   >
                     {borrowFromBank.isPending
                       ? "Borrowing..."
-                      : "Borrow from Bank"}
+                      : "Borrow Credit"}
                   </button>
                 </form>
 
@@ -327,14 +330,14 @@ export default function BankModal({ canManageBank, onClose }: Props) {
                         : "cursor-not-allowed border-hex-border text-hex-border"
                     }`}
                   >
-                    {repayBankDebt.isPending ? "Repaying..." : "Repay Debt"}
+                    {repayBankDebt.isPending ? "Repaying..." : "Repay Credit"}
                   </button>
                 </form>
               </div>
 
               <div className="border border-hex-border px-4 py-3">
                 <h3 className="font-mono text-xs uppercase tracking-[0.18em] text-hex-gold">
-                  Recent Bank Activity
+                  Recent Credit Activity
                 </h3>
                 <div
                   className={`mt-3 space-y-2 ${
@@ -345,7 +348,7 @@ export default function BankModal({ canManageBank, onClose }: Props) {
                 >
                   {data.recent_entries.length === 0 && (
                     <p className="font-mono text-xs text-hex-bronze">
-                      No bank activity yet.
+                      No credit activity yet.
                     </p>
                   )}
                   {data.recent_entries.map((entry) => (
@@ -366,7 +369,7 @@ export default function BankModal({ canManageBank, onClose }: Props) {
                           {formatAmount(entry.amount)} P
                         </div>
                         <div className="text-hex-bronze">
-                          Debt: {formatAmount(entry.outstanding_debt)} P
+                          Credit: {formatAmount(entry.outstanding_debt)} P
                         </div>
                       </div>
                     </div>

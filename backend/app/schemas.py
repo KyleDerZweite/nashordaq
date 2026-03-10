@@ -9,6 +9,8 @@ from app.models import (
     OrderSide,
     OrderSource,
     OrderStatus,
+    PlayingIncomeMatchResult,
+    UserWealthSnapshotSource,
 )
 
 UserRole = Literal["player", "spectator"]
@@ -40,6 +42,19 @@ class BankActionRequest(BaseModel):
     amount: float = Field(gt=0)
 
 
+class PlayingIncomeEntryResponse(BaseModel):
+    id: int
+    match_id: str
+    match_result: PlayingIncomeMatchResult
+    match_duration_seconds: int
+    match_completed_at: datetime
+    share_price: float
+    base_rate: float
+    outcome_multiplier: float
+    amount: float
+    created_at: datetime
+
+
 class BankSummaryResponse(BaseModel):
     cash_balance: float
     holdings_value: float
@@ -54,7 +69,34 @@ class BankSummaryResponse(BaseModel):
     next_interest_amount: float
     interest_rate_per_interval: float
     interest_interval_hours: float
+    projected_next_win_income: float
+    projected_next_loss_income: float
+    playing_income_last_24h: float
+    playing_income_lifetime_total: float
     recent_entries: list[BankLedgerEntryResponse]
+    recent_playing_income_entries: list[PlayingIncomeEntryResponse]
+
+
+class UserWealthSnapshotResponse(BaseModel):
+    id: int
+    source: UserWealthSnapshotSource
+    cash_balance: float
+    holdings_value: float
+    active_gamba_value: float
+    debt_outstanding: float
+    net_worth: float
+    recorded_at: datetime
+
+
+class BalanceInsightsResponse(BaseModel):
+    cash_balance: float
+    holdings_value: float
+    active_gamba_value: float
+    debt_outstanding: float
+    net_worth: float
+    playing_income_last_24h: float
+    playing_income_lifetime_total: float
+    history: list[UserWealthSnapshotResponse]
 
 
 class UserOnboardingCreate(BaseModel):

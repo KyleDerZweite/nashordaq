@@ -51,6 +51,10 @@ class Settings(BaseSettings):
     bank_max_borrow_net_worth_ratio: float = 0.25
     bank_base_credit_limit: float = 250.0
     bank_credit_limit_rounding_increment: float = 50.0
+    playing_income_base_rate: float = 0.01
+    playing_income_loss_multiplier: float = 0.5
+    playing_income_min_match_duration_seconds: int = 900
+    playing_income_recent_match_count: int = 10
 
 
 settings = Settings()

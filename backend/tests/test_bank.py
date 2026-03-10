@@ -2,7 +2,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from app.models import User
+from app.models import PlayingIncomeEntry, PlayingIncomeMatchResult, TrackedPlayer, User
 
 
 async def _onboard_bank_user(auth_client):
@@ -180,3 +180,60 @@ async def test_bank_summary_previews_due_interest(auth_client, db_session):
     assert summary["debt_principal"] == pytest.approx(500.0)
     assert summary["debt_accrued_interest"] == pytest.approx(10.75)
     assert summary["debt_outstanding"] == pytest.approx(510.75)
+
+
+async def test_bank_summary_includes_playing_income_metrics(auth_client, db_session):
+    await _onboard_bank_user(auth_client)
+
+    me_resp = await auth_client.get("/api/user/me")
+    user_id = me_resp.json()["id"]
+    user = await db_session.get(User, user_id)
+    assert user is not None
+    user.balance = 1000.0
+    player = await db_session.get(TrackedPlayer, user.linked_player_id)
+    assert player is not None
+    player.current_price = 42.0
+    now = datetime.now(UTC)
+    db_session.add_all(
+        [
+            PlayingIncomeEntry(
+                user_id=user.id,
+                player_id=player.id,
+                match_id="EUW1_500",
+                match_result=PlayingIncomeMatchResult.WIN,
+                match_duration_seconds=1800,
+                match_completed_at=now - timedelta(hours=2),
+                share_price=40.0,
+                base_rate=0.01,
+                outcome_multiplier=1.0,
+                amount=0.4,
+            ),
+            PlayingIncomeEntry(
+                user_id=user.id,
+                player_id=player.id,
+                match_id="EUW1_499",
+                match_result=PlayingIncomeMatchResult.LOSS,
+                match_duration_seconds=1700,
+                match_completed_at=now - timedelta(days=2),
+                share_price=40.0,
+                base_rate=0.01,
+                outcome_multiplier=0.5,
+                amount=0.2,
+            ),
+        ]
+    )
+    await db_session.commit()
+
+    summary_resp = await auth_client.get("/api/bank")
+    assert summary_resp.status_code == 200
+    summary = summary_resp.json()
+    assert summary["projected_next_win_income"] == pytest.approx(0.42)
+    assert summary["projected_next_loss_income"] == pytest.approx(0.21)
+    assert summary["playing_income_last_24h"] == pytest.approx(0.4)
+    assert summary["playing_income_lifetime_total"] == pytest.approx(0.6)
+    assert [
+        entry["match_id"] for entry in summary["recent_playing_income_entries"]
+    ] == [
+        "EUW1_500",
+        "EUW1_499",
+    ]

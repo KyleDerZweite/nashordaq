@@ -55,6 +55,27 @@ async def init_db() -> None:
                 text("ALTER TABLE users ADD COLUMN debt_next_accrual_at DATETIME")
             )
 
+        tracked_player_cols_result = await conn.execute(
+            text("PRAGMA table_info(tracked_players)")
+        )
+        tracked_player_columns = {
+            row[1] for row in tracked_player_cols_result.fetchall()
+        }
+        if "last_playing_income_match_id" not in tracked_player_columns:
+            await conn.execute(
+                text(
+                    "ALTER TABLE tracked_players "
+                    "ADD COLUMN last_playing_income_match_id VARCHAR(64)"
+                )
+            )
+        if "last_playing_income_match_end_at" not in tracked_player_columns:
+            await conn.execute(
+                text(
+                    "ALTER TABLE tracked_players "
+                    "ADD COLUMN last_playing_income_match_end_at DATETIME"
+                )
+            )
+
         result = await conn.execute(text("PRAGMA table_info(holding_lots)"))
         columns = {row[1] for row in result.fetchall()}
         if "buy_order_id" not in columns:

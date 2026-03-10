@@ -19,6 +19,7 @@ export {
   useLeaderboard,
   useSystemStatus,
   useBankSummary,
+  useBalanceInsights,
   useGambaPositions,
   useCreateGambaPosition,
   useBorrowFromBank,

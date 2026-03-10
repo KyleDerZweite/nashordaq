@@ -37,6 +37,17 @@ class BankLedgerEntryType(enum.StrEnum):
     REPAYMENT = "REPAYMENT"
 
 
+class PlayingIncomeMatchResult(enum.StrEnum):
+    WIN = "WIN"
+    LOSS = "LOSS"
+
+
+class UserWealthSnapshotSource(enum.StrEnum):
+    ONBOARDING = "ONBOARDING"
+    MARKET_UPDATE = "MARKET_UPDATE"
+    CREDIT_ACTION = "CREDIT_ACTION"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -62,6 +73,9 @@ class User(Base):
     bank_ledger_entries: Mapped[list["BankLedgerEntry"]] = relationship(
         back_populates="user"
     )
+    wealth_snapshots: Mapped[list["UserWealthSnapshot"]] = relationship(
+        back_populates="user"
+    )
     linked_player: Mapped["TrackedPlayer | None"] = relationship(
         foreign_keys=[linked_player_id],
         back_populates="linked_users",
@@ -83,6 +97,13 @@ class TrackedPlayer(Base):
     streak: Mapped[int] = mapped_column(Integer, default=0)
     gamma_factor: Mapped[float] = mapped_column(Float, default=1.0)
     last_updated: Mapped[datetime | None] = mapped_column(default=None)
+    last_playing_income_match_id: Mapped[str | None] = mapped_column(
+        String(64), default=None
+    )
+    last_playing_income_match_end_at: Mapped[datetime | None] = mapped_column(
+        default=None,
+        index=True,
+    )
 
     __table_args__ = (
         UniqueConstraint("game_name", "tag_line", name="uq_player_riot_id"),
@@ -95,6 +116,9 @@ class TrackedPlayer(Base):
         back_populates="player"
     )
     price_history: Mapped[list["PriceHistory"]] = relationship(back_populates="player")
+    playing_income_entries: Mapped[list["PlayingIncomeEntry"]] = relationship(
+        back_populates="player"
+    )
     linked_users: Mapped[list["User"]] = relationship(
         back_populates="linked_player",
         foreign_keys="User.linked_player_id",
@@ -221,6 +245,52 @@ class BankLedgerEntry(Base):
     created_at: Mapped[datetime] = mapped_column(insert_default=func.now(), index=True)
 
     user: Mapped["User"] = relationship(back_populates="bank_ledger_entries")
+
+
+class PlayingIncomeEntry(Base):
+    __tablename__ = "playing_income_entries"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    player_id: Mapped[int] = mapped_column(ForeignKey("tracked_players.id"), index=True)
+    match_id: Mapped[str] = mapped_column(String(64))
+    match_result: Mapped[PlayingIncomeMatchResult] = mapped_column(
+        Enum(PlayingIncomeMatchResult)
+    )
+    match_duration_seconds: Mapped[int] = mapped_column(Integer)
+    match_completed_at: Mapped[datetime] = mapped_column(index=True)
+    share_price: Mapped[float] = mapped_column(Float)
+    base_rate: Mapped[float] = mapped_column(Float)
+    outcome_multiplier: Mapped[float] = mapped_column(Float)
+    amount: Mapped[float] = mapped_column(Float)
+    created_at: Mapped[datetime] = mapped_column(insert_default=func.now(), index=True)
+
+    __table_args__ = (
+        UniqueConstraint("player_id", "match_id", name="uq_playing_income_match"),
+    )
+
+    user: Mapped["User"] = relationship()
+    player: Mapped["TrackedPlayer"] = relationship(
+        back_populates="playing_income_entries"
+    )
+
+
+class UserWealthSnapshot(Base):
+    __tablename__ = "user_wealth_snapshots"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    source: Mapped[UserWealthSnapshotSource] = mapped_column(
+        Enum(UserWealthSnapshotSource)
+    )
+    cash_balance: Mapped[float] = mapped_column(Float)
+    holdings_value: Mapped[float] = mapped_column(Float)
+    active_gamba_value: Mapped[float] = mapped_column(Float)
+    debt_outstanding: Mapped[float] = mapped_column(Float)
+    net_worth: Mapped[float] = mapped_column(Float)
+    recorded_at: Mapped[datetime] = mapped_column(insert_default=func.now(), index=True)
+
+    user: Mapped["User"] = relationship(back_populates="wealth_snapshots")
 
 
 class PriceHistory(Base):

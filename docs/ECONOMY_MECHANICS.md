@@ -148,3 +148,41 @@ Debt_next = Debt_current + (Debt_current * 0.0215)
 - If the scheduler misses one or more rollover windows, the backend catches up one 72-hour interval at a time.
 
 Implementation: `app/banking.py`, `app/routers/bank.py`, `app/scheduler.py`
+
+## 7. Playing Income
+
+Linked player accounts receive a small direct cash reward when Nashordaq detects a newly completed Ranked Solo 5v5 match for that player.
+
+### Eligibility
+
+- Only the user's linked Riot account is eligible.
+- Only newly detected Ranked Solo 5v5 matches count.
+- Each match can pay at most once.
+- Matches shorter than 15 minutes are ignored so remakes and aborted games do not generate income.
+
+### Formula
+
+The reward uses the player's current share price after the latest market refresh.
+
+```
+PlayingIncome = P_current * BaseRate * OutcomeMultiplier
+```
+
+Current defaults:
+
+- `BaseRate = 0.01`
+- `OutcomeMultiplier = 1.0` on a win
+- `OutcomeMultiplier = 0.5` on a loss
+
+Examples:
+
+- A player with current price `42.00` earns `0.42` on a win.
+- The same player earns `0.21` on a loss.
+
+### Processing Rules
+
+- Match detection is driven by Riot Match-V5 history, not by win/loss snapshot deltas.
+- The scheduler stores the last processed match cursor per tracked player so completed matches are not rewarded twice.
+- Reward history is stored immutably for bank-summary reporting and auditability.
+
+Implementation: `app/riot.py`, `app/scheduler.py`, `app/banking.py`, `app/routers/bank.py`

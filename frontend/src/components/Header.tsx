@@ -3,19 +3,25 @@ import { formatAmount } from "../utils/format";
 
 export default function Header({
   balance,
-  debtOutstanding = 0,
+  netWorth = 0,
+  creditOutstanding = 0,
+  creditAvailable = 0,
   username,
   playerDisplayName,
   canEditProfile = false,
-  onOpenBank,
+  onOpenBalanceInsights,
+  onOpenCredit,
   onEditProfile,
 }: {
   balance: number;
-  debtOutstanding?: number;
+  netWorth?: number;
+  creditOutstanding?: number;
+  creditAvailable?: number;
   username?: string;
   playerDisplayName?: string;
   canEditProfile?: boolean;
-  onOpenBank?: () => void;
+  onOpenBalanceInsights?: () => void;
+  onOpenCredit?: () => void;
   onEditProfile?: () => void;
 }) {
   const initial = username ? username[0].toUpperCase() : "?";
@@ -41,37 +47,45 @@ export default function Header({
 
         {/* Account bar */}
         <div className="flex items-center gap-6">
-          <button
-            type="button"
-            onClick={onOpenBank}
-            className="min-w-52 border-2 border-hex-gold-dim px-3.5 py-1.5 text-left shadow-brutal-sm transition-colors hover:border-hex-gold hover:bg-hex-bg-alt/70"
-          >
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <div className="text-xs uppercase tracking-wider text-hex-bronze">
-                  Balance
-                </div>
-                <p className="font-mono text-lg font-bold text-hex-gold">
-                  {formatAmount(balance)}
-                  <span className="ml-1 text-xs text-hex-bronze">P</span>
-                </p>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={onOpenBalanceInsights}
+              className="min-w-44 border-2 border-hex-gold-dim px-3.5 py-1.5 text-left shadow-brutal-sm transition-colors hover:border-hex-gold hover:bg-hex-bg-alt/70"
+            >
+              <div className="text-xs uppercase tracking-wider text-hex-bronze">
+                Balance
               </div>
-              <div className="text-right">
-                <div className="text-xs uppercase tracking-wider text-hex-bronze">
-                  Debt
-                </div>
-                <p
-                  className={`font-mono text-sm font-bold ${
-                    debtOutstanding > 0 ? "text-red-400" : "text-hex-bronze"
-                  }`}
-                >
-                  {debtOutstanding > 0 ? "-" : ""}
-                  {formatAmount(debtOutstanding)}
-                  <span className="ml-1 text-[10px] text-hex-bronze">P</span>
-                </p>
+              <p className="font-mono text-lg font-bold text-hex-gold">
+                {formatAmount(balance)}
+                <span className="ml-1 text-xs text-hex-bronze">P</span>
+              </p>
+              <p className="mt-1 font-mono text-[11px] text-hex-bronze">
+                Net worth {formatAmount(netWorth)} P
+              </p>
+            </button>
+
+            <button
+              type="button"
+              onClick={onOpenCredit}
+              className="min-w-44 border-2 border-hex-gold-dim px-3.5 py-1.5 text-left shadow-brutal-sm transition-colors hover:border-hex-gold hover:bg-hex-bg-alt/70"
+            >
+              <div className="text-xs uppercase tracking-wider text-hex-bronze">
+                Credit
               </div>
-            </div>
-          </button>
+              <p
+                className={`font-mono text-lg font-bold ${
+                  creditOutstanding > 0 ? "text-red-400" : "text-hex-gold"
+                }`}
+              >
+                {formatAmount(creditOutstanding)}
+                <span className="ml-1 text-xs text-hex-bronze">P</span>
+              </p>
+              <p className="mt-1 font-mono text-[11px] text-hex-bronze">
+                Available {formatAmount(creditAvailable)} P
+              </p>
+            </button>
+          </div>
           <div className="relative">
             <button
               type="button"

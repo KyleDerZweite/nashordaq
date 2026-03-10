@@ -7,9 +7,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import CurrentUser, get_user_role, is_spectator_user
+from app.banking import build_balance_insights_summary, record_user_wealth_snapshot
 from app.config import settings
 from app.database import get_session
-from app.models import PriceHistory, TrackedPlayer, User
+from app.models import PriceHistory, TrackedPlayer, User, UserWealthSnapshotSource
 from app.pricing import (
     calculate_ipo_price,
     calculate_lp_abs,
@@ -17,7 +18,13 @@ from app.pricing import (
     generate_gamma_base,
 )
 from app.riot import PlayerNotFoundError, RateLimitedError, get_rank
-from app.schemas import UserOnboardingCreate, UserProfileUpdate, UserResponse
+from app.schemas import (
+    BalanceInsightsResponse,
+    UserOnboardingCreate,
+    UserProfileUpdate,
+    UserResponse,
+    UserWealthSnapshotResponse,
+)
 
 router = APIRouter(tags=["user"])
 
@@ -135,6 +142,39 @@ async def get_me(user: CurrentUser) -> UserResponse:
     return _to_user_response(user)
 
 
+@router.get("/user/balance-insights", response_model=BalanceInsightsResponse)
+async def get_balance_insights(
+    user: CurrentUser,
+    session: SessionDep,
+) -> BalanceInsightsResponse:
+    summary = await build_balance_insights_summary(
+        session, user, as_of=datetime.now(UTC)
+    )
+
+    return BalanceInsightsResponse(
+        cash_balance=summary.snapshot.cash_balance,
+        holdings_value=summary.snapshot.holdings_value,
+        active_gamba_value=summary.snapshot.active_gamba_value,
+        debt_outstanding=summary.snapshot.debt_outstanding,
+        net_worth=summary.snapshot.debt_adjusted_net_worth,
+        playing_income_last_24h=summary.playing_income.playing_income_last_24h,
+        playing_income_lifetime_total=summary.playing_income.playing_income_lifetime_total,
+        history=[
+            UserWealthSnapshotResponse(
+                id=entry.id,
+                source=entry.source,
+                cash_balance=entry.cash_balance,
+                holdings_value=entry.holdings_value,
+                active_gamba_value=entry.active_gamba_value,
+                debt_outstanding=entry.debt_outstanding,
+                net_worth=entry.net_worth,
+                recorded_at=entry.recorded_at,
+            )
+            for entry in summary.history
+        ],
+    )
+
+
 @router.post("/user/onboarding", response_model=UserResponse)
 async def complete_onboarding(
     body: UserOnboardingCreate,
@@ -181,6 +221,12 @@ async def complete_onboarding(
 
     user.linked_player_id = player.id
     await _initialize_player_market_state(request, session, player)
+    await record_user_wealth_snapshot(
+        session,
+        user,
+        source=UserWealthSnapshotSource.ONBOARDING,
+        as_of=datetime.now(UTC),
+    )
     await session.commit()
     await session.refresh(user)
     return _to_user_response(user)
@@ -228,6 +274,12 @@ async def update_profile(
     player.display_name = display_name
 
     await _initialize_player_market_state(request, session, player)
+    await record_user_wealth_snapshot(
+        session,
+        user,
+        source=UserWealthSnapshotSource.ONBOARDING,
+        as_of=datetime.now(UTC),
+    )
     await session.commit()
     await session.refresh(user)
     return _to_user_response(user)

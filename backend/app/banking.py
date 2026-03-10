@@ -12,8 +12,11 @@ from app.models import (
     GambaPosition,
     GambaStatus,
     Holding,
+    PlayingIncomeEntry,
     TrackedPlayer,
     User,
+    UserWealthSnapshot,
+    UserWealthSnapshotSource,
 )
 
 
@@ -41,8 +44,32 @@ class AccountSnapshot:
     next_interest_amount: float
 
 
+@dataclass(slots=True)
+class PlayingIncomeSummary:
+    projected_next_win_income: float
+    projected_next_loss_income: float
+    playing_income_last_24h: float
+    playing_income_lifetime_total: float
+    recent_entries: list[PlayingIncomeEntry]
+
+
+@dataclass(slots=True)
+class BalanceInsightsSummary:
+    snapshot: AccountSnapshot
+    playing_income: PlayingIncomeSummary
+    history: list[UserWealthSnapshot]
+
+
 def round_currency(value: float) -> float:
     return round(value + 1e-9, 2)
+
+
+def calculate_playing_income_amount(
+    share_price: float, outcome_multiplier: float
+) -> float:
+    return round_currency(
+        share_price * settings.playing_income_base_rate * outcome_multiplier
+    )
 
 
 def normalize_datetime(value: datetime | None) -> datetime | None:
@@ -216,6 +243,103 @@ async def build_account_snapshot(
         available_credit=available_credit,
         next_interest_accrual_at=debt_preview.next_accrual_at,
         next_interest_amount=next_interest_amount,
+    )
+
+
+async def build_playing_income_summary(
+    session: AsyncSession,
+    user: User,
+    *,
+    as_of: datetime | None = None,
+) -> PlayingIncomeSummary:
+    now = normalize_datetime(as_of) or datetime.now(UTC)
+    recent_cutoff = now - timedelta(hours=24)
+
+    lifetime_total_result = await session.scalar(
+        select(func.coalesce(func.sum(PlayingIncomeEntry.amount), 0.0)).where(
+            PlayingIncomeEntry.user_id == user.id
+        )
+    )
+    recent_total_result = await session.scalar(
+        select(func.coalesce(func.sum(PlayingIncomeEntry.amount), 0.0)).where(
+            PlayingIncomeEntry.user_id == user.id,
+            PlayingIncomeEntry.match_completed_at >= recent_cutoff,
+        )
+    )
+    recent_entries_result = await session.execute(
+        select(PlayingIncomeEntry)
+        .where(PlayingIncomeEntry.user_id == user.id)
+        .order_by(
+            PlayingIncomeEntry.match_completed_at.desc(),
+            PlayingIncomeEntry.id.desc(),
+        )
+        .limit(8)
+    )
+    recent_entries = recent_entries_result.scalars().all()
+
+    linked_player = None
+    if user.linked_player_id is not None:
+        linked_player = await session.get(TrackedPlayer, user.linked_player_id)
+
+    share_price = linked_player.current_price if linked_player is not None else 0.0
+
+    return PlayingIncomeSummary(
+        projected_next_win_income=calculate_playing_income_amount(share_price, 1.0),
+        projected_next_loss_income=calculate_playing_income_amount(
+            share_price,
+            settings.playing_income_loss_multiplier,
+        ),
+        playing_income_last_24h=round_currency(float(recent_total_result or 0.0)),
+        playing_income_lifetime_total=round_currency(
+            float(lifetime_total_result or 0.0)
+        ),
+        recent_entries=recent_entries,
+    )
+
+
+async def record_user_wealth_snapshot(
+    session: AsyncSession,
+    user: User,
+    *,
+    source: UserWealthSnapshotSource,
+    as_of: datetime | None = None,
+) -> UserWealthSnapshot:
+    snapshot = await build_account_snapshot(session, user, as_of=as_of)
+    entry = UserWealthSnapshot(
+        user_id=user.id,
+        source=source,
+        cash_balance=snapshot.cash_balance,
+        holdings_value=snapshot.holdings_value,
+        active_gamba_value=snapshot.active_gamba_value,
+        debt_outstanding=snapshot.debt_outstanding,
+        net_worth=snapshot.debt_adjusted_net_worth,
+        recorded_at=normalize_datetime(as_of) or datetime.now(UTC),
+    )
+    session.add(entry)
+    return entry
+
+
+async def build_balance_insights_summary(
+    session: AsyncSession,
+    user: User,
+    *,
+    as_of: datetime | None = None,
+    history_limit: int = 16,
+) -> BalanceInsightsSummary:
+    snapshot = await build_account_snapshot(session, user, as_of=as_of)
+    playing_income = await build_playing_income_summary(session, user, as_of=as_of)
+    history_result = await session.execute(
+        select(UserWealthSnapshot)
+        .where(UserWealthSnapshot.user_id == user.id)
+        .order_by(UserWealthSnapshot.recorded_at.desc(), UserWealthSnapshot.id.desc())
+        .limit(history_limit)
+    )
+    history = list(reversed(history_result.scalars().all()))
+
+    return BalanceInsightsSummary(
+        snapshot=snapshot,
+        playing_income=playing_income,
+        history=history,
     )
 
 

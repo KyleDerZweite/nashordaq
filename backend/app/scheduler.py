@@ -8,7 +8,11 @@ from fastapi import FastAPI
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.banking import apply_due_interest
+from app.banking import (
+    apply_due_interest,
+    calculate_playing_income_amount,
+    record_user_wealth_snapshot,
+)
 from app.config import settings
 from app.database import SessionLocal
 from app.models import (
@@ -19,10 +23,13 @@ from app.models import (
     OrderSide,
     OrderSource,
     OrderStatus,
+    PlayingIncomeEntry,
+    PlayingIncomeMatchResult,
     PriceHistory,
     TrackedPlayer,
     Transaction,
     User,
+    UserWealthSnapshotSource,
 )
 from app.pricing import (
     calculate_ipo_price,
@@ -32,7 +39,14 @@ from app.pricing import (
     generate_gamma_base,
     update_streak,
 )
-from app.riot import PlayerNotFoundError, RateLimitedError, get_rank
+from app.riot import (
+    MatchSummary,
+    PlayerNotFoundError,
+    RateLimitedError,
+    get_match_summary,
+    get_rank,
+    get_recent_match_ids,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +55,7 @@ _app: FastAPI | None = None
 _last_market_update_at: datetime | None = None
 MARKET_UPDATE_JOB_INTERVAL_SECONDS = 30
 MARKET_STATUS_GRACE_SECONDS = 90
+RANKED_SOLO_QUEUE_ID = 420
 
 
 def get_last_market_update_at() -> datetime | None:
@@ -94,6 +109,177 @@ async def _get_or_create_holding(
         session.add(holding)
         await session.flush()
     return holding
+
+
+def _match_completed_at(summary: MatchSummary) -> datetime:
+    timestamp = summary.game_end_timestamp
+    if timestamp > 10_000_000_000:
+        timestamp = timestamp / 1000
+    return datetime.fromtimestamp(timestamp, tz=UTC)
+
+
+async def _get_unprocessed_match_summaries(
+    player: TrackedPlayer,
+    http_client,
+) -> tuple[list[MatchSummary], MatchSummary | None]:
+    if player.puuid is None:
+        return [], None
+
+    match_ids = await get_recent_match_ids(
+        client=http_client,
+        base_url=settings.riot_api_base_url,
+        api_key=settings.riot_api_key,
+        puuid=player.puuid,
+        count=settings.playing_income_recent_match_count,
+        queue=RANKED_SOLO_QUEUE_ID,
+        type="ranked",
+    )
+    if not match_ids:
+        return [], None
+
+    newest_summary = await get_match_summary(
+        client=http_client,
+        base_url=settings.riot_api_base_url,
+        api_key=settings.riot_api_key,
+        puuid=player.puuid,
+        match_id=match_ids[0],
+    )
+
+    if player.last_playing_income_match_id is None:
+        return [], newest_summary
+
+    unseen_ids: list[str] = []
+    for match_id in match_ids:
+        if match_id == player.last_playing_income_match_id:
+            break
+        unseen_ids.append(match_id)
+
+    if not unseen_ids:
+        return [], newest_summary
+
+    summaries = [newest_summary] if unseen_ids[0] == newest_summary.match_id else []
+    for match_id in unseen_ids[len(summaries) :]:
+        summaries.append(
+            await get_match_summary(
+                client=http_client,
+                base_url=settings.riot_api_base_url,
+                api_key=settings.riot_api_key,
+                puuid=player.puuid,
+                match_id=match_id,
+            )
+        )
+
+    summaries.sort(key=lambda summary: summary.game_end_timestamp)
+    return summaries, newest_summary
+
+
+async def _apply_playing_income_for_player(
+    session: AsyncSession,
+    player: TrackedPlayer,
+    http_client,
+) -> None:
+    summaries, newest_summary = await _get_unprocessed_match_summaries(
+        player, http_client
+    )
+
+    if player.last_playing_income_match_id is None:
+        if newest_summary is not None:
+            player.last_playing_income_match_id = newest_summary.match_id
+            player.last_playing_income_match_end_at = _match_completed_at(
+                newest_summary
+            )
+            logger.info(
+                "Initialized playing-income cursor for %s#%s at %s",
+                player.game_name,
+                player.tag_line,
+                newest_summary.match_id,
+            )
+        return
+
+    if not summaries:
+        if newest_summary is not None:
+            player.last_playing_income_match_id = newest_summary.match_id
+            player.last_playing_income_match_end_at = _match_completed_at(
+                newest_summary
+            )
+        return
+
+    user_result = await session.execute(
+        select(User).where(User.linked_player_id == player.id)
+    )
+    user = user_result.scalar_one_or_none()
+    if user is None:
+        latest_summary = summaries[-1]
+        player.last_playing_income_match_id = latest_summary.match_id
+        player.last_playing_income_match_end_at = _match_completed_at(latest_summary)
+        return
+
+    existing_ids_result = await session.execute(
+        select(PlayingIncomeEntry.match_id).where(
+            PlayingIncomeEntry.player_id == player.id,
+            PlayingIncomeEntry.match_id.in_(
+                [summary.match_id for summary in summaries]
+            ),
+        )
+    )
+    existing_ids = {match_id for match_id in existing_ids_result.scalars().all()}
+
+    latest_seen_summary = summaries[-1]
+    for summary in summaries:
+        latest_seen_summary = summary
+        if summary.match_id in existing_ids:
+            continue
+
+        completed_at = _match_completed_at(summary)
+        player.last_playing_income_match_id = summary.match_id
+        player.last_playing_income_match_end_at = completed_at
+
+        if summary.queue_id != RANKED_SOLO_QUEUE_ID:
+            continue
+        if (
+            summary.game_duration_seconds
+            < settings.playing_income_min_match_duration_seconds
+        ):
+            continue
+
+        outcome_multiplier = (
+            1.0 if summary.win else settings.playing_income_loss_multiplier
+        )
+        amount = calculate_playing_income_amount(
+            player.current_price, outcome_multiplier
+        )
+        if amount <= 0:
+            continue
+
+        user.balance += amount
+        session.add(
+            PlayingIncomeEntry(
+                user_id=user.id,
+                player_id=player.id,
+                match_id=summary.match_id,
+                match_result=(
+                    PlayingIncomeMatchResult.WIN
+                    if summary.win
+                    else PlayingIncomeMatchResult.LOSS
+                ),
+                match_duration_seconds=summary.game_duration_seconds,
+                match_completed_at=completed_at,
+                share_price=player.current_price,
+                base_rate=settings.playing_income_base_rate,
+                outcome_multiplier=outcome_multiplier,
+                amount=amount,
+            )
+        )
+        logger.info(
+            "Applied playing income for %s#%s match %s: %.2f",
+            player.game_name,
+            player.tag_line,
+            summary.match_id,
+            amount,
+        )
+
+    player.last_playing_income_match_id = latest_seen_summary.match_id
+    player.last_playing_income_match_end_at = _match_completed_at(latest_seen_summary)
 
 
 async def market_update_job() -> None:
@@ -160,6 +346,7 @@ async def market_update_job() -> None:
                 rank_data.tier, rank_data.rank, rank_data.league_points
             )
             win_rate = calculate_win_rate(rank_data.wins, rank_data.losses)
+            should_record_market_update = False
 
             if player.lp_abs == 0 and player.current_price <= 10.0:
                 player.current_price = calculate_ipo_price(
@@ -171,6 +358,7 @@ async def market_update_job() -> None:
                 player.lp_abs = new_lp_abs
                 player.previous_lp_abs = new_lp_abs
                 player.gamma_factor = generate_gamma_base(hash(player.puuid) % 10000)
+                should_record_market_update = True
                 logger.info(
                     "Initialized price for %s#%s at %.2f",
                     player.game_name,
@@ -182,45 +370,66 @@ async def market_update_job() -> None:
 
                 if delta_lp == 0:
                     logger.info(
-                        "No LP change for %s#%s; skipping market state update",
+                        "No LP change for %s#%s; preserving market state",
                         player.game_name,
                         player.tag_line,
                     )
-                    await asyncio.sleep(0.1)
-                    continue
+                else:
+                    player.previous_lp_abs = player.lp_abs
+                    player.lp_abs = new_lp_abs
+                    player.streak = update_streak(player.streak, delta_lp)
+                    player.current_price = calculate_new_price(
+                        player.current_price,
+                        delta_lp,
+                        player.streak,
+                        player.gamma_factor,
+                        win_rate=win_rate,
+                        hot_streak=rank_data.hot_streak,
+                        veteran=rank_data.veteran,
+                        inactive=rank_data.inactive,
+                        fresh_blood=rank_data.fresh_blood,
+                    )
+                    should_record_market_update = True
+                    logger.info(
+                        "Updated price for %s#%s to %.2f (delta_lp=%d, win_rate=%.3f)",
+                        player.game_name,
+                        player.tag_line,
+                        player.current_price,
+                        delta_lp,
+                        win_rate,
+                    )
 
-                player.previous_lp_abs = player.lp_abs
-                player.lp_abs = new_lp_abs
-                player.streak = update_streak(player.streak, delta_lp)
-                player.current_price = calculate_new_price(
-                    player.current_price,
-                    delta_lp,
-                    player.streak,
-                    player.gamma_factor,
-                    win_rate=win_rate,
-                    hot_streak=rank_data.hot_streak,
-                    veteran=rank_data.veteran,
-                    inactive=rank_data.inactive,
-                    fresh_blood=rank_data.fresh_blood,
+            if should_record_market_update:
+                player.last_updated = datetime.now(UTC)
+                session.add(
+                    PriceHistory(
+                        player_id=player.id,
+                        price=player.current_price,
+                        lp_abs=player.lp_abs,
+                    )
                 )
-                logger.info(
-                    "Updated price for %s#%s to %.2f (delta_lp=%d, win_rate=%.3f)",
+
+            try:
+                await _apply_playing_income_for_player(session, player, http_client)
+            except PlayerNotFoundError:
+                logger.warning(
+                    "Missing match data for %s#%s; skipping playing income",
                     player.game_name,
                     player.tag_line,
-                    player.current_price,
-                    delta_lp,
-                    win_rate,
                 )
-
-            player.last_updated = datetime.now(UTC)
-
-            session.add(
-                PriceHistory(
-                    player_id=player.id,
-                    price=player.current_price,
-                    lp_abs=player.lp_abs,
+            except RateLimitedError:
+                logger.warning(
+                    "Rate limited while fetching matches for %s#%s",
+                    player.game_name,
+                    player.tag_line,
                 )
-            )
+                break
+            except Exception:
+                logger.exception(
+                    "Error applying playing income for %s#%s",
+                    player.game_name,
+                    player.tag_line,
+                )
 
             await asyncio.sleep(0.1)
 
@@ -338,6 +547,17 @@ async def market_update_job() -> None:
         indebted_users = indebted_users_result.scalars().all()
         for user in indebted_users:
             await apply_due_interest(session, user, as_of=datetime.now(UTC))
+
+        all_users_result = await session.execute(select(User))
+        all_users = all_users_result.scalars().all()
+        snapshot_time = datetime.now(UTC)
+        for user in all_users:
+            await record_user_wealth_snapshot(
+                session,
+                user,
+                source=UserWealthSnapshotSource.MARKET_UPDATE,
+                as_of=snapshot_time,
+            )
 
         await session.commit()
         if successful_player_refreshes > 0:

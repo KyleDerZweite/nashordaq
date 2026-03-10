@@ -11,14 +11,21 @@ from app.banking import (
     apply_due_interest,
     apply_repayment,
     build_account_snapshot,
+    build_playing_income_summary,
     current_outstanding_debt,
     initialize_debt_schedule,
+    record_user_wealth_snapshot,
     round_currency,
 )
 from app.config import settings
 from app.database import get_session
-from app.models import BankLedgerEntry, User
-from app.schemas import BankActionRequest, BankLedgerEntryResponse, BankSummaryResponse
+from app.models import BankLedgerEntry, User, UserWealthSnapshotSource
+from app.schemas import (
+    BankActionRequest,
+    BankLedgerEntryResponse,
+    BankSummaryResponse,
+    PlayingIncomeEntryResponse,
+)
 
 router = APIRouter(tags=["bank"])
 
@@ -32,6 +39,7 @@ async def _build_bank_summary(
     as_of: datetime | None = None,
 ) -> BankSummaryResponse:
     snapshot = await build_account_snapshot(session, user, as_of=as_of)
+    playing_income = await build_playing_income_summary(session, user, as_of=as_of)
     entries_result = await session.execute(
         select(BankLedgerEntry)
         .where(BankLedgerEntry.user_id == user.id)
@@ -54,6 +62,10 @@ async def _build_bank_summary(
         next_interest_amount=snapshot.next_interest_amount,
         interest_rate_per_interval=settings.bank_interest_rate_per_interval,
         interest_interval_hours=settings.bank_interest_interval_hours,
+        projected_next_win_income=playing_income.projected_next_win_income,
+        projected_next_loss_income=playing_income.projected_next_loss_income,
+        playing_income_last_24h=playing_income.playing_income_last_24h,
+        playing_income_lifetime_total=playing_income.playing_income_lifetime_total,
         recent_entries=[
             BankLedgerEntryResponse(
                 id=entry.id,
@@ -65,6 +77,21 @@ async def _build_bank_summary(
                 created_at=entry.created_at,
             )
             for entry in entries
+        ],
+        recent_playing_income_entries=[
+            PlayingIncomeEntryResponse(
+                id=entry.id,
+                match_id=entry.match_id,
+                match_result=entry.match_result,
+                match_duration_seconds=entry.match_duration_seconds,
+                match_completed_at=entry.match_completed_at,
+                share_price=entry.share_price,
+                base_rate=entry.base_rate,
+                outcome_multiplier=entry.outcome_multiplier,
+                amount=entry.amount,
+                created_at=entry.created_at,
+            )
+            for entry in playing_income.recent_entries
         ],
     )
 
@@ -98,6 +125,12 @@ async def borrow_from_bank(
         initialize_debt_schedule(user, at=now)
 
     session.add(apply_borrow(user, amount, at=now))
+    await record_user_wealth_snapshot(
+        session,
+        user,
+        source=UserWealthSnapshotSource.CREDIT_ACTION,
+        as_of=now,
+    )
     await session.commit()
     await session.refresh(user)
     return await _build_bank_summary(session, user, as_of=now)
@@ -123,6 +156,12 @@ async def repay_bank_debt(
         )
 
     session.add(apply_repayment(user, amount, at=now))
+    await record_user_wealth_snapshot(
+        session,
+        user,
+        source=UserWealthSnapshotSource.CREDIT_ACTION,
+        as_of=now,
+    )
     await session.commit()
     await session.refresh(user)
     return await _build_bank_summary(session, user, as_of=now)

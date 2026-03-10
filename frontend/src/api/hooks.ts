@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { get, post, put, del } from "./client";
 import type {
+  BalanceInsightsResponse,
   BankActionRequest,
   BankSummaryResponse,
   GambaCreate,
@@ -32,6 +33,7 @@ export const queryKeys = {
   systemStatus: ["systemStatus"] as const,
   gamba: ["gamba"] as const,
   bank: ["bank"] as const,
+  balanceInsights: ["balanceInsights"] as const,
 };
 
 // ---- Queries ----
@@ -130,6 +132,15 @@ export function useBankSummary(enabled = true) {
   });
 }
 
+export function useBalanceInsights(enabled = true) {
+  return useQuery<BalanceInsightsResponse>({
+    queryKey: queryKeys.balanceInsights,
+    queryFn: () => get<BalanceInsightsResponse>("/user/balance-insights"),
+    enabled,
+    refetchInterval: 30_000,
+  });
+}
+
 // ---- Mutations ----
 
 export function usePlaceOrder() {
@@ -141,6 +152,7 @@ export function usePlaceOrder() {
       void qc.invalidateQueries({ queryKey: queryKeys.recentOrders });
       void qc.invalidateQueries({ queryKey: queryKeys.portfolio });
       void qc.invalidateQueries({ queryKey: queryKeys.user });
+      void qc.invalidateQueries({ queryKey: queryKeys.balanceInsights });
     },
   });
 }
@@ -154,6 +166,7 @@ export function useCancelOrder() {
       void qc.invalidateQueries({ queryKey: queryKeys.recentOrders });
       void qc.invalidateQueries({ queryKey: queryKeys.portfolio });
       void qc.invalidateQueries({ queryKey: queryKeys.user });
+      void qc.invalidateQueries({ queryKey: queryKeys.balanceInsights });
     },
   });
 }
@@ -170,6 +183,7 @@ export function useCompleteOnboarding() {
       void qc.invalidateQueries({ queryKey: queryKeys.orders });
       void qc.invalidateQueries({ queryKey: queryKeys.recentOrders });
       void qc.invalidateQueries({ queryKey: queryKeys.leaderboard });
+      void qc.invalidateQueries({ queryKey: queryKeys.balanceInsights });
     },
   });
 }
@@ -186,6 +200,7 @@ export function useUpdateUserProfile() {
       void qc.invalidateQueries({ queryKey: queryKeys.orders });
       void qc.invalidateQueries({ queryKey: queryKeys.recentOrders });
       void qc.invalidateQueries({ queryKey: queryKeys.leaderboard });
+      void qc.invalidateQueries({ queryKey: queryKeys.balanceInsights });
     },
   });
 }
@@ -199,12 +214,14 @@ export function useCreateGambaPosition() {
       void qc.invalidateQueries({ queryKey: queryKeys.user });
       void qc.invalidateQueries({ queryKey: queryKeys.orders });
       void qc.invalidateQueries({ queryKey: queryKeys.recentOrders });
+      void qc.invalidateQueries({ queryKey: queryKeys.balanceInsights });
     },
   });
 }
 
 function invalidateBankRelatedQueries(qc: ReturnType<typeof useQueryClient>) {
   void qc.invalidateQueries({ queryKey: queryKeys.bank });
+  void qc.invalidateQueries({ queryKey: queryKeys.balanceInsights });
   void qc.invalidateQueries({ queryKey: queryKeys.user });
   void qc.invalidateQueries({ queryKey: queryKeys.portfolio });
   void qc.invalidateQueries({ queryKey: queryKeys.leaderboard });
