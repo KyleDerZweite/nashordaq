@@ -92,9 +92,9 @@ export default function BankModal({ canManageBank, onClose }: Props) {
           </div>
           <button
             onClick={onClose}
-            className="font-mono text-lg font-bold text-hex-bronze transition-colors hover:text-hex-white"
+            className="border-2 border-hex-border px-4 py-3 font-mono text-xs font-bold uppercase tracking-[0.18em] text-hex-bronze transition-colors hover:border-hex-white hover:text-hex-white"
           >
-            X
+            Close
           </button>
         </div>
 

@@ -87,10 +87,11 @@ export default function TradeTerminal({
             {side} &mdash; {player.display_name}
           </h2>
           <button
+            type="button"
             onClick={onClose}
-            className="font-mono text-lg font-bold text-hex-bronze transition-colors hover:text-hex-white"
+            className="border-2 border-hex-border px-3 py-2 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-hex-bronze transition-colors hover:border-hex-white hover:text-hex-white"
           >
-            X
+            Close
           </button>
         </div>
 

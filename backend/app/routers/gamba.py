@@ -74,19 +74,6 @@ async def create_gamba_position(
     if body.cash_amount > user.balance:
         raise HTTPException(status_code=400, detail="Insufficient balance")
 
-    existing_position = await session.scalar(
-        select(GambaPosition)
-        .where(GambaPosition.user_id == user.id)
-        .where(GambaPosition.status == GambaStatus.ACTIVE)
-        .limit(1)
-    )
-
-    if existing_position is not None:
-        raise HTTPException(
-            status_code=400,
-            detail="You already have an active Gamba position",
-        )
-
     player = await _get_random_eligible_player(session, user.linked_player_id)
     if player.current_price <= 0:
         raise HTTPException(status_code=400, detail="Selected player is not tradable")

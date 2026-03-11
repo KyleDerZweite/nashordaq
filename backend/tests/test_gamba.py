@@ -52,7 +52,7 @@ async def test_create_gamba_position_creates_recent_order(
     assert recent_order["quantity"] == pytest.approx(4.0)
 
 
-async def test_create_gamba_position_rejects_second_active_position(
+async def test_create_gamba_position_allows_multiple_active_positions(
     auth_client,
     tradable_player,
     monkeypatch,
@@ -64,8 +64,15 @@ async def test_create_gamba_position_rejects_second_active_position(
     assert first_resp.status_code == 201
 
     second_resp = await auth_client.post("/api/gamba", json={"cash_amount": 100})
-    assert second_resp.status_code == 400
-    assert second_resp.json()["detail"] == "You already have an active Gamba position"
+    assert second_resp.status_code == 201
+
+    positions_resp = await auth_client.get("/api/gamba")
+    assert positions_resp.status_code == 200
+    assert len(positions_resp.json()) == 2
+
+    me_resp = await auth_client.get("/api/user/me")
+    assert me_resp.status_code == 200
+    assert me_resp.json()["balance"] == pytest.approx(settings.starting_balance - 200)
 
 
 @pytest.mark.asyncio

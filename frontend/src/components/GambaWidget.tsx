@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useCreateGambaPosition, useGambaPositions } from "../api";
+import GambaModal from "./GambaModal";
 import {
   formatAmount,
   formatLocalDateTime,
@@ -13,25 +14,37 @@ interface Props {
 
 export default function GambaWidget({ balance, canTrade }: Props) {
   const [cashAmount, setCashAmount] = useState("");
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const { data: positions } = useGambaPositions(canTrade);
   const createGambaPosition = useCreateGambaPosition();
 
-  const activePosition = useMemo(
-    () => positions?.find((position) => position.status === "ACTIVE") ?? null,
+  const activePositions = useMemo(
+    () => positions?.filter((position) => position.status === "ACTIVE") ?? [],
     [positions],
   );
-  const displayMultiplier = activePosition?.settlement_multiplier ?? 2;
+  const summaryPositions = useMemo(
+    () =>
+      activePositions.length > 0
+        ? activePositions.slice(0, 3)
+        : (positions ?? []).slice(0, 3),
+    [activePositions, positions],
+  );
+  const committedTotal = useMemo(
+    () =>
+      activePositions.reduce(
+        (total, position) => total + position.cash_amount,
+        0,
+      ),
+    [activePositions],
+  );
+  const displayMultiplier = activePositions[0]?.settlement_multiplier ?? 2;
 
   const parsedCashAmount = Number(cashAmount);
   const hasValidAmount =
     Number.isFinite(parsedCashAmount) && parsedCashAmount > 0;
   const canAfford = hasValidAmount && parsedCashAmount <= balance;
   const canSubmit =
-    canTrade &&
-    !activePosition &&
-    hasValidAmount &&
-    canAfford &&
-    !createGambaPosition.isPending;
+    canTrade && hasValidAmount && canAfford && !createGambaPosition.isPending;
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -97,9 +110,9 @@ export default function GambaWidget({ balance, canTrade }: Props) {
             <button
               type="button"
               onClick={handleMax}
-              disabled={!canTrade || balance <= 0 || Boolean(activePosition)}
+              disabled={!canTrade || balance <= 0}
               className={`shrink-0 border-2 px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider transition-colors ${
-                canTrade && balance > 0 && !activePosition
+                canTrade && balance > 0
                   ? "border-hex-gold text-hex-gold hover:bg-hex-gold hover:text-hex-bg"
                   : "cursor-not-allowed border-hex-border text-hex-border"
               }`}
@@ -113,49 +126,90 @@ export default function GambaWidget({ balance, canTrade }: Props) {
           </p>
         </div>
 
-        {activePosition && (
-          <div className="border-2 border-hex-magic/50 bg-hex-bg-alt px-3 py-3">
+        {(positions?.length ?? 0) > 0 && (
+          <div className="space-y-3 border-2 border-hex-magic/50 bg-hex-bg-alt px-3 py-3">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-hex-bronze">
-                  Active Gamba
+                  {activePositions.length > 0
+                    ? "Active Gambas"
+                    : "Recent Gambas"}
                 </p>
                 <p className="font-serif text-lg font-bold text-hex-white">
-                  {activePosition.player_name}
+                  {activePositions.length > 0
+                    ? `${activePositions.length} running`
+                    : `${positions?.length ?? 0} total`}
                 </p>
               </div>
               <div className="text-right font-mono text-xs text-hex-bronze">
-                <div>Auto-sell</div>
+                <div>
+                  {activePositions.length > 0 ? "Committed" : "History"}
+                </div>
                 <div className="text-hex-gold">
-                  {formatLocalDateTime(activePosition.scheduled_settlement_at)}
+                  {activePositions.length > 0
+                    ? `${formatAmount(committedTotal)} P`
+                    : `${positions?.length ?? 0} slips`}
                 </div>
               </div>
             </div>
-            <div className="mt-3 grid grid-cols-3 gap-2 border-t border-hex-border pt-3 font-mono text-xs">
-              <div>
-                <div className="uppercase tracking-wider text-hex-bronze">
-                  Cash
-                </div>
-                <div className="font-bold text-hex-gold">
-                  {formatAmount(activePosition.cash_amount)} P
-                </div>
-              </div>
-              <div>
-                <div className="uppercase tracking-wider text-hex-bronze">
-                  Qty
-                </div>
-                <div className="font-bold text-hex-white">
-                  {formatQuantity(activePosition.quantity)}
-                </div>
-              </div>
-              <div>
-                <div className="uppercase tracking-wider text-hex-bronze">
-                  Entry
-                </div>
-                <div className="font-bold text-hex-white">
-                  {formatAmount(activePosition.entry_price)}
-                </div>
-              </div>
+
+            <div className="overflow-hidden border border-hex-border">
+              <table className="w-full table-fixed">
+                <thead>
+                  <tr className="border-b border-hex-border bg-hex-bg text-left">
+                    <th className="px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-hex-bronze">
+                      Player
+                    </th>
+                    <th className="px-3 py-2 text-right font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-hex-bronze">
+                      Cash
+                    </th>
+                    <th className="px-3 py-2 text-right font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-hex-bronze">
+                      Exit
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {summaryPositions.map((position) => (
+                    <tr
+                      key={position.id}
+                      className="border-b border-hex-border/50 last:border-b-0"
+                    >
+                      <td className="px-3 py-2 font-mono text-xs text-hex-white">
+                        <div className="truncate font-semibold">
+                          {position.player_name}
+                        </div>
+                        <div className="truncate text-[11px] text-hex-bronze">
+                          {formatQuantity(position.quantity)} @{" "}
+                          {formatAmount(position.entry_price)}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2 text-right font-mono text-xs font-bold text-hex-gold">
+                        {formatAmount(position.cash_amount)} P
+                      </td>
+                      <td className="px-3 py-2 text-right font-mono text-[11px] text-hex-bronze">
+                        {formatLocalDateTime(position.scheduled_settlement_at)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 border-t border-hex-border pt-3">
+              <p className="font-mono text-[11px] text-hex-bronze">
+                {activePositions.length > 0
+                  ? activePositions.length > summaryPositions.length
+                    ? `Showing ${summaryPositions.length} of ${activePositions.length} active gambas.`
+                    : `All ${activePositions.length} active gambas shown.`
+                  : `Showing the latest ${summaryPositions.length} gamba records.`}
+              </p>
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(true)}
+                className="border border-hex-gold px-3 py-2 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-hex-gold transition-colors hover:bg-hex-gold hover:text-hex-bg"
+              >
+                View All
+              </button>
             </div>
           </div>
         )}
@@ -173,7 +227,7 @@ export default function GambaWidget({ balance, canTrade }: Props) {
           </p>
         )}
 
-        {!activePosition && !canAfford && hasValidAmount && (
+        {!canAfford && hasValidAmount && (
           <p className="font-mono text-xs text-hex-zaun">
             Insufficient balance
           </p>
@@ -190,11 +244,18 @@ export default function GambaWidget({ balance, canTrade }: Props) {
         >
           {createGambaPosition.isPending
             ? "Rolling..."
-            : activePosition
-              ? "Active Gamba Running"
+            : activePositions.length > 0
+              ? `Start Another Gamba (${activePositions.length} Active)`
               : "Start Gamba"}
         </button>
       </form>
+
+      {isModalOpen && (
+        <GambaModal
+          positions={positions ?? []}
+          onClose={() => setIsModalOpen(false)}
+        />
+      )}
     </section>
   );
 }
