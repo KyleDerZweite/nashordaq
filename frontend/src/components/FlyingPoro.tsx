@@ -13,6 +13,17 @@ const PORO_ASSETS: Record<string, string> = {
   "tier-6": "/poro/tier-6.png",
 };
 
+const PORO_ANIMATED_ASSETS: Record<string, [string, string]> = {
+  "tier-1": ["/poro/tier-1.png", "/poro/tier-1_run.png"],
+  "tier-2": ["/poro/tier-2.png", "/poro/tier-2_run.png"],
+  "tier-3": ["/poro/tier-3.png", "/poro/tier-3_run.png"],
+  "tier-4": ["/poro/tier-4.png", "/poro/tier-4_run.png"],
+  "tier-5": ["/poro/tier-5.png", "/poro/tier-5_run.png"],
+  "tier-6": ["/poro/tier-6.png", "/poro/tier-6_run.png"],
+};
+
+const RUN_FRAME_INTERVAL_MS = 140;
+
 interface ViewportSize {
   width: number;
   height: number;
@@ -58,9 +69,11 @@ export default function FlyingPoro({ enabled }: { enabled: boolean }) {
   });
   const [dismissedSpawnId, setDismissedSpawnId] = useState<string | null>(null);
   const [rewardBurst, setRewardBurst] = useState<RewardBurst | null>(null);
+  const [animationFrame, setAnimationFrame] = useState(0);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const clearTimerRef = useRef<number | null>(null);
   const burstTimerRef = useRef<number | null>(null);
+  const animationTimerRef = useRef<number | null>(null);
   const serverOffsetRef = useRef(0);
 
   const activeSpawn = data?.active_spawn ?? null;
@@ -68,6 +81,8 @@ export default function FlyingPoro({ enabled }: { enabled: boolean }) {
     activeSpawn && activeSpawn.spawn_id !== dismissedSpawnId
       ? activeSpawn
       : null;
+  const shouldMirrorHorizontally =
+    visibleSpawn !== null && visibleSpawn.end_x > visibleSpawn.start_x;
 
   useEffect(() => {
     serverOffsetRef.current = data
@@ -111,14 +126,11 @@ export default function FlyingPoro({ enabled }: { enabled: boolean }) {
       viewport,
     );
     const remainingMs = Math.max(0, expiresAt - now);
-    const dx = visibleSpawn.end_x - visibleSpawn.start_x;
-    const dy = visibleSpawn.end_y - visibleSpawn.start_y;
-    const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
 
     button.style.transitionProperty = "none";
     button.style.transitionDuration = "0ms";
     button.style.transitionTimingFunction = "linear";
-    button.style.transform = `translate3d(${currentPoint.x}px, ${currentPoint.y}px, 0) rotate(${angle}deg)`;
+    button.style.transform = `translate3d(${currentPoint.x}px, ${currentPoint.y}px, 0)`;
 
     if (remainingMs === 0) {
       clearTimerRef.current = window.setTimeout(() => {
@@ -132,7 +144,7 @@ export default function FlyingPoro({ enabled }: { enabled: boolean }) {
       button.style.transitionProperty = "transform";
       button.style.transitionDuration = `${remainingMs}ms`;
       button.style.transitionTimingFunction = "linear";
-      button.style.transform = `translate3d(${endPoint.x}px, ${endPoint.y}px, 0) rotate(${angle}deg)`;
+      button.style.transform = `translate3d(${endPoint.x}px, ${endPoint.y}px, 0)`;
     });
 
     clearTimerRef.current = window.setTimeout(() => {
@@ -154,8 +166,38 @@ export default function FlyingPoro({ enabled }: { enabled: boolean }) {
       if (burstTimerRef.current !== null) {
         window.clearTimeout(burstTimerRef.current);
       }
+      if (animationTimerRef.current !== null) {
+        window.clearInterval(animationTimerRef.current);
+      }
     };
   }, []);
+
+  useEffect(() => {
+    if (animationTimerRef.current !== null) {
+      window.clearInterval(animationTimerRef.current);
+      animationTimerRef.current = null;
+    }
+
+    if (!visibleSpawn) {
+      return;
+    }
+
+    const animationFrames = PORO_ANIMATED_ASSETS[visibleSpawn.asset_key];
+    if (!animationFrames) {
+      return;
+    }
+
+    animationTimerRef.current = window.setInterval(() => {
+      setAnimationFrame((current) => (current + 1) % animationFrames.length);
+    }, RUN_FRAME_INTERVAL_MS);
+
+    return () => {
+      if (animationTimerRef.current !== null) {
+        window.clearInterval(animationTimerRef.current);
+        animationTimerRef.current = null;
+      }
+    };
+  }, [visibleSpawn]);
 
   if (!enabled || !data?.enabled || !visibleSpawn) {
     return rewardBurst ? (
@@ -171,7 +213,10 @@ export default function FlyingPoro({ enabled }: { enabled: boolean }) {
     ) : null;
   }
 
-  const assetSrc = PORO_ASSETS[visibleSpawn.asset_key] ?? PORO_ASSETS["tier-1"];
+  const animationFrames = PORO_ANIMATED_ASSETS[visibleSpawn.asset_key];
+  const assetSrc = animationFrames
+    ? animationFrames[animationFrame]
+    : (PORO_ASSETS[visibleSpawn.asset_key] ?? PORO_ASSETS["tier-1"]);
 
   return (
     <>
@@ -222,6 +267,7 @@ export default function FlyingPoro({ enabled }: { enabled: boolean }) {
           src={assetSrc}
           alt=""
           className="poro-flight__image"
+          style={{ transform: shouldMirrorHorizontally ? "scaleX(-1)" : undefined }}
           draggable={false}
         />
       </button>

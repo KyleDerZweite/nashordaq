@@ -1,5 +1,7 @@
+import asyncio
 import math
 import random
+from collections import defaultdict
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
@@ -26,6 +28,37 @@ class PoroStateSummary:
     server_time: datetime
 
 
+class PoroStateNotifier:
+    def __init__(self) -> None:
+        self._listeners: dict[int, set[asyncio.Event]] = defaultdict(set)
+        self._lock = asyncio.Lock()
+
+    async def subscribe(self, user_id: int) -> asyncio.Event:
+        listener = asyncio.Event()
+        async with self._lock:
+            self._listeners[user_id].add(listener)
+        return listener
+
+    async def unsubscribe(self, user_id: int, listener: asyncio.Event) -> None:
+        async with self._lock:
+            listeners = self._listeners.get(user_id)
+            if listeners is None:
+                return
+            listeners.discard(listener)
+            if not listeners:
+                self._listeners.pop(user_id, None)
+
+    async def notify(self, user_id: int) -> None:
+        async with self._lock:
+            listeners = tuple(self._listeners.get(user_id, ()))
+
+        for listener in listeners:
+            listener.set()
+
+
+poro_state_notifier = PoroStateNotifier()
+
+
 TIER_ORDER = (
     PoroTier.TIER_1,
     PoroTier.TIER_2,
@@ -36,12 +69,12 @@ TIER_ORDER = (
 )
 
 TIER_REWARDS = {
-    PoroTier.TIER_1: 2.0,
-    PoroTier.TIER_2: 4.0,
-    PoroTier.TIER_3: 7.0,
-    PoroTier.TIER_4: 12.0,
-    PoroTier.TIER_5: 18.0,
-    PoroTier.TIER_6: 30.0,
+    PoroTier.TIER_1: 6.0,
+    PoroTier.TIER_2: 12.0,
+    PoroTier.TIER_3: 24.0,
+    PoroTier.TIER_4: 50.0,
+    PoroTier.TIER_5: 100.0,
+    PoroTier.TIER_6: 220.0,
 }
 
 TIER_ASSET_KEYS = {
@@ -54,13 +87,13 @@ TIER_ASSET_KEYS = {
 }
 
 SPAWN_WEIGHTS = (
-    (None, 55.0),
+    (None, 57.0),
     (PoroTier.TIER_1, 26.0),
-    (PoroTier.TIER_2, 11.0),
+    (PoroTier.TIER_2, 10.0),
     (PoroTier.TIER_3, 4.5),
-    (PoroTier.TIER_4, 2.2),
-    (PoroTier.TIER_5, 1.0),
-    (PoroTier.TIER_6, 0.3),
+    (PoroTier.TIER_4, 1.7),
+    (PoroTier.TIER_5, 0.7),
+    (PoroTier.TIER_6, 0.1),
 )
 
 
@@ -77,8 +110,13 @@ def _normalize_datetime(value: datetime | None) -> datetime | None:
 
 
 def _roll_interval_seconds() -> int:
-    minimum = settings.poro_min_interval_minutes * 60
-    maximum = settings.poro_max_interval_minutes * 60
+    minimum = settings.poro_min_interval_seconds_override
+    maximum = settings.poro_max_interval_seconds_override
+
+    if minimum is None or maximum is None:
+        minimum = settings.poro_min_interval_minutes * 60
+        maximum = settings.poro_max_interval_minutes * 60
+
     mode = minimum + ((maximum - minimum) * 0.65)
     return max(minimum, min(maximum, int(random.triangular(minimum, maximum, mode))))
 
@@ -110,11 +148,15 @@ def _edge_point(edge: str) -> tuple[float, float]:
     return (random.uniform(inset_min, inset_max), 1.0 + overscan)
 
 
+def _adjacent_edges(edge: str) -> tuple[str, str]:
+    if edge in {"left", "right"}:
+        return ("top", "bottom")
+    return ("left", "right")
+
+
 def _roll_path() -> tuple[float, float, float, float, int]:
     start_edge = random.choice(("left", "right", "top", "bottom"))
-    candidate_edges = tuple(
-        edge for edge in ("left", "right", "top", "bottom") if edge != start_edge
-    )
+    candidate_edges = _adjacent_edges(start_edge)
     end_edge = random.choice(candidate_edges)
     start_x, start_y = _edge_point(start_edge)
     end_x, end_y = _edge_point(end_edge)
@@ -171,16 +213,17 @@ def _expire_spawn(
     state.updated_at = as_of
 
 
-async def resolve_poro_state(
+async def _sync_poro_state(
     session: AsyncSession,
     user: User,
+    state: UserPoroState,
     *,
-    as_of: datetime | None = None,
-) -> PoroStateSummary:
+    as_of: datetime,
+) -> tuple[PoroStateSummary, bool]:
     now = _normalize_datetime(as_of) or datetime.now(UTC)
-    state = await _get_or_create_state(session, user, as_of=now)
     active_spawn = await _load_active_spawn(session, state)
     next_roll_at = _normalize_datetime(state.next_roll_at)
+    changed = False
 
     if active_spawn is not None:
         active_expires_at = _normalize_datetime(active_spawn.expires_at)
@@ -189,34 +232,45 @@ async def resolve_poro_state(
         ):
             _expire_spawn(state, active_spawn, as_of=now)
             active_spawn = None
+            next_roll_at = _normalize_datetime(state.next_roll_at)
+            changed = True
         else:
-            state.updated_at = now
-            return PoroStateSummary(
-                active_spawn=active_spawn,
-                next_roll_at=next_roll_at,
-                server_time=now,
+            return (
+                PoroStateSummary(
+                    active_spawn=active_spawn,
+                    next_roll_at=next_roll_at,
+                    server_time=now,
+                ),
+                changed,
             )
 
     if next_roll_at is None:
         next_roll_at = _schedule_next_roll(now)
         state.next_roll_at = next_roll_at
+        state.updated_at = now
+        changed = True
 
     if next_roll_at > now:
-        state.updated_at = now
-        return PoroStateSummary(
-            active_spawn=None,
-            next_roll_at=next_roll_at,
-            server_time=now,
+        return (
+            PoroStateSummary(
+                active_spawn=None,
+                next_roll_at=next_roll_at,
+                server_time=now,
+            ),
+            changed,
         )
 
     tier = _roll_tier()
     if tier is None:
         state.next_roll_at = _schedule_next_roll(now)
         state.updated_at = now
-        return PoroStateSummary(
-            active_spawn=None,
-            next_roll_at=state.next_roll_at,
-            server_time=now,
+        return (
+            PoroStateSummary(
+                active_spawn=None,
+                next_roll_at=state.next_roll_at,
+                server_time=now,
+            ),
+            True,
         )
 
     start_x, start_y, end_x, end_y, duration_ms = _roll_path()
@@ -241,11 +295,65 @@ async def resolve_poro_state(
     state.active_spawn_id = spawn.id
     state.next_roll_at = None
     state.updated_at = now
-    return PoroStateSummary(
-        active_spawn=spawn,
-        next_roll_at=state.next_roll_at,
-        server_time=now,
+    return (
+        PoroStateSummary(
+            active_spawn=spawn,
+            next_roll_at=state.next_roll_at,
+            server_time=now,
+        ),
+        True,
     )
+
+
+async def resolve_poro_state(
+    session: AsyncSession,
+    user: User,
+    *,
+    as_of: datetime | None = None,
+) -> PoroStateSummary:
+    now = _normalize_datetime(as_of) or datetime.now(UTC)
+    state = await _get_or_create_state(session, user, as_of=now)
+    summary, _ = await _sync_poro_state(session, user, state, as_of=now)
+    return summary
+
+
+# Fingerprint cache used by maintain_poro_states to detect external DB changes
+# (e.g. spawns created by the priming script that bypass the notifier).
+_maintenance_state_cache: dict[int, tuple[int | None, str | None]] = {}
+
+
+def _state_fingerprint(
+    state: UserPoroState,
+) -> tuple[int | None, str | None]:
+    updated = str(state.updated_at) if state.updated_at is not None else None
+    return (state.active_spawn_id, updated)
+
+
+async def maintain_poro_states(
+    session: AsyncSession,
+    *,
+    as_of: datetime | None = None,
+) -> set[int]:
+    now = _normalize_datetime(as_of) or datetime.now(UTC)
+    result = await session.execute(
+        select(User).where(User.linked_player_id.is_not(None))
+    )
+    users = result.scalars().all()
+    changed_user_ids: set[int] = set()
+
+    for user in users:
+        state = await _get_or_create_state(session, user, as_of=now)
+        _, changed = await _sync_poro_state(session, user, state, as_of=now)
+
+        fingerprint = _state_fingerprint(state)
+        if _maintenance_state_cache.get(user.id) != fingerprint:
+            changed = True
+        _maintenance_state_cache[user.id] = fingerprint
+
+        if changed:
+            changed_user_ids.add(user.id)
+
+    return changed_user_ids
 
 
 async def claim_poro_spawn(

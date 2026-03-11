@@ -31,6 +31,7 @@ from app.models import (
     User,
     UserWealthSnapshotSource,
 )
+from app.poro import maintain_poro_states, poro_state_notifier
 from app.pricing import (
     calculate_ipo_price,
     calculate_lp_abs,
@@ -54,6 +55,7 @@ scheduler = AsyncIOScheduler()
 _app: FastAPI | None = None
 _last_market_update_at: datetime | None = None
 MARKET_UPDATE_JOB_INTERVAL_SECONDS = 30
+PORO_MAINTENANCE_JOB_INTERVAL_SECONDS = 5
 MARKET_STATUS_GRACE_SECONDS = 90
 RANKED_SOLO_QUEUE_ID = 420
 
@@ -572,6 +574,18 @@ async def market_update_job() -> None:
             )
 
 
+async def poro_maintenance_job() -> None:
+    if not settings.poro_enabled:
+        return
+
+    async with SessionLocal() as session:
+        changed_user_ids = await maintain_poro_states(session, as_of=datetime.now(UTC))
+        await session.commit()
+
+    for user_id in changed_user_ids:
+        await poro_state_notifier.notify(user_id)
+
+
 def start_scheduler(app: FastAPI) -> None:
     global _app, _last_market_update_at
 
@@ -581,6 +595,14 @@ def start_scheduler(app: FastAPI) -> None:
         market_update_job,
         IntervalTrigger(seconds=MARKET_UPDATE_JOB_INTERVAL_SECONDS),
         id="market_update",
+        replace_existing=True,
+        max_instances=1,
+        next_run_time=datetime.now(UTC),
+    )
+    scheduler.add_job(
+        poro_maintenance_job,
+        IntervalTrigger(seconds=PORO_MAINTENANCE_JOB_INTERVAL_SECONDS),
+        id="poro_maintenance",
         replace_existing=True,
         max_instances=1,
         next_run_time=datetime.now(UTC),

@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { get, post, put, del } from "./client";
 import type {
@@ -39,6 +40,91 @@ export const queryKeys = {
   balanceInsights: ["balanceInsights"] as const,
   poro: ["poro"] as const,
 };
+
+const PORO_ACTIVE_POLL_MS = 5_000;
+const PORO_IDLE_POLL_MS = 5_000;
+
+function getInitialDocumentVisibility() {
+  if (typeof document === "undefined") {
+    return true;
+  }
+
+  return document.visibilityState === "visible";
+}
+
+function useDocumentVisible() {
+  const [isVisible, setIsVisible] = useState(getInitialDocumentVisibility);
+
+  useEffect(() => {
+    if (typeof document === "undefined") {
+      return;
+    }
+
+    function handleVisibilityChange() {
+      setIsVisible(document.visibilityState === "visible");
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () =>
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, []);
+
+  return isVisible;
+}
+
+function usePoroStreamSync(enabled: boolean) {
+  const qc = useQueryClient();
+  const isVisible = useDocumentVisible();
+  const [isConnected, setIsConnected] = useState(false);
+
+  useEffect(() => {
+    if (
+      !enabled ||
+      !isVisible ||
+      typeof window === "undefined" ||
+      typeof window.EventSource === "undefined"
+    ) {
+      return;
+    }
+
+    let isClosed = false;
+    const stream = new window.EventSource("/api/poro/stream");
+
+    stream.onopen = () => {
+      if (!isClosed) {
+        setIsConnected(true);
+      }
+    };
+
+    stream.onmessage = (event) => {
+      if (isClosed) {
+        return;
+      }
+
+      try {
+        const payload = JSON.parse(event.data) as PoroStateResponse;
+        qc.setQueryData(queryKeys.poro, payload);
+        setIsConnected(true);
+      } catch {
+        setIsConnected(false);
+      }
+    };
+
+    stream.onerror = () => {
+      if (!isClosed) {
+        setIsConnected(false);
+      }
+    };
+
+    return () => {
+      isClosed = true;
+      setIsConnected(false);
+      stream.close();
+    };
+  }, [enabled, isVisible, qc]);
+
+  return enabled && isVisible ? isConnected : false;
+}
 
 // ---- Queries ----
 
@@ -146,11 +232,32 @@ export function useBalanceInsights(enabled = true) {
 }
 
 export function usePoroState(enabled = true) {
+  const isStreamConnected = usePoroStreamSync(enabled);
+
   return useQuery<PoroStateResponse>({
     queryKey: queryKeys.poro,
     queryFn: () => get<PoroStateResponse>("/poro"),
     enabled,
-    refetchInterval: 20_000,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+    refetchInterval: (query) => {
+      if (isStreamConnected) {
+        return false;
+      }
+
+      const data = query.state.data;
+      if (!enabled || !data?.enabled) {
+        return false;
+      }
+
+      if (data.active_spawn) {
+        return PORO_ACTIVE_POLL_MS;
+      }
+
+      return PORO_IDLE_POLL_MS;
+    },
+    refetchIntervalInBackground: true,
   });
 }
 

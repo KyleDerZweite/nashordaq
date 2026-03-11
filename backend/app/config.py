@@ -58,8 +58,10 @@ class Settings(BaseSettings):
     poro_enabled: bool = True
     poro_min_interval_minutes: int = 30
     poro_max_interval_minutes: int = 180
-    poro_spawn_min_duration_seconds: float = 10.0
-    poro_spawn_max_duration_seconds: float = 18.0
+    poro_min_interval_seconds_override: int | None = None
+    poro_max_interval_seconds_override: int | None = None
+    poro_spawn_min_duration_seconds: float = 6.0
+    poro_spawn_max_duration_seconds: float = 10.0
 
 
 settings = Settings()

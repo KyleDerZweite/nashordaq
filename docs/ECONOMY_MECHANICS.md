@@ -198,22 +198,26 @@ Nashordaq can occasionally spawn a small clickable poro that flies across the UI
 - Some intervals intentionally produce no poro.
 - Only one active poro can exist per user at a time.
 - Rewards can be claimed once and expire when the poro flight ends.
+- Poro paths only cross between adjacent screen edges, so they do not traverse the full screen from `left` to `right` or `top` to `bottom`.
+- Default flight time is shorter, usually between `6` and `10` seconds, to keep claims more reactive.
 
 ### Current Tier Odds And Flat Rewards
 
-- `No spawn`: `55.0%`
-- `Tier 1`: `26.0%`, reward `2`
-- `Tier 2`: `11.0%`, reward `4`
-- `Tier 3`: `4.5%`, reward `7`
-- `Tier 4`: `2.2%`, reward `12`
-- `Tier 5`: `1.0%`, reward `18`
-- `Tier 6`: `0.3%`, reward `30`
+- `No spawn`: `57.0%`
+- `Tier 1`: `26.0%`, reward `6`
+- `Tier 2`: `10.0%`, reward `12`
+- `Tier 3`: `4.5%`, reward `24`
+- `Tier 4`: `1.7%`, reward `50`
+- `Tier 5`: `0.7%`, reward `100`
+- `Tier 6`: `0.1%`, reward `220`
+
+This table yields an average payout of about `5.61` per roll, including `No spawn` outcomes, with a much stronger jackpot shape at the top end.
 
 ### Processing Rules
 
 - Claim validation happens on the backend, not in the browser.
 - A poro claim credits cash immediately and records the change in user wealth history.
 - Duplicate or expired claims are rejected.
-- This mechanic is intentionally small and separate from LP-driven pricing, order execution, bank debt, and Playing Income.
+- This mechanic is intentionally separate from LP-driven pricing, order execution, bank debt, and Playing Income.
 
 Implementation: `app/poro.py`, `app/routers/poro.py`, `frontend/src/components/FlyingPoro.tsx`

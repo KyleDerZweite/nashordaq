@@ -13,6 +13,8 @@ from app.models import (
     GambaStatus,
     Holding,
     PlayingIncomeEntry,
+    PoroSpawn,
+    PoroSpawnStatus,
     TrackedPlayer,
     User,
     UserWealthSnapshot,
@@ -297,6 +299,37 @@ async def build_playing_income_summary(
     )
 
 
+async def build_poro_rewards_summary(
+    session: AsyncSession,
+    user: User,
+    *,
+    as_of: datetime | None = None,
+) -> tuple[float, float]:
+    now = normalize_datetime(as_of) or datetime.now(UTC)
+    recent_cutoff = now - timedelta(hours=24)
+
+    lifetime_total_result = await session.scalar(
+        select(func.coalesce(func.sum(PoroSpawn.reward_amount), 0.0)).where(
+            PoroSpawn.user_id == user.id,
+            PoroSpawn.status == PoroSpawnStatus.CLAIMED,
+            PoroSpawn.claimed_at.is_not(None),
+        )
+    )
+    recent_total_result = await session.scalar(
+        select(func.coalesce(func.sum(PoroSpawn.reward_amount), 0.0)).where(
+            PoroSpawn.user_id == user.id,
+            PoroSpawn.status == PoroSpawnStatus.CLAIMED,
+            PoroSpawn.claimed_at.is_not(None),
+            PoroSpawn.claimed_at >= recent_cutoff,
+        )
+    )
+
+    return (
+        round_currency(float(recent_total_result or 0.0)),
+        round_currency(float(lifetime_total_result or 0.0)),
+    )
+
+
 async def record_user_wealth_snapshot(
     session: AsyncSession,
     user: User,
@@ -328,6 +361,9 @@ async def build_balance_insights_summary(
 ) -> BalanceInsightsSummary:
     snapshot = await build_account_snapshot(session, user, as_of=as_of)
     playing_income = await build_playing_income_summary(session, user, as_of=as_of)
+    poro_rewards_last_24h, poro_rewards_lifetime_total = (
+        await build_poro_rewards_summary(session, user, as_of=as_of)
+    )
     history_result = await session.execute(
         select(UserWealthSnapshot)
         .where(UserWealthSnapshot.user_id == user.id)
@@ -338,7 +374,18 @@ async def build_balance_insights_summary(
 
     return BalanceInsightsSummary(
         snapshot=snapshot,
-        playing_income=playing_income,
+        playing_income=PlayingIncomeSummary(
+            projected_next_win_income=playing_income.projected_next_win_income,
+            projected_next_loss_income=playing_income.projected_next_loss_income,
+            playing_income_last_24h=round_currency(
+                playing_income.playing_income_last_24h + poro_rewards_last_24h
+            ),
+            playing_income_lifetime_total=round_currency(
+                playing_income.playing_income_lifetime_total
+                + poro_rewards_lifetime_total
+            ),
+            recent_entries=playing_income.recent_entries,
+        ),
         history=history,
     )
 
