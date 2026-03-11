@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.banking import normalize_datetime
 from app.database import get_session
 from app.models import PriceHistory, TrackedPlayer
 from app.schemas import PlayerDetail, PlayerSummary, PlayerTrend, PriceHistoryEntry
@@ -17,13 +18,17 @@ SessionDep = Annotated[AsyncSession, Depends(get_session)]
 TREND_WINDOW = 10
 
 
+def _price_history_sort_key(entry: PriceHistory):
+    return normalize_datetime(entry.recorded_at) or entry.recorded_at
+
+
 def _trend_for_player(
     player: TrackedPlayer,
     price_history: list[PriceHistory] | None = None,
 ) -> PlayerTrend:
     recent_history = sorted(
         price_history or [],
-        key=lambda entry: entry.recorded_at,
+        key=_price_history_sort_key,
         reverse=True,
     )[:TREND_WINDOW]
 
@@ -83,7 +88,7 @@ async def get_player(
 
     sorted_history = sorted(
         player.price_history,
-        key=lambda h: h.recorded_at,
+        key=_price_history_sort_key,
         reverse=True,
     )
     history = sorted_history if limit is None else sorted_history[:limit]

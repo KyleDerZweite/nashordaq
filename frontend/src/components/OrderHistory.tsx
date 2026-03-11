@@ -20,29 +20,72 @@ export default function OrderHistory({
   const cancelOrder = useCancelOrder();
   const [view, setView] = useState<OrderHistoryView>(defaultView);
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
+  const [filterQuery, setFilterQuery] = useState("");
 
   const orders = useMemo(
     () => (view === "own" ? ownOrders : allOrders),
     [allOrders, ownOrders, view],
   );
 
-  const showScrollbar = orders.length > 30;
+  const normalizedFilterQuery = filterQuery.trim().toLocaleLowerCase();
+  const filteredOrders = useMemo(() => {
+    if (normalizedFilterQuery.length === 0) {
+      return orders;
+    }
+
+    return orders.filter((order) => {
+      const stockMatch = order.player_name
+        .toLocaleLowerCase()
+        .includes(normalizedFilterQuery);
+      const playerMatch = (order.user_name ?? "")
+        .toLocaleLowerCase()
+        .includes(normalizedFilterQuery);
+
+      return stockMatch || playerMatch;
+    });
+  }, [normalizedFilterQuery, orders]);
+
+  const showScrollbar = filteredOrders.length > 30;
 
   return (
     <section className="border-2 border-hex-gold-dim bg-hex-panel">
-      <div className="flex items-center justify-between border-b-2 border-hex-gold-dim px-5 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b-2 border-hex-gold-dim px-5 py-3">
         <h2 className="font-serif text-xl font-bold text-hex-gold">
           Recent Orders
         </h2>
-        <button
-          type="button"
-          onClick={() =>
-            setView((current) => (current === "own" ? "all" : "own"))
-          }
-          className="border border-hex-gold px-3 py-1 font-mono text-xs font-bold uppercase tracking-wider text-hex-gold transition-colors hover:bg-hex-gold hover:text-hex-bg"
-        >
-          {view === "own" ? "Show All" : "Show Own"}
-        </button>
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          <label className="flex items-center gap-2 border border-hex-border bg-hex-bg-alt px-3 py-1.5">
+            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-hex-bronze">
+              Filter
+            </span>
+            <input
+              type="text"
+              value={filterQuery}
+              onChange={(event) => setFilterQuery(event.target.value)}
+              placeholder={view === "all" ? "Stock or player" : "Stock"}
+              className="min-w-40 bg-transparent font-mono text-xs text-hex-white outline-none placeholder:text-hex-border"
+            />
+            {filterQuery && (
+              <button
+                type="button"
+                onClick={() => setFilterQuery("")}
+                className="font-mono text-xs font-bold uppercase tracking-wider text-hex-bronze transition-colors hover:text-hex-white"
+              >
+                Clear
+              </button>
+            )}
+          </label>
+
+          <button
+            type="button"
+            onClick={() =>
+              setView((current) => (current === "own" ? "all" : "own"))
+            }
+            className="border border-hex-gold px-3 py-1 font-mono text-xs font-bold uppercase tracking-wider text-hex-gold transition-colors hover:bg-hex-gold hover:text-hex-bg"
+          >
+            {view === "own" ? "Show All" : "Show Own"}
+          </button>
+        </div>
       </div>
 
       <div
@@ -73,7 +116,7 @@ export default function OrderHistory({
             </tr>
           </thead>
           <tbody>
-            {orders.map((o) => (
+            {filteredOrders.map((o) => (
               <tr
                 key={o.id}
                 className="cursor-pointer border-b border-hex-border/50 transition-colors hover:bg-hex-bg-alt"
@@ -148,15 +191,17 @@ export default function OrderHistory({
                 </td>
               </tr>
             ))}
-            {orders.length === 0 && (
+            {filteredOrders.length === 0 && (
               <tr>
                 <td
                   colSpan={view === "all" ? 8 : 7}
                   className="px-4 py-6 text-center font-mono text-sm text-hex-bronze"
                 >
-                  {view === "own"
-                    ? "No own orders yet."
-                    : "No recent market orders yet."}
+                  {orders.length === 0
+                    ? view === "own"
+                      ? "No own orders yet."
+                      : "No recent market orders yet."
+                    : "No orders match the current filter."}
                 </td>
               </tr>
             )}

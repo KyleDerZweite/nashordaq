@@ -94,3 +94,35 @@ async def test_trend_uses_recent_ten_history_points(
     assert detail_resp.status_code == 200
     detail_data = detail_resp.json()
     assert detail_data["trend"] == "down"
+
+
+async def test_market_endpoints_handle_mixed_naive_and_aware_history_timestamps(
+    auth_client, db_session, seeded_player
+):
+    history_entries = [
+        PriceHistory(
+            player_id=seeded_player.id,
+            price=11.0,
+            lp_abs=1100,
+            recorded_at=datetime(2026, 3, 1, 9, 0, 0),
+        ),
+        PriceHistory(
+            player_id=seeded_player.id,
+            price=13.0,
+            lp_abs=1300,
+            recorded_at=datetime(2026, 3, 2, 9, 0, 0, tzinfo=UTC),
+        ),
+    ]
+    db_session.add_all(history_entries)
+    await db_session.commit()
+
+    list_resp = await auth_client.get("/api/market/players")
+    assert list_resp.status_code == 200
+    list_data = list_resp.json()
+    assert list_data[0]["trend"] == "up"
+
+    detail_resp = await auth_client.get(f"/api/market/players/{seeded_player.id}")
+    assert detail_resp.status_code == 200
+    detail_data = detail_resp.json()
+    assert detail_data["price_history"][0]["price"] == 13.0
+    assert detail_data["price_history"][1]["price"] == 11.0

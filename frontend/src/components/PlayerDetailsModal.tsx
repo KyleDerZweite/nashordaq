@@ -17,6 +17,8 @@ import {
 type ChartResolution = "daily" | "all";
 type TrendDirection = "up" | "down" | "flat";
 
+const OPGG_PLATFORM = "euw";
+
 interface Props {
   playerId: number;
   canTrade?: boolean;
@@ -106,6 +108,28 @@ function calculateMomentum(
     recentChange,
     previousChange,
   };
+}
+
+function buildOpGgSummonerUrl(gameName: string, tagLine: string): string {
+  return `https://op.gg/lol/summoners/${OPGG_PLATFORM}/${encodeURIComponent(`${gameName}-${tagLine}`)}`;
+}
+
+function OutgoingLinkIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 20 20"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="square"
+      strokeLinejoin="miter"
+    >
+      <rect x="3" y="7" width="10" height="10" />
+      <rect x="7" y="3" width="10" height="10" />
+    </svg>
+  );
 }
 
 export default function PlayerDetailsModal({
@@ -258,6 +282,14 @@ export default function PlayerDetailsModal({
       : `Movement is picking up by ${formatAmount(Math.abs(delta))} P versus the previous ${windowSize}-day block.`;
   }, [metrics]);
 
+  const opGgUrl = useMemo(() => {
+    if (!player) {
+      return null;
+    }
+
+    return buildOpGgSummonerUrl(player.game_name, player.tag_line);
+  }, [player]);
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-hex-bg/85 px-4 py-6"
@@ -285,11 +317,24 @@ export default function PlayerDetailsModal({
               <h2 className="font-serif text-3xl font-bold text-hex-gold">
                 {player?.display_name ?? "Loading player..."}
               </h2>
-              <p className="mt-1 font-mono text-sm text-hex-bronze">
-                {player
-                  ? `${player.game_name}#${player.tag_line}`
-                  : "Fetching complete market history"}
-              </p>
+              {player && opGgUrl ? (
+                <a
+                  href={opGgUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-1 inline-flex flex-wrap items-center gap-2 font-mono text-sm text-hex-bronze underline decoration-hex-magic decoration-2 underline-offset-4 transition-colors hover:text-hex-white"
+                  title="Open this summoner on OP.GG"
+                >
+                  <span className="text-hex-magic">
+                    <OutgoingLinkIcon />
+                  </span>
+                  <span>{`${player.game_name}#${player.tag_line}`}</span>
+                </a>
+              ) : (
+                <p className="mt-1 font-mono text-sm text-hex-bronze">
+                  Fetching complete market history
+                </p>
+              )}
             </div>
 
             <div className="flex flex-wrap items-center justify-end gap-3">

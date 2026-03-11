@@ -271,6 +271,18 @@ export default function App() {
         </div>
       </footer>
 
+      {selectedPlayerId !== null && (
+        <PlayerDetailsModal
+          playerId={selectedPlayerId}
+          canTrade={canTrade}
+          isOwnStock={user?.linked_player_id === selectedPlayerId}
+          onTrade={(side) => {
+            setTrade({ playerId: selectedPlayerId, side });
+          }}
+          onClose={() => setSelectedPlayerId(null)}
+        />
+      )}
+
       {/* Trade modal */}
       {trade && tradePlayer && canTrade && (
         <TradeTerminal
@@ -280,19 +292,6 @@ export default function App() {
           ownedQuantity={tradeHolding?.quantity ?? 0}
           isOwnStock={user?.linked_player_id === tradePlayer.id}
           onClose={() => setTrade(null)}
-        />
-      )}
-
-      {selectedPlayerId !== null && (
-        <PlayerDetailsModal
-          playerId={selectedPlayerId}
-          canTrade={canTrade}
-          isOwnStock={user?.linked_player_id === selectedPlayerId}
-          onTrade={(side) => {
-            setSelectedPlayerId(null);
-            setTrade({ playerId: selectedPlayerId, side });
-          }}
-          onClose={() => setSelectedPlayerId(null)}
         />
       )}
 

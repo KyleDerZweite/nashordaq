@@ -74,7 +74,7 @@ export default function TradeTerminal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-hex-bg/80"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-hex-bg/80"
       onClick={onClose}
     >
       <section
