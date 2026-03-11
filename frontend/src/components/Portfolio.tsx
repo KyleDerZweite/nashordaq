@@ -24,9 +24,10 @@ function getSummaryCellBorderClass(index: number, useTwoColumnLayout: boolean) {
 
 interface Props {
   portfolio?: PortfolioResponse | null;
+  onOpenInsights?: () => void;
 }
 
-export default function Portfolio({ portfolio }: Props) {
+export default function Portfolio({ portfolio, onOpenInsights }: Props) {
   const holdings = portfolio?.holdings ?? [];
   const balance = portfolio?.balance ?? 0;
   const holdingsValue = portfolio?.holdings_value ?? 0;
@@ -34,7 +35,7 @@ export default function Portfolio({ portfolio }: Props) {
   const totalValue =
     portfolio?.total_value ?? balance + holdingsValue + gambaValue;
   const summaryItems = [
-    { label: "Poro", value: balance },
+    { label: "Poros", value: balance },
     { label: "Holdings", value: holdingsValue },
     { label: "Gamba", value: gambaValue },
     { label: "Total", value: totalValue },
@@ -103,12 +104,41 @@ export default function Portfolio({ portfolio }: Props) {
     };
   }, [balance, holdingsValue, gambaValue, totalValue]);
 
+  function handleKeyDown(event: React.KeyboardEvent<HTMLElement>) {
+    if (!onOpenInsights) {
+      return;
+    }
+
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      onOpenInsights();
+    }
+  }
+
   return (
-    <section className="border-2 border-hex-gold-dim bg-hex-panel">
+    <section
+      className={`border-2 border-hex-gold-dim bg-hex-panel shadow-brutal-sm outline-none transition-colors ${
+        onOpenInsights
+          ? "hover:border-hex-gold focus-visible:border-hex-gold"
+          : ""
+      }`}
+      onClick={onOpenInsights}
+      onKeyDown={handleKeyDown}
+      role={onOpenInsights ? "button" : undefined}
+      tabIndex={onOpenInsights ? 0 : undefined}
+      aria-label={onOpenInsights ? "Open portfolio insights" : undefined}
+    >
       <div className="border-b-2 border-hex-gold-dim px-5 py-3">
-        <h2 className="font-serif text-xl font-bold text-hex-gold">
-          Porofolio
-        </h2>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="font-serif text-xl font-bold text-hex-gold">
+            Porofolio
+          </h2>
+          {onOpenInsights && (
+            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-hex-bronze">
+              Open Insights
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Summary numbers */}
@@ -155,12 +185,6 @@ export default function Portfolio({ portfolio }: Props) {
                 Qty
               </th>
               <th className="px-4 py-2 text-right font-mono text-xs font-bold uppercase tracking-wider text-hex-bronze">
-                Buy
-              </th>
-              <th className="px-4 py-2 text-right font-mono text-xs font-bold uppercase tracking-wider text-hex-bronze">
-                Current
-              </th>
-              <th className="px-4 py-2 text-right font-mono text-xs font-bold uppercase tracking-wider text-hex-bronze">
                 Value
               </th>
               <th className="px-4 py-2 text-right font-mono text-xs font-bold uppercase tracking-wider text-hex-bronze">
@@ -179,12 +203,6 @@ export default function Portfolio({ portfolio }: Props) {
                 </td>
                 <td className="px-4 py-2.5 text-right font-mono text-sm text-hex-bronze">
                   {h.quantity}
-                </td>
-                <td className="px-4 py-2.5 text-right font-mono text-sm text-hex-gold">
-                  {formatAmount(h.average_buy_price)}
-                </td>
-                <td className="px-4 py-2.5 text-right font-mono text-sm text-hex-gold">
-                  {formatAmount(h.current_price)}
                 </td>
                 <td className="px-4 py-2.5 text-right font-mono text-sm font-bold text-hex-magic">
                   {formatAmount(h.market_value)}

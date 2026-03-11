@@ -296,10 +296,10 @@ export default function PlayerDetailsModal({
       onClick={onClose}
     >
       <section
-        className="relative flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden border-4 border-hex-gold-dim bg-hex-panel shadow-brutal-lg"
+        className="relative flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden border-4 border-hex-gold bg-hex-panel shadow-brutal-lg"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="border-b-4 border-hex-gold-dim bg-hex-bg-alt px-6 py-5">
+        <div className="border-b-4 border-hex-gold bg-hex-bg-alt px-6 py-5">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <div className="mb-2 flex flex-wrap items-center gap-3">

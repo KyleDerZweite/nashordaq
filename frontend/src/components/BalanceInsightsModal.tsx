@@ -174,7 +174,7 @@ export default function BalanceInsightsModal({ isOpen, onClose }: Props) {
                           {
                             key: "balance",
                             label: "Balance",
-                            color: "#d8c48a",
+                            color: "#c8aa6e",
                             strokeWidth: 3.25,
                             fillOpacity: 0.18,
                             formatValue: (value) => `${formatAmount(value)} P`,
@@ -182,7 +182,7 @@ export default function BalanceInsightsModal({ isOpen, onClose }: Props) {
                           {
                             key: "netWorth",
                             label: "Net Worth",
-                            color: "#7dd3fc",
+                            color: "#c8aa6e",
                             strokeWidth: 3,
                             dashArray: "8 6",
                             formatValue: (value) => `${formatAmount(value)} P`,
@@ -208,7 +208,9 @@ export default function BalanceInsightsModal({ isOpen, onClose }: Props) {
                       />
                       <div className="flex flex-wrap gap-4 font-mono text-[11px] uppercase tracking-[0.18em] text-hex-bronze">
                         <span className="text-hex-gold">Solid: Balance</span>
-                        <span className="text-sky-300">Dashed: Net Worth</span>
+                        <span className="text-hex-gold/80">
+                          Dashed: Net Worth
+                        </span>
                       </div>
                     </div>
                   ) : (

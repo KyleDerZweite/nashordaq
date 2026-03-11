@@ -4,6 +4,7 @@ import Header from "./components/Header";
 import BankModal from "./components/BankModal";
 import MarketGrid from "./components/MarketGrid";
 import Portfolio from "./components/Portfolio";
+import PortfolioInsightsModal from "./components/PortfolioInsightsModal";
 import Leaderboard from "./components/Leaderboard";
 import GambaWidget from "./components/GambaWidget";
 import OrderHistory from "./components/OrderHistory";
@@ -40,6 +41,7 @@ export default function App() {
   const [isProfileEditorOpen, setIsProfileEditorOpen] = useState(false);
   const [isBalanceInsightsOpen, setIsBalanceInsightsOpen] = useState(false);
   const [isBankModalOpen, setIsBankModalOpen] = useState(false);
+  const [isPortfolioInsightsOpen, setIsPortfolioInsightsOpen] = useState(false);
 
   const { data: user } = useUser();
   const onboardingComplete = user?.onboarding_complete ?? false;
@@ -233,7 +235,10 @@ export default function App() {
 
           {/* Sidebar */}
           <div className="flex flex-col gap-6">
-            <Portfolio portfolio={portfolio} />
+            <Portfolio
+              portfolio={portfolio}
+              onOpenInsights={() => setIsPortfolioInsightsOpen(true)}
+            />
             <Leaderboard entries={leaderboard ?? []} />
             <GambaWidget balance={balance} canTrade={canTrade} />
           </div>
@@ -299,6 +304,15 @@ export default function App() {
         <BalanceInsightsModal
           isOpen={isBalanceInsightsOpen}
           onClose={() => setIsBalanceInsightsOpen(false)}
+        />
+      )}
+
+      {isPortfolioInsightsOpen && (
+        <PortfolioInsightsModal
+          portfolio={portfolio}
+          canTrade={canTrade}
+          onTrade={(playerId, side) => setTrade({ playerId, side })}
+          onClose={() => setIsPortfolioInsightsOpen(false)}
         />
       )}
 

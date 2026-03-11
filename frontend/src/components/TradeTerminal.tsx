@@ -78,17 +78,11 @@ export default function TradeTerminal({
       onClick={onClose}
     >
       <section
-        className={`w-full max-w-md border-4 bg-hex-panel shadow-brutal-lg ${
-          isBuy ? "border-hex-magic" : "border-hex-zaun"
-        }`}
+        className="w-full max-w-md border-4 border-hex-gold bg-hex-panel shadow-brutal-lg"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div
-          className={`flex items-center justify-between border-b-4 px-5 py-3 ${
-            isBuy ? "border-hex-magic" : "border-hex-zaun"
-          }`}
-        >
+        <div className="flex items-center justify-between border-b-4 border-hex-gold px-5 py-3">
           <h2 className="font-serif text-xl font-bold text-hex-gold">
             {side} &mdash; {player.display_name}
           </h2>

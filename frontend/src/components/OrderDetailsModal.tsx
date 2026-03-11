@@ -29,10 +29,10 @@ export default function OrderDetailsModal({ orderId, onClose }: Props) {
       onClick={onClose}
     >
       <section
-        className="w-full max-w-2xl border-4 border-hex-gold-dim bg-hex-panel shadow-brutal-lg"
+        className="w-full max-w-2xl border-4 border-hex-gold bg-hex-panel shadow-brutal-lg"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b-4 border-hex-gold-dim px-5 py-3">
+        <div className="flex items-center justify-between border-b-4 border-hex-gold px-5 py-3">
           <div>
             <h2 className="font-serif text-xl font-bold text-hex-gold">
               Order Details

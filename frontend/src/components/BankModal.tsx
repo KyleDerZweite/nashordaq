@@ -78,10 +78,10 @@ export default function BankModal({ canManageBank, onClose }: Props) {
       onClick={onClose}
     >
       <section
-        className="w-full max-w-3xl border-4 border-hex-zaun bg-hex-panel shadow-brutal-lg"
+        className="w-full max-w-3xl border-4 border-hex-gold bg-hex-panel shadow-brutal-lg"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b-4 border-hex-zaun px-5 py-3">
+        <div className="flex items-center justify-between border-b-4 border-hex-gold px-5 py-3">
           <div>
             <h2 className="font-serif text-xl font-bold text-hex-gold">
               Credit
@@ -260,7 +260,7 @@ export default function BankModal({ canManageBank, onClose }: Props) {
                     disabled={!canSubmitBorrow}
                     className={`w-full border-2 py-2 font-mono text-xs font-bold uppercase tracking-[0.18em] transition-colors ${
                       canSubmitBorrow
-                        ? "border-hex-gold text-hex-gold hover:bg-hex-gold hover:text-hex-bg"
+                        ? "border-hex-zaun text-hex-zaun hover:bg-hex-zaun hover:text-hex-bg"
                         : "cursor-not-allowed border-hex-border text-hex-border"
                     }`}
                   >
@@ -326,7 +326,7 @@ export default function BankModal({ canManageBank, onClose }: Props) {
                     disabled={!canSubmitRepay}
                     className={`w-full border-2 py-2 font-mono text-xs font-bold uppercase tracking-[0.18em] transition-colors ${
                       canSubmitRepay
-                        ? "border-hex-gold text-hex-gold hover:bg-hex-gold hover:text-hex-bg"
+                        ? "border-hex-magic text-hex-magic hover:bg-hex-magic hover:text-hex-bg"
                         : "cursor-not-allowed border-hex-border text-hex-border"
                     }`}
                   >

@@ -251,12 +251,8 @@ export default function TimeSeriesChart({
     setHoveredIndex(nextHoveredIndex);
 
     const point =
-      geometry.points[
-        clamp(nextHoveredIndex, 0, geometry.points.length - 1)
-      ];
-    const anchorY = Math.min(
-      ...series.map((item) => point.yByKey[item.key]),
-    );
+      geometry.points[clamp(nextHoveredIndex, 0, geometry.points.length - 1)];
+    const anchorY = Math.min(...series.map((item) => point.yByKey[item.key]));
     const container = containerRef.current;
     if (!container) {
       return;
@@ -321,11 +317,7 @@ export default function TimeSeriesChart({
                   stopColor={item.color}
                   stopOpacity={item.fillOpacity}
                 />
-                <stop
-                  offset="100%"
-                  stopColor={item.color}
-                  stopOpacity="0.02"
-                />
+                <stop offset="100%" stopColor={item.color} stopOpacity="0.02" />
               </linearGradient>
             ))}
         </defs>
