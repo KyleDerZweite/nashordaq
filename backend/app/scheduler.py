@@ -2,10 +2,11 @@ import asyncio
 import logging
 from datetime import UTC, datetime, timedelta
 
+import httpx
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from fastapi import FastAPI
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.banking import (
@@ -120,55 +121,170 @@ def _match_completed_at(summary: MatchSummary) -> datetime:
     return datetime.fromtimestamp(timestamp, tz=UTC)
 
 
+def _normalize_datetime(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
+async def _get_playing_income_history_start(
+    session: AsyncSession,
+    player: TrackedPlayer,
+) -> datetime:
+    configured_start = _normalize_datetime(settings.playing_income_start_date)
+    latest_recorded_completed_at = await session.scalar(
+        select(func.max(PlayingIncomeEntry.match_completed_at)).where(
+            PlayingIncomeEntry.player_id == player.id
+        )
+    )
+    if latest_recorded_completed_at is None:
+        return configured_start
+
+    latest_recorded_completed_at = _normalize_datetime(latest_recorded_completed_at)
+    return max(
+        configured_start,
+        latest_recorded_completed_at + timedelta(seconds=1),
+    )
+
+
+async def _get_match_ids_since(
+    player: TrackedPlayer,
+    http_client,
+    *,
+    start_time: datetime,
+) -> list[str]:
+    puuid = player.puuid
+    if puuid is None:
+        return []
+
+    page_size = max(1, settings.playing_income_recent_match_count)
+    start = 0
+    match_ids: list[str] = []
+    use_start_time = True
+    use_filters = True
+
+    while True:
+        try:
+            page = await get_recent_match_ids(
+                client=http_client,
+                base_url=settings.riot_api_base_url,
+                api_key=settings.riot_api_key,
+                puuid=puuid,
+                start=start,
+                count=page_size,
+                start_time=start_time if use_start_time else None,
+                queue=RANKED_SOLO_QUEUE_ID if use_filters else None,
+                type="ranked" if use_filters else None,
+            )
+        except httpx.HTTPStatusError as exc:
+            if use_start_time and exc.response.status_code == 400:
+                logger.warning(
+                    (
+                        "Riot Match-V5 rejected filtered startTime history for "
+                        "%s#%s; falling back to unfiltered paging"
+                    ),
+                    player.game_name,
+                    player.tag_line,
+                )
+                use_start_time = False
+                use_filters = False
+                start = 0
+                match_ids.clear()
+                continue
+            raise
+
+        if not page:
+            break
+
+        match_ids.extend(page)
+        if len(page) < page_size:
+            break
+
+        start += len(page)
+
+    return match_ids
+
+
+async def _get_match_summary_if_available(
+    player: TrackedPlayer,
+    http_client,
+    *,
+    match_id: str,
+) -> MatchSummary | None:
+    try:
+        return await get_match_summary(
+            client=http_client,
+            base_url=settings.riot_api_base_url,
+            api_key=settings.riot_api_key,
+            puuid=player.puuid,
+            match_id=match_id,
+        )
+    except PlayerNotFoundError:
+        logger.warning(
+            "Skipping match %s for %s#%s because Riot returned no participant data",
+            match_id,
+            player.game_name,
+            player.tag_line,
+        )
+        return None
+
+
 async def _get_unprocessed_match_summaries(
+    session: AsyncSession,
     player: TrackedPlayer,
     http_client,
 ) -> tuple[list[MatchSummary], MatchSummary | None]:
     if player.puuid is None:
         return [], None
 
-    match_ids = await get_recent_match_ids(
-        client=http_client,
-        base_url=settings.riot_api_base_url,
-        api_key=settings.riot_api_key,
-        puuid=player.puuid,
-        count=settings.playing_income_recent_match_count,
-        queue=RANKED_SOLO_QUEUE_ID,
-        type="ranked",
+    history_start = await _get_playing_income_history_start(session, player)
+    match_ids = await _get_match_ids_since(
+        player,
+        http_client,
+        start_time=history_start,
     )
     if not match_ids:
         return [], None
 
-    newest_summary = await get_match_summary(
-        client=http_client,
-        base_url=settings.riot_api_base_url,
-        api_key=settings.riot_api_key,
-        puuid=player.puuid,
-        match_id=match_ids[0],
+    recorded_ids_result = await session.execute(
+        select(PlayingIncomeEntry.match_id).where(
+            PlayingIncomeEntry.player_id == player.id,
+        )
     )
+    recorded_ids = set(recorded_ids_result.scalars().all())
+    unseen_ids = [match_id for match_id in match_ids if match_id not in recorded_ids]
 
-    if player.last_playing_income_match_id is None:
-        return [], newest_summary
+    newest_summary: MatchSummary | None = None
+    if unseen_ids and unseen_ids[0] == match_ids[0]:
+        candidate_newest_summary = await _get_match_summary_if_available(
+            player,
+            http_client,
+            match_id=match_ids[0],
+        )
+        if (
+            candidate_newest_summary is not None
+            and _match_completed_at(candidate_newest_summary) >= history_start
+        ):
+            newest_summary = candidate_newest_summary
 
-    unseen_ids: list[str] = []
-    for match_id in match_ids:
-        if match_id == player.last_playing_income_match_id:
-            break
-        unseen_ids.append(match_id)
-
-    if not unseen_ids:
-        return [], newest_summary
-
-    summaries = [newest_summary] if unseen_ids[0] == newest_summary.match_id else []
+    summaries = [newest_summary] if newest_summary is not None else []
     for match_id in unseen_ids[len(summaries) :]:
-        summaries.append(
-            await get_match_summary(
-                client=http_client,
-                base_url=settings.riot_api_base_url,
-                api_key=settings.riot_api_key,
-                puuid=player.puuid,
-                match_id=match_id,
-            )
+        summary = await _get_match_summary_if_available(
+            player,
+            http_client,
+            match_id=match_id,
+        )
+        if summary is None:
+            continue
+        if _match_completed_at(summary) < history_start:
+            continue
+        summaries.append(summary)
+
+    if newest_summary is None:
+        newest_summary = await _get_match_summary_if_available(
+            player,
+            http_client,
+            match_id=match_ids[0],
         )
 
     summaries.sort(key=lambda summary: summary.game_end_timestamp)
@@ -181,22 +297,8 @@ async def _apply_playing_income_for_player(
     http_client,
 ) -> None:
     summaries, newest_summary = await _get_unprocessed_match_summaries(
-        player, http_client
+        session, player, http_client
     )
-
-    if player.last_playing_income_match_id is None:
-        if newest_summary is not None:
-            player.last_playing_income_match_id = newest_summary.match_id
-            player.last_playing_income_match_end_at = _match_completed_at(
-                newest_summary
-            )
-            logger.info(
-                "Initialized playing-income cursor for %s#%s at %s",
-                player.game_name,
-                player.tag_line,
-                newest_summary.match_id,
-            )
-        return
 
     if not summaries:
         if newest_summary is not None:
@@ -211,30 +313,13 @@ async def _apply_playing_income_for_player(
     )
     user = user_result.scalar_one_or_none()
     if user is None:
-        latest_summary = summaries[-1]
+        latest_summary = newest_summary or summaries[-1]
         player.last_playing_income_match_id = latest_summary.match_id
         player.last_playing_income_match_end_at = _match_completed_at(latest_summary)
         return
 
-    existing_ids_result = await session.execute(
-        select(PlayingIncomeEntry.match_id).where(
-            PlayingIncomeEntry.player_id == player.id,
-            PlayingIncomeEntry.match_id.in_(
-                [summary.match_id for summary in summaries]
-            ),
-        )
-    )
-    existing_ids = {match_id for match_id in existing_ids_result.scalars().all()}
-
-    latest_seen_summary = summaries[-1]
     for summary in summaries:
-        latest_seen_summary = summary
-        if summary.match_id in existing_ids:
-            continue
-
         completed_at = _match_completed_at(summary)
-        player.last_playing_income_match_id = summary.match_id
-        player.last_playing_income_match_end_at = completed_at
 
         if summary.queue_id != RANKED_SOLO_QUEUE_ID:
             continue
@@ -280,8 +365,9 @@ async def _apply_playing_income_for_player(
             amount,
         )
 
-    player.last_playing_income_match_id = latest_seen_summary.match_id
-    player.last_playing_income_match_end_at = _match_completed_at(latest_seen_summary)
+    latest_summary = newest_summary or summaries[-1]
+    player.last_playing_income_match_id = latest_summary.match_id
+    player.last_playing_income_match_end_at = _match_completed_at(latest_summary)
 
 
 async def market_update_job() -> None:
@@ -338,8 +424,9 @@ async def market_update_job() -> None:
                 )
                 continue
 
-            if player.puuid is None:
+            if player.puuid != rank_data.puuid:
                 player.puuid = rank_data.puuid
+            if player.summoner_id != rank_data.summoner_id:
                 player.summoner_id = rank_data.summoner_id
 
             successful_player_refreshes += 1

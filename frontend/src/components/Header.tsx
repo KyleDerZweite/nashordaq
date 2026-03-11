@@ -9,6 +9,7 @@ export default function Header({
   username,
   playerDisplayName,
   canEditProfile = false,
+  showCreditPanel = true,
   onOpenBalanceInsights,
   onOpenCredit,
   onEditProfile,
@@ -20,6 +21,7 @@ export default function Header({
   username?: string;
   playerDisplayName?: string;
   canEditProfile?: boolean;
+  showCreditPanel?: boolean;
   onOpenBalanceInsights?: () => void;
   onOpenCredit?: () => void;
   onEditProfile?: () => void;
@@ -65,26 +67,28 @@ export default function Header({
               </p>
             </button>
 
-            <button
-              type="button"
-              onClick={onOpenCredit}
-              className="min-w-44 border-2 border-hex-gold-dim px-3.5 py-1.5 text-left shadow-brutal-sm transition-colors hover:border-hex-gold hover:bg-hex-bg-alt/70"
-            >
-              <div className="text-xs uppercase tracking-wider text-hex-bronze">
-                Credit
-              </div>
-              <p
-                className={`font-mono text-lg font-bold ${
-                  creditOutstanding > 0 ? "text-red-400" : "text-hex-gold"
-                }`}
+            {showCreditPanel && (
+              <button
+                type="button"
+                onClick={onOpenCredit}
+                className="min-w-44 border-2 border-hex-gold-dim px-3.5 py-1.5 text-left shadow-brutal-sm transition-colors hover:border-hex-gold hover:bg-hex-bg-alt/70"
               >
-                {formatAmount(creditOutstanding)}
-                <span className="ml-1 text-xs text-hex-bronze">P</span>
-              </p>
-              <p className="mt-1 font-mono text-[11px] text-hex-bronze">
-                Available {formatAmount(creditAvailable)} P
-              </p>
-            </button>
+                <div className="text-xs uppercase tracking-wider text-hex-bronze">
+                  Credit
+                </div>
+                <p
+                  className={`font-mono text-lg font-bold ${
+                    creditOutstanding > 0 ? "text-red-400" : "text-hex-gold"
+                  }`}
+                >
+                  {formatAmount(creditOutstanding)}
+                  <span className="ml-1 text-xs text-hex-bronze">P</span>
+                </p>
+                <p className="mt-1 font-mono text-[11px] text-hex-bronze">
+                  Available {formatAmount(creditAvailable)} P
+                </p>
+              </button>
+            )}
           </div>
           <div className="relative">
             <button

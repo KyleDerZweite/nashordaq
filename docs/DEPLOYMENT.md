@@ -29,7 +29,7 @@ NEWT_SECRET=your-newt-secret
 | Variable | Default | Description |
 |---|---|---|
 | `NASHORDAQ_AUTH_HEADER` | `Remote-User` | Header containing the authenticated username |
-| `NASHORDAQ_SPECTATOR_REMOTE_USER` | unset | Authenticated username that should be treated as spectator-only |
+| `NASHORDAQ_ADMIN_REMOTE_USERS` | unset | Comma-separated authenticated usernames that should be treated as admin/operator accounts |
 | `NASHORDAQ_STARTING_BALANCE` | `1000.0` | Initial balance for new users |
 | `NASHORDAQ_ENFORCE_TRUSTED_PROXY` | `false` | Reject auth headers from non-trusted source IPs |
 | `NASHORDAQ_TRUSTED_PROXY_CIDRS` | `127.0.0.1/32,::1/128` | Allowed proxy CIDR ranges (when enforcement is on) |

@@ -8,6 +8,8 @@ interface Props {
   ownOrders: OrderResponse[];
   allOrders: OrderResponse[];
   defaultView?: OrderHistoryView;
+  allowViewToggle?: boolean;
+  title?: string;
 }
 
 type OrderHistoryView = "own" | "all";
@@ -16,6 +18,8 @@ export default function OrderHistory({
   ownOrders,
   allOrders,
   defaultView = "own",
+  allowViewToggle = true,
+  title = "Recent Orders",
 }: Props) {
   const cancelOrder = useCancelOrder();
   const [view, setView] = useState<OrderHistoryView>(defaultView);
@@ -50,9 +54,7 @@ export default function OrderHistory({
   return (
     <section className="border-2 border-hex-gold-dim bg-hex-panel">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b-2 border-hex-gold-dim px-5 py-3">
-        <h2 className="font-serif text-xl font-bold text-hex-gold">
-          Recent Orders
-        </h2>
+        <h2 className="font-serif text-xl font-bold text-hex-gold">{title}</h2>
         <div className="flex flex-wrap items-center justify-end gap-3">
           <label className="flex items-center gap-2 border border-hex-border bg-hex-bg-alt px-3 py-1.5">
             <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-hex-bronze">
@@ -76,15 +78,17 @@ export default function OrderHistory({
             )}
           </label>
 
-          <button
-            type="button"
-            onClick={() =>
-              setView((current) => (current === "own" ? "all" : "own"))
-            }
-            className="border border-hex-gold px-3 py-1 font-mono text-xs font-bold uppercase tracking-wider text-hex-gold transition-colors hover:bg-hex-gold hover:text-hex-bg"
-          >
-            {view === "own" ? "Show All" : "Show Own"}
-          </button>
+          {allowViewToggle && (
+            <button
+              type="button"
+              onClick={() =>
+                setView((current) => (current === "own" ? "all" : "own"))
+              }
+              className="border border-hex-gold px-3 py-1 font-mono text-xs font-bold uppercase tracking-wider text-hex-gold transition-colors hover:bg-hex-gold hover:text-hex-bg"
+            >
+              {view === "own" ? "Show All" : "Show Own"}
+            </button>
+          )}
         </div>
       </div>
 

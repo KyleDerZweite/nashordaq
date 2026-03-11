@@ -41,21 +41,22 @@ def _is_trusted_proxy_request(request: Request) -> bool:
 
 
 def get_user_role(username: str) -> UserRole:
-    spectator_remote_user = settings.spectator_remote_user
-    if (
-        spectator_remote_user
-        and username.casefold() == spectator_remote_user.casefold()
-    ):
-        return "spectator"
+    configured_admin_users = tuple(
+        candidate.strip().casefold()
+        for candidate in settings.admin_remote_users.split(",")
+        if candidate.strip()
+    )
+    if username.casefold() in configured_admin_users:
+        return "admin"
     return "player"
 
 
-def is_spectator_username(username: str) -> bool:
-    return get_user_role(username) == "spectator"
+def is_admin_username(username: str) -> bool:
+    return get_user_role(username) == "admin"
 
 
-def is_spectator_user(user: User) -> bool:
-    return is_spectator_username(user.username)
+def is_admin_user(user: User) -> bool:
+    return is_admin_username(user.username)
 
 
 async def _get_current_user(request: Request, session: SessionDep) -> User:
@@ -89,8 +90,8 @@ CurrentUser = Annotated[User, Depends(_get_current_user)]
 
 
 def _require_onboarded_user(user: CurrentUser) -> User:
-    if is_spectator_user(user):
-        raise HTTPException(status_code=403, detail="Spectator users cannot trade")
+    if is_admin_user(user):
+        raise HTTPException(status_code=403, detail="Admin users cannot trade")
 
     if user.linked_player_id is None:
         raise HTTPException(status_code=403, detail="Complete onboarding first")
@@ -98,3 +99,12 @@ def _require_onboarded_user(user: CurrentUser) -> User:
 
 
 CurrentOnboardedUser = Annotated[User, Depends(_require_onboarded_user)]
+
+
+def _require_admin_user(user: CurrentUser) -> User:
+    if not is_admin_user(user):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return user
+
+
+CurrentAdminUser = Annotated[User, Depends(_require_admin_user)]

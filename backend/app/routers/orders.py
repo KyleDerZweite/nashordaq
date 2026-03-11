@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import CurrentOnboardedUser, CurrentUser, is_spectator_user
+from app.auth import CurrentOnboardedUser, CurrentUser, is_admin_user
 from app.config import settings
 from app.database import get_session
 from app.models import (
@@ -114,7 +114,7 @@ def _order_detail_response(
     )
 
 
-async def _build_order_responses(
+async def build_order_responses(
     session: AsyncSession,
     orders: list[Order],
 ) -> list[OrderResponse]:
@@ -364,7 +364,7 @@ async def list_orders(
     session: SessionDep,
     status: OrderStatus | None = Query(default=None),  # noqa: B008
 ) -> list[OrderResponse]:
-    if is_spectator_user(user):
+    if is_admin_user(user):
         return []
 
     if user.linked_player_id is None:
@@ -378,7 +378,7 @@ async def list_orders(
     result = await session.execute(stmt)
     orders = result.scalars().all()
 
-    return await _build_order_responses(session, orders)
+    return await build_order_responses(session, orders)
 
 
 @router.get("/orders/recent", response_model=list[OrderResponse])
@@ -393,7 +393,7 @@ async def list_recent_orders(
         select(Order).order_by(Order.created_at.desc()).limit(limit)
     )
     orders = result.scalars().all()
-    return await _build_order_responses(session, orders)
+    return await build_order_responses(session, orders)
 
 
 @router.get("/orders/{order_id}", response_model=OrderDetailResponse)

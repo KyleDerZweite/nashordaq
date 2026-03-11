@@ -216,8 +216,8 @@ export default function GambaWidget({ balance, canTrade }: Props) {
 
         {!canTrade && (
           <p className="font-mono text-xs text-hex-bronze">
-            Gamba Invest unlocks after onboarding and is disabled for
-            spectators.
+            Gamba Invest unlocks after onboarding and is disabled for admin
+            accounts.
           </p>
         )}
 

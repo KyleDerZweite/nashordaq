@@ -20,7 +20,7 @@ export type UserWealthSnapshotSource =
 export interface UserResponse {
   id: number;
   username: string;
-  role: "player" | "spectator";
+  role: "player" | "admin";
   balance: number;
   linked_player_id: number | null;
   onboarding_complete: boolean;
@@ -202,6 +202,46 @@ export interface PortfolioResponse {
   debt_outstanding: number;
   holdings: HoldingResponse[];
   total_value: number;
+}
+
+export interface AdminOverviewResponse {
+  total_users: number;
+  onboarded_users: number;
+  admin_users: number;
+  tracked_players: number;
+  total_orders: number;
+  pending_orders: number;
+  executed_orders: number;
+  reverted_orders: number;
+  cancelled_orders: number;
+  total_cash_balance: number;
+  total_debt_outstanding: number;
+}
+
+export interface AdminUserSummaryResponse {
+  id: number;
+  username: string;
+  role: "player" | "admin";
+  linked_player_id: number | null;
+  linked_player_name: string | null;
+  onboarding_complete: boolean;
+  balance: number;
+  holdings_value: number;
+  active_gamba_value: number;
+  debt_outstanding: number;
+  total_value: number;
+  created_at: string;
+}
+
+export interface AdminUserPortfolioResponse {
+  user_id: number;
+  username: string;
+  role: "player" | "admin";
+  linked_player_id: number | null;
+  linked_player_name: string | null;
+  onboarding_complete: boolean;
+  created_at: string;
+  portfolio: PortfolioResponse;
 }
 
 export interface LeaderboardEntry {

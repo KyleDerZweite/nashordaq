@@ -20,7 +20,7 @@ A closed, trusted friend group. Public registration and email verification are o
 
 5. **Leaderboard:** Users can view a ranked list of all participants ordered by total net worth (cash + holdings value + active Gamba mark value - outstanding bank debt).
 
-6. **Bank Credit:** Clicking the balance card opens a bank modal where onboarded player accounts can borrow virtual currency. Borrowing increases cash immediately, outstanding debt compounds by 2.15% every 72 hours, and repayment is allowed at any time.
+6. **Bank Credit:** Clicking the balance card opens a bank modal where onboarded player accounts can borrow virtual currency. Borrowing increases cash immediately, the first interest charge is added immediately, outstanding debt then compounds by 2.5% every 120 hours, and repayment is allowed at any time.
 
 7. **Playing Income:** Onboarded player accounts earn a small direct cash reward when the system detects that their linked Riot account completed a new Ranked Solo 5v5 match. Rewards are credited once per completed match, use the player's current share price as the base, and ignore remakes/short games.
 

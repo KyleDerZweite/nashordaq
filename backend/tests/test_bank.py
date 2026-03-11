@@ -17,7 +17,7 @@ async def _onboard_bank_user(auth_client):
     assert onboard_resp.status_code == 200
 
 
-async def test_bank_borrow_uses_credit_limit_and_keeps_net_worth_flat(
+async def test_bank_borrow_applies_immediate_interest_and_reduces_net_worth(
     auth_client,
     db_session,
 ):
@@ -41,17 +41,22 @@ async def test_bank_borrow_uses_credit_limit_and_keeps_net_worth_flat(
     borrowed = borrow_resp.json()
     assert borrowed["cash_balance"] == pytest.approx(1500.0)
     assert borrowed["debt_principal"] == pytest.approx(500.0)
-    assert borrowed["debt_outstanding"] == pytest.approx(500.0)
-    assert borrowed["debt_adjusted_net_worth"] == pytest.approx(1000.0)
+    assert borrowed["debt_accrued_interest"] == pytest.approx(12.5)
+    assert borrowed["debt_outstanding"] == pytest.approx(512.5)
+    assert borrowed["debt_adjusted_net_worth"] == pytest.approx(987.5)
     assert borrowed["available_credit"] == pytest.approx(0.0)
+    assert [entry["entry_type"] for entry in borrowed["recent_entries"][:2]] == [
+        "INTEREST",
+        "BORROW",
+    ]
 
     portfolio_resp = await auth_client.get("/api/portfolio")
     assert portfolio_resp.status_code == 200
-    assert portfolio_resp.json()["total_value"] == pytest.approx(1000.0)
+    assert portfolio_resp.json()["total_value"] == pytest.approx(987.5)
 
     leaderboard_resp = await auth_client.get("/api/leaderboard")
     assert leaderboard_resp.status_code == 200
-    assert leaderboard_resp.json()[0]["total_value"] == pytest.approx(1000.0)
+    assert leaderboard_resp.json()[0]["total_value"] == pytest.approx(987.5)
 
 
 async def test_bank_credit_limit_adds_flat_credit_at_four_thousand_net_worth(
@@ -160,6 +165,38 @@ async def test_bank_repayment_clears_interest_first(auth_client, db_session):
     assert repaid["debt_outstanding"] == pytest.approx(450.0)
 
 
+async def test_bank_second_borrow_charges_interest_only_on_new_amount(
+    auth_client,
+    db_session,
+):
+    await _onboard_bank_user(auth_client)
+
+    me_resp = await auth_client.get("/api/user/me")
+    user_id = me_resp.json()["id"]
+    user = await db_session.get(User, user_id)
+    assert user is not None
+    user.balance = 3000.0
+    await db_session.commit()
+
+    first_borrow_resp = await auth_client.post("/api/bank/borrow", json={"amount": 500})
+    assert first_borrow_resp.status_code == 200
+
+    second_borrow_resp = await auth_client.post(
+        "/api/bank/borrow", json={"amount": 100}
+    )
+    assert second_borrow_resp.status_code == 200
+    borrowed = second_borrow_resp.json()
+    assert borrowed["debt_principal"] == pytest.approx(600.0)
+    assert borrowed["debt_accrued_interest"] == pytest.approx(15.0)
+    assert borrowed["debt_outstanding"] == pytest.approx(615.0)
+    assert [entry["entry_type"] for entry in borrowed["recent_entries"][:4]] == [
+        "INTEREST",
+        "BORROW",
+        "INTEREST",
+        "BORROW",
+    ]
+
+
 async def test_bank_summary_previews_due_interest(auth_client, db_session):
     await _onboard_bank_user(auth_client)
 
@@ -170,7 +207,7 @@ async def test_bank_summary_previews_due_interest(auth_client, db_session):
     user.balance = 1250.0
     user.debt_principal = 500.0
     user.debt_accrued_interest = 0.0
-    user.debt_last_accrued_at = datetime.now(UTC) - timedelta(hours=72)
+    user.debt_last_accrued_at = datetime.now(UTC) - timedelta(hours=120)
     user.debt_next_accrual_at = datetime.now(UTC) - timedelta(minutes=5)
     await db_session.commit()
 
@@ -178,8 +215,8 @@ async def test_bank_summary_previews_due_interest(auth_client, db_session):
     assert summary_resp.status_code == 200
     summary = summary_resp.json()
     assert summary["debt_principal"] == pytest.approx(500.0)
-    assert summary["debt_accrued_interest"] == pytest.approx(10.75)
-    assert summary["debt_outstanding"] == pytest.approx(510.75)
+    assert summary["debt_accrued_interest"] == pytest.approx(12.5)
+    assert summary["debt_outstanding"] == pytest.approx(512.5)
 
 
 async def test_bank_summary_includes_playing_income_metrics(auth_client, db_session):
@@ -237,3 +274,24 @@ async def test_bank_summary_includes_playing_income_metrics(auth_client, db_sess
         "EUW1_500",
         "EUW1_499",
     ]
+
+
+async def test_bank_summary_applies_minimum_playing_income_projection(
+    auth_client, db_session
+):
+    await _onboard_bank_user(auth_client)
+
+    me_resp = await auth_client.get("/api/user/me")
+    user_id = me_resp.json()["id"]
+    user = await db_session.get(User, user_id)
+    assert user is not None
+    player = await db_session.get(TrackedPlayer, user.linked_player_id)
+    assert player is not None
+    player.current_price = 8.0
+    await db_session.commit()
+
+    summary_resp = await auth_client.get("/api/bank")
+    assert summary_resp.status_code == 200
+    summary = summary_resp.json()
+    assert summary["projected_next_win_income"] == pytest.approx(0.15)
+    assert summary["projected_next_loss_income"] == pytest.approx(0.15)

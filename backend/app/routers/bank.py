@@ -8,12 +8,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth import CurrentOnboardedUser
 from app.banking import (
     apply_borrow,
+    apply_borrow_interest,
     apply_due_interest,
     apply_repayment,
     build_account_snapshot,
     build_playing_income_summary,
     current_outstanding_debt,
-    initialize_debt_schedule,
     record_user_wealth_snapshot,
     round_currency,
 )
@@ -121,10 +121,8 @@ async def borrow_from_bank(
             detail="Borrow amount exceeds available credit",
         )
 
-    if current_outstanding_debt(user) <= 0:
-        initialize_debt_schedule(user, at=now)
-
     session.add(apply_borrow(user, amount, at=now))
+    session.add(apply_borrow_interest(user, amount, at=now))
     await record_user_wealth_snapshot(
         session,
         user,

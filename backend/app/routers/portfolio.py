@@ -15,10 +15,9 @@ router = APIRouter(tags=["portfolio"])
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 
-@router.get("/portfolio", response_model=PortfolioResponse)
-async def get_portfolio(
-    user: CurrentOnboardedUser,
-    session: SessionDep,
+async def build_portfolio_response(
+    session: AsyncSession,
+    user,
 ) -> PortfolioResponse:
     snapshot = await build_account_snapshot(session, user)
     result = await session.execute(
@@ -88,3 +87,11 @@ async def get_portfolio(
         holdings=holdings,
         total_value=snapshot.debt_adjusted_net_worth,
     )
+
+
+@router.get("/portfolio", response_model=PortfolioResponse)
+async def get_portfolio(
+    user: CurrentOnboardedUser,
+    session: SessionDep,
+) -> PortfolioResponse:
+    return await build_portfolio_response(session, user)

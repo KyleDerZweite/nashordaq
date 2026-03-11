@@ -16,7 +16,7 @@ from app.models import (
     User,
     UserWealthSnapshot,
 )
-from app.riot import MatchSummary, RankData
+from app.riot import MatchSummary, PlayerNotFoundError, RankData
 
 
 @pytest.mark.asyncio
@@ -138,7 +138,7 @@ async def test_market_update_job_accrues_due_bank_interest(db_engine, monkeypatc
             balance=1250.0,
             debt_principal=250.0,
             debt_accrued_interest=0.0,
-            debt_last_accrued_at=due_time - timedelta(hours=72),
+            debt_last_accrued_at=due_time - timedelta(hours=120),
             debt_next_accrual_at=due_time,
         )
         session.add_all([player, user])
@@ -190,8 +190,8 @@ async def test_market_update_job_accrues_due_bank_interest(db_engine, monkeypatc
     assert user is not None
     assert entry is not None
     assert user.debt_principal == pytest.approx(250.0)
-    assert user.debt_accrued_interest == pytest.approx(5.38)
-    assert entry.amount == pytest.approx(5.38)
+    assert user.debt_accrued_interest == pytest.approx(6.25)
+    assert entry.amount == pytest.approx(6.25)
 
 
 @pytest.mark.asyncio
@@ -219,11 +219,25 @@ async def test_market_update_job_applies_playing_income_once_per_new_match(
         )
         session.add(player)
         await session.flush()
+        user = User(
+            username="income-user",
+            balance=1000.0,
+            linked_player_id=player.id,
+        )
+        session.add(user)
+        await session.flush()
         session.add(
-            User(
-                username="income-user",
-                balance=1000.0,
-                linked_player_id=player.id,
+            PlayingIncomeEntry(
+                user_id=user.id,
+                player_id=player.id,
+                match_id="EUW1_100",
+                match_result=PlayingIncomeMatchResult.WIN,
+                match_duration_seconds=1800,
+                match_completed_at=datetime(2024, 3, 9, 16, 0, tzinfo=UTC),
+                share_price=50.0,
+                base_rate=0.01,
+                outcome_multiplier=1.0,
+                amount=0.5,
             )
         )
         await session.commit()
@@ -270,6 +284,11 @@ async def test_market_update_job_applies_playing_income_once_per_new_match(
     monkeypatch.setattr(scheduler_module, "SessionLocal", session_factory)
     monkeypatch.setattr(scheduler_module, "get_rank", fake_get_rank)
     monkeypatch.setattr(
+        scheduler_module.settings,
+        "playing_income_start_date",
+        datetime(2024, 1, 1, tzinfo=UTC),
+    )
+    monkeypatch.setattr(
         scheduler_module,
         "get_recent_match_ids",
         fake_get_recent_match_ids,
@@ -313,12 +332,614 @@ async def test_market_update_job_applies_playing_income_once_per_new_match(
     assert user is not None
     assert player is not None
     assert user.balance == pytest.approx(1000.75)
-    assert [entry.match_id for entry in entries] == ["EUW1_101", "EUW1_102"]
-    assert entries[0].match_result == PlayingIncomeMatchResult.LOSS
-    assert entries[0].amount == pytest.approx(0.25)
-    assert entries[1].match_result == PlayingIncomeMatchResult.WIN
-    assert entries[1].amount == pytest.approx(0.5)
+    assert [entry.match_id for entry in entries] == ["EUW1_100", "EUW1_101", "EUW1_102"]
+    assert entries[1].match_result == PlayingIncomeMatchResult.LOSS
+    assert entries[1].amount == pytest.approx(0.25)
+    assert entries[2].match_result == PlayingIncomeMatchResult.WIN
+    assert entries[2].amount == pytest.approx(0.5)
     assert player.last_playing_income_match_id == "EUW1_102"
+
+
+@pytest.mark.asyncio
+async def test_market_update_job_backfills_playing_income_from_start_date(
+    db_engine, monkeypatch
+):
+    session_factory = async_sessionmaker(
+        db_engine, class_=AsyncSession, expire_on_commit=False
+    )
+
+    configured_start = datetime(2024, 3, 1, tzinfo=UTC)
+
+    async with session_factory() as session:
+        player = TrackedPlayer(
+            game_name="BackfillPlayer",
+            tag_line="EUW",
+            display_name="Backfill Player",
+            puuid="backfill-puuid",
+            summoner_id="backfill-summoner",
+            current_price=50.0,
+            lp_abs=1500,
+            previous_lp_abs=1500,
+            streak=0,
+            gamma_factor=1.0,
+            last_updated=datetime(2026, 3, 10, 12, 0, tzinfo=UTC),
+            last_playing_income_match_id="EUW1_299",
+        )
+        session.add(player)
+        await session.flush()
+        session.add(
+            User(
+                username="backfill-user",
+                balance=1000.0,
+                linked_player_id=player.id,
+            )
+        )
+        await session.commit()
+
+    async def fake_get_rank(**_: object) -> RankData:
+        return RankData(
+            puuid="backfill-puuid",
+            summoner_id="backfill-summoner",
+            tier="GOLD",
+            rank="I",
+            league_points=0,
+            wins=10,
+            losses=10,
+            hot_streak=False,
+            veteran=False,
+            inactive=False,
+            fresh_blood=False,
+        )
+
+    match_id_calls: list[dict[str, object]] = []
+
+    async def fake_get_recent_match_ids(**kwargs: object) -> list[str]:
+        match_id_calls.append(dict(kwargs))
+        assert kwargs["start_time"] == configured_start
+        if kwargs["start"] == 0:
+            return ["EUW1_302", "EUW1_301"]
+        if kwargs["start"] == 2:
+            return ["EUW1_300"]
+        return []
+
+    async def fake_get_match_summary(**kwargs: object) -> MatchSummary:
+        match_id = str(kwargs["match_id"])
+        summaries = {
+            "EUW1_300": MatchSummary(
+                match_id="EUW1_300",
+                queue_id=420,
+                win=True,
+                game_duration_seconds=2200,
+                game_end_timestamp=1_710_000_100_000,
+            ),
+            "EUW1_301": MatchSummary(
+                match_id="EUW1_301",
+                queue_id=420,
+                win=False,
+                game_duration_seconds=1800,
+                game_end_timestamp=1_710_000_200_000,
+            ),
+            "EUW1_302": MatchSummary(
+                match_id="EUW1_302",
+                queue_id=420,
+                win=True,
+                game_duration_seconds=2400,
+                game_end_timestamp=1_710_000_300_000,
+            ),
+        }
+        return summaries[match_id]
+
+    http_client = httpx.AsyncClient()
+    monkeypatch.setattr(scheduler_module, "SessionLocal", session_factory)
+    monkeypatch.setattr(scheduler_module, "get_rank", fake_get_rank)
+    monkeypatch.setattr(
+        scheduler_module.settings,
+        "playing_income_start_date",
+        configured_start,
+    )
+    monkeypatch.setattr(
+        scheduler_module.settings,
+        "playing_income_recent_match_count",
+        2,
+    )
+    monkeypatch.setattr(
+        scheduler_module,
+        "get_recent_match_ids",
+        fake_get_recent_match_ids,
+    )
+    monkeypatch.setattr(
+        scheduler_module,
+        "get_match_summary",
+        fake_get_match_summary,
+    )
+    monkeypatch.setattr(
+        scheduler_module,
+        "_app",
+        SimpleNamespace(state=SimpleNamespace(http_client=http_client)),
+    )
+    monkeypatch.setattr(scheduler_module, "_last_market_update_at", None)
+
+    try:
+        await scheduler_module.market_update_job()
+    finally:
+        await http_client.aclose()
+
+    async with session_factory() as session:
+        user = await session.scalar(
+            select(User).where(User.username == "backfill-user")
+        )
+        entries = (
+            (
+                await session.execute(
+                    select(PlayingIncomeEntry).order_by(
+                        PlayingIncomeEntry.match_completed_at.asc()
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        player = await session.scalar(
+            select(TrackedPlayer).where(TrackedPlayer.game_name == "BackfillPlayer")
+        )
+
+    assert user is not None
+    assert player is not None
+    assert user.balance == pytest.approx(1001.25)
+    assert [entry.match_id for entry in entries] == ["EUW1_300", "EUW1_301", "EUW1_302"]
+    assert [entry.amount for entry in entries] == pytest.approx([0.5, 0.25, 0.5])
+    assert player.last_playing_income_match_id == "EUW1_302"
+    assert [call["start"] for call in match_id_calls] == [0, 2]
+
+
+@pytest.mark.asyncio
+async def test_market_update_job_applies_minimum_playing_income_amount(
+    db_engine, monkeypatch
+):
+    session_factory = async_sessionmaker(
+        db_engine, class_=AsyncSession, expire_on_commit=False
+    )
+
+    async with session_factory() as session:
+        player = TrackedPlayer(
+            game_name="MinimumIncomePlayer",
+            tag_line="EUW",
+            display_name="Minimum Income Player",
+            puuid="minimum-puuid",
+            summoner_id="minimum-summoner",
+            current_price=8.0,
+            lp_abs=1500,
+            previous_lp_abs=1500,
+            streak=0,
+            gamma_factor=1.0,
+            last_updated=datetime(2026, 3, 10, 12, 0, tzinfo=UTC),
+        )
+        session.add(player)
+        await session.flush()
+        session.add(
+            User(
+                username="minimum-income-user",
+                balance=1000.0,
+                linked_player_id=player.id,
+            )
+        )
+        await session.commit()
+
+    async def fake_get_rank(**_: object) -> RankData:
+        return RankData(
+            puuid="minimum-puuid",
+            summoner_id="minimum-summoner",
+            tier="GOLD",
+            rank="I",
+            league_points=0,
+            wins=10,
+            losses=10,
+            hot_streak=False,
+            veteran=False,
+            inactive=False,
+            fresh_blood=False,
+        )
+
+    async def fake_get_recent_match_ids(**_: object) -> list[str]:
+        return ["EUW1_900"]
+
+    async def fake_get_match_summary(**_: object) -> MatchSummary:
+        return MatchSummary(
+            match_id="EUW1_900",
+            queue_id=420,
+            win=False,
+            game_duration_seconds=1800,
+            game_end_timestamp=1_773_187_200_000,
+        )
+
+    http_client = httpx.AsyncClient()
+    monkeypatch.setattr(scheduler_module, "SessionLocal", session_factory)
+    monkeypatch.setattr(scheduler_module, "get_rank", fake_get_rank)
+    monkeypatch.setattr(
+        scheduler_module.settings,
+        "playing_income_start_date",
+        datetime(2026, 3, 1, tzinfo=UTC),
+    )
+    monkeypatch.setattr(
+        scheduler_module,
+        "get_recent_match_ids",
+        fake_get_recent_match_ids,
+    )
+    monkeypatch.setattr(
+        scheduler_module,
+        "get_match_summary",
+        fake_get_match_summary,
+    )
+    monkeypatch.setattr(
+        scheduler_module,
+        "_app",
+        SimpleNamespace(state=SimpleNamespace(http_client=http_client)),
+    )
+    monkeypatch.setattr(scheduler_module, "_last_market_update_at", None)
+
+    try:
+        await scheduler_module.market_update_job()
+    finally:
+        await http_client.aclose()
+
+    async with session_factory() as session:
+        user = await session.scalar(
+            select(User).where(User.username == "minimum-income-user")
+        )
+        entry = await session.scalar(
+            select(PlayingIncomeEntry).where(PlayingIncomeEntry.match_id == "EUW1_900")
+        )
+
+    assert user is not None
+    assert entry is not None
+    assert user.balance == pytest.approx(1000.15)
+    assert entry.amount == pytest.approx(0.15)
+
+
+@pytest.mark.asyncio
+async def test_market_update_job_falls_back_when_start_time_query_is_rejected(
+    db_engine, monkeypatch
+):
+    session_factory = async_sessionmaker(
+        db_engine, class_=AsyncSession, expire_on_commit=False
+    )
+
+    async with session_factory() as session:
+        player = TrackedPlayer(
+            game_name="FallbackIncomePlayer",
+            tag_line="EUW",
+            display_name="Fallback Income Player",
+            puuid="fallback-puuid",
+            summoner_id="fallback-summoner",
+            current_price=20.0,
+            lp_abs=1500,
+            previous_lp_abs=1500,
+            streak=0,
+            gamma_factor=1.0,
+            last_updated=datetime(2026, 3, 10, 12, 0, tzinfo=UTC),
+        )
+        session.add(player)
+        await session.flush()
+        session.add(
+            User(
+                username="fallback-income-user",
+                balance=1000.0,
+                linked_player_id=player.id,
+            )
+        )
+        await session.commit()
+
+    async def fake_get_rank(**_: object) -> RankData:
+        return RankData(
+            puuid="fallback-puuid",
+            summoner_id="fallback-summoner",
+            tier="GOLD",
+            rank="I",
+            league_points=0,
+            wins=10,
+            losses=10,
+            hot_streak=False,
+            veteran=False,
+            inactive=False,
+            fresh_blood=False,
+        )
+
+    request_calls: list[dict[str, object]] = []
+
+    async def fake_get_recent_match_ids(**kwargs: object) -> list[str]:
+        request_calls.append(dict(kwargs))
+        if kwargs["start_time"] is not None:
+            request = httpx.Request("GET", "https://example.test/matches")
+            response = httpx.Response(400, request=request)
+            raise httpx.HTTPStatusError(
+                "bad request",
+                request=request,
+                response=response,
+            )
+        if kwargs["start"] == 0:
+            return ["EUW1_950", "EUW1_949"]
+        return []
+
+    async def fake_get_match_summary(**kwargs: object) -> MatchSummary:
+        match_id = str(kwargs["match_id"])
+        summaries = {
+            "EUW1_949": MatchSummary(
+                match_id="EUW1_949",
+                queue_id=420,
+                win=False,
+                game_duration_seconds=1800,
+                game_end_timestamp=1_773_187_200_000,
+            ),
+            "EUW1_950": MatchSummary(
+                match_id="EUW1_950",
+                queue_id=420,
+                win=True,
+                game_duration_seconds=1800,
+                game_end_timestamp=1_773_190_800_000,
+            ),
+        }
+        return summaries[match_id]
+
+    http_client = httpx.AsyncClient()
+    monkeypatch.setattr(scheduler_module, "SessionLocal", session_factory)
+    monkeypatch.setattr(scheduler_module, "get_rank", fake_get_rank)
+    monkeypatch.setattr(
+        scheduler_module.settings,
+        "playing_income_start_date",
+        datetime(2026, 3, 10, tzinfo=UTC),
+    )
+    monkeypatch.setattr(
+        scheduler_module,
+        "get_recent_match_ids",
+        fake_get_recent_match_ids,
+    )
+    monkeypatch.setattr(
+        scheduler_module,
+        "get_match_summary",
+        fake_get_match_summary,
+    )
+    monkeypatch.setattr(
+        scheduler_module,
+        "_app",
+        SimpleNamespace(state=SimpleNamespace(http_client=http_client)),
+    )
+    monkeypatch.setattr(scheduler_module, "_last_market_update_at", None)
+
+    try:
+        await scheduler_module.market_update_job()
+    finally:
+        await http_client.aclose()
+
+    async with session_factory() as session:
+        user = await session.scalar(
+            select(User).where(User.username == "fallback-income-user")
+        )
+        entries = (
+            (
+                await session.execute(
+                    select(PlayingIncomeEntry).order_by(
+                        PlayingIncomeEntry.match_completed_at.asc()
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+    assert user is not None
+    assert user.balance == pytest.approx(1000.35)
+    assert [entry.match_id for entry in entries] == ["EUW1_949", "EUW1_950"]
+    assert request_calls[0]["start_time"] is not None
+    assert request_calls[1]["start_time"] is None
+
+
+@pytest.mark.asyncio
+async def test_market_update_job_refreshes_stale_puuid_before_match_history(
+    db_engine, monkeypatch
+):
+    session_factory = async_sessionmaker(
+        db_engine, class_=AsyncSession, expire_on_commit=False
+    )
+
+    async with session_factory() as session:
+        player = TrackedPlayer(
+            game_name="RefreshPuuidPlayer",
+            tag_line="EUW",
+            display_name="Refresh Puuid Player",
+            puuid="stale-puuid",
+            summoner_id="stale-summoner",
+            current_price=20.0,
+            lp_abs=1500,
+            previous_lp_abs=1500,
+            streak=0,
+            gamma_factor=1.0,
+            last_updated=datetime(2026, 3, 10, 12, 0, tzinfo=UTC),
+        )
+        session.add(player)
+        await session.flush()
+        session.add(
+            User(
+                username="refresh-puuid-user",
+                balance=1000.0,
+                linked_player_id=player.id,
+            )
+        )
+        await session.commit()
+
+    async def fake_get_rank(**_: object) -> RankData:
+        return RankData(
+            puuid="fresh-puuid",
+            summoner_id="fresh-summoner",
+            tier="GOLD",
+            rank="I",
+            league_points=0,
+            wins=10,
+            losses=10,
+            hot_streak=False,
+            veteran=False,
+            inactive=False,
+            fresh_blood=False,
+        )
+
+    request_puuids: list[str] = []
+
+    async def fake_get_recent_match_ids(**kwargs: object) -> list[str]:
+        request_puuids.append(str(kwargs["puuid"]))
+        return []
+
+    http_client = httpx.AsyncClient()
+    monkeypatch.setattr(scheduler_module, "SessionLocal", session_factory)
+    monkeypatch.setattr(scheduler_module, "get_rank", fake_get_rank)
+    monkeypatch.setattr(
+        scheduler_module,
+        "get_recent_match_ids",
+        fake_get_recent_match_ids,
+    )
+    monkeypatch.setattr(
+        scheduler_module,
+        "_app",
+        SimpleNamespace(state=SimpleNamespace(http_client=http_client)),
+    )
+    monkeypatch.setattr(scheduler_module, "_last_market_update_at", None)
+
+    try:
+        await scheduler_module.market_update_job()
+    finally:
+        await http_client.aclose()
+
+    async with session_factory() as session:
+        player = await session.scalar(
+            select(TrackedPlayer).where(TrackedPlayer.game_name == "RefreshPuuidPlayer")
+        )
+
+    assert player is not None
+    assert player.puuid == "fresh-puuid"
+    assert player.summoner_id == "fresh-summoner"
+    assert request_puuids == ["fresh-puuid"]
+
+
+@pytest.mark.asyncio
+async def test_market_update_job_skips_malformed_match_summary_and_continues(
+    db_engine, monkeypatch
+):
+    session_factory = async_sessionmaker(
+        db_engine, class_=AsyncSession, expire_on_commit=False
+    )
+
+    async with session_factory() as session:
+        player = TrackedPlayer(
+            game_name="SkipBrokenMatchPlayer",
+            tag_line="EUW",
+            display_name="Skip Broken Match Player",
+            puuid="skip-broken-puuid",
+            summoner_id="skip-broken-summoner",
+            current_price=20.0,
+            lp_abs=1500,
+            previous_lp_abs=1500,
+            streak=0,
+            gamma_factor=1.0,
+            last_updated=datetime(2026, 3, 10, 12, 0, tzinfo=UTC),
+        )
+        session.add(player)
+        await session.flush()
+        session.add(
+            User(
+                username="skip-broken-user",
+                balance=1000.0,
+                linked_player_id=player.id,
+            )
+        )
+        await session.commit()
+
+    async def fake_get_rank(**_: object) -> RankData:
+        return RankData(
+            puuid="skip-broken-puuid",
+            summoner_id="skip-broken-summoner",
+            tier="GOLD",
+            rank="I",
+            league_points=0,
+            wins=10,
+            losses=10,
+            hot_streak=False,
+            veteran=False,
+            inactive=False,
+            fresh_blood=False,
+        )
+
+    async def fake_get_recent_match_ids(**_: object) -> list[str]:
+        return ["EUW1_1002", "EUW1_1001", "EUW1_1000"]
+
+    async def fake_get_match_summary(**kwargs: object) -> MatchSummary:
+        match_id = str(kwargs["match_id"])
+        if match_id == "EUW1_1001":
+            raise PlayerNotFoundError("missing participant")
+        summaries = {
+            "EUW1_1000": MatchSummary(
+                match_id="EUW1_1000",
+                queue_id=420,
+                win=False,
+                game_duration_seconds=1800,
+                game_end_timestamp=1_773_187_200_000,
+            ),
+            "EUW1_1002": MatchSummary(
+                match_id="EUW1_1002",
+                queue_id=420,
+                win=True,
+                game_duration_seconds=1800,
+                game_end_timestamp=1_773_194_400_000,
+            ),
+        }
+        return summaries[match_id]
+
+    http_client = httpx.AsyncClient()
+    monkeypatch.setattr(scheduler_module, "SessionLocal", session_factory)
+    monkeypatch.setattr(scheduler_module, "get_rank", fake_get_rank)
+    monkeypatch.setattr(
+        scheduler_module.settings,
+        "playing_income_start_date",
+        datetime(2026, 3, 10, tzinfo=UTC),
+    )
+    monkeypatch.setattr(
+        scheduler_module,
+        "get_recent_match_ids",
+        fake_get_recent_match_ids,
+    )
+    monkeypatch.setattr(
+        scheduler_module,
+        "get_match_summary",
+        fake_get_match_summary,
+    )
+    monkeypatch.setattr(
+        scheduler_module,
+        "_app",
+        SimpleNamespace(state=SimpleNamespace(http_client=http_client)),
+    )
+    monkeypatch.setattr(scheduler_module, "_last_market_update_at", None)
+
+    try:
+        await scheduler_module.market_update_job()
+    finally:
+        await http_client.aclose()
+
+    async with session_factory() as session:
+        user = await session.scalar(
+            select(User).where(User.username == "skip-broken-user")
+        )
+        entries = (
+            (
+                await session.execute(
+                    select(PlayingIncomeEntry).order_by(
+                        PlayingIncomeEntry.match_completed_at.asc()
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+    assert user is not None
+    assert user.balance == pytest.approx(1000.35)
+    assert [entry.match_id for entry in entries] == ["EUW1_1000", "EUW1_1002"]
 
 
 @pytest.mark.asyncio

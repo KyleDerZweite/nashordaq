@@ -1,3 +1,5 @@
+from datetime import UTC, datetime
+
 import httpx
 from pydantic import BaseModel
 
@@ -36,6 +38,11 @@ class PlayerNotFoundError(Exception):
 
 class RateLimitedError(Exception):
     pass
+
+
+def _timestamp_seconds(value: datetime) -> int:
+    value = value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+    return int(value.timestamp())
 
 
 def _check_response(response: httpx.Response) -> None:
@@ -137,11 +144,14 @@ async def get_recent_match_ids(
     *,
     start: int = 0,
     count: int = 20,
+    start_time: datetime | None = None,
     queue: int | None = None,
     type: str | None = None,
 ) -> list[str]:
     headers = {"X-Riot-Token": api_key}
     params: dict[str, int | str] = {"start": start, "count": count}
+    if start_time is not None:
+        params["startTime"] = _timestamp_seconds(start_time)
     if queue is not None:
         params["queue"] = queue
     if type is not None:

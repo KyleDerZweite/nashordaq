@@ -114,12 +114,12 @@ async def test_onboarding_tagline_with_hash_is_accepted(auth_client):
     assert data["onboarding_complete"] is True
 
 
-async def test_spectator_user_role_and_onboarding_blocked(auth_client, monkeypatch):
-    monkeypatch.setattr(settings, "spectator_remote_user", "testuser")
+async def test_admin_user_role_and_onboarding_blocked(auth_client, monkeypatch):
+    monkeypatch.setattr(settings, "admin_remote_users", "testuser")
 
     me_resp = await auth_client.get("/api/user/me")
     assert me_resp.status_code == 200
-    assert me_resp.json()["role"] == "spectator"
+    assert me_resp.json()["role"] == "admin"
 
     onboarding_resp = await auth_client.post(
         "/api/user/onboarding",
@@ -130,7 +130,7 @@ async def test_spectator_user_role_and_onboarding_blocked(auth_client, monkeypat
         },
     )
     assert onboarding_resp.status_code == 403
-    assert onboarding_resp.json()["detail"] == "Spectator users cannot onboard"
+    assert onboarding_resp.json()["detail"] == "Admin users cannot onboard"
 
 
 async def test_onboarding_initializes_market_price(auth_client, monkeypatch):
@@ -236,8 +236,8 @@ async def test_update_profile_duplicate_player_rejected(auth_client):
     assert update_resp.status_code == 409
 
 
-async def test_spectator_user_profile_update_blocked(auth_client, monkeypatch):
-    monkeypatch.setattr(settings, "spectator_remote_user", "testuser")
+async def test_admin_user_profile_update_blocked(auth_client, monkeypatch):
+    monkeypatch.setattr(settings, "admin_remote_users", "testuser")
 
     update_resp = await auth_client.put(
         "/api/user/profile",
@@ -248,4 +248,4 @@ async def test_spectator_user_profile_update_blocked(auth_client, monkeypatch):
         },
     )
     assert update_resp.status_code == 403
-    assert update_resp.json()["detail"] == "Spectator users cannot edit their profile"
+    assert update_resp.json()["detail"] == "Admin users cannot edit their profile"

@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { get, post, put, del } from "./client";
 import type {
+  AdminOverviewResponse,
+  AdminUserPortfolioResponse,
+  AdminUserSummaryResponse,
   BalanceInsightsResponse,
   BankActionRequest,
   BankSummaryResponse,
@@ -35,6 +38,12 @@ export const queryKeys = {
   recentOrders: ["recentOrders"] as const,
   leaderboard: ["leaderboard"] as const,
   systemStatus: ["systemStatus"] as const,
+  adminOverview: ["adminOverview"] as const,
+  adminUsers: ["adminUsers"] as const,
+  adminOrders: ["adminOrders"] as const,
+  adminSystemStatus: ["adminSystemStatus"] as const,
+  adminUserPortfolio: (userId: number) =>
+    ["adminUserPortfolio", userId] as const,
   gamba: ["gamba"] as const,
   bank: ["bank"] as const,
   balanceInsights: ["balanceInsights"] as const,
@@ -201,6 +210,51 @@ export function useSystemStatus() {
     queryKey: queryKeys.systemStatus,
     queryFn: () => get<SystemStatusResponse>("/system/status"),
     refetchInterval: 30_000,
+  });
+}
+
+export function useAdminOverview(enabled = true) {
+  return useQuery<AdminOverviewResponse>({
+    queryKey: queryKeys.adminOverview,
+    queryFn: () => get<AdminOverviewResponse>("/admin/overview"),
+    enabled,
+    refetchInterval: 30_000,
+  });
+}
+
+export function useAdminUsers(enabled = true) {
+  return useQuery<AdminUserSummaryResponse[]>({
+    queryKey: queryKeys.adminUsers,
+    queryFn: () => get<AdminUserSummaryResponse[]>("/admin/users"),
+    enabled,
+    refetchInterval: 30_000,
+  });
+}
+
+export function useAdminOrders(enabled = true) {
+  return useQuery<OrderResponse[]>({
+    queryKey: queryKeys.adminOrders,
+    queryFn: () => get<OrderResponse[]>("/admin/orders"),
+    enabled,
+    refetchInterval: 15_000,
+  });
+}
+
+export function useAdminSystemStatus(enabled = true) {
+  return useQuery<SystemStatusResponse>({
+    queryKey: queryKeys.adminSystemStatus,
+    queryFn: () => get<SystemStatusResponse>("/admin/system/status"),
+    enabled,
+    refetchInterval: 30_000,
+  });
+}
+
+export function useAdminUserPortfolio(userId: number | null, enabled = true) {
+  return useQuery<AdminUserPortfolioResponse>({
+    queryKey: queryKeys.adminUserPortfolio(userId ?? 0),
+    queryFn: () =>
+      get<AdminUserPortfolioResponse>(`/admin/users/${userId}/portfolio`),
+    enabled: enabled && userId !== null,
   });
 }
 

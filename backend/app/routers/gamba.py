@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import CurrentOnboardedUser, CurrentUser, is_spectator_user
+from app.auth import CurrentOnboardedUser, CurrentUser, is_admin_user
 from app.config import settings
 from app.database import get_session
 from app.models import (
@@ -125,7 +125,7 @@ async def list_gamba_positions(
     user: CurrentUser,
     session: SessionDep,
 ) -> list[GambaPositionResponse]:
-    if is_spectator_user(user) or user.linked_player_id is None:
+    if is_admin_user(user) or user.linked_player_id is None:
         return []
 
     result = await session.execute(

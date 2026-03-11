@@ -19,6 +19,7 @@ from app.riot import (
     get_rank,
 )
 from app.routers import (
+    admin,
     bank,
     gamba,
     leaderboard,
@@ -75,6 +76,7 @@ app.add_middleware(
 )
 
 app.include_router(user.router, prefix="/api")
+app.include_router(admin.router, prefix="/api")
 app.include_router(market.router, prefix="/api")
 app.include_router(orders.router, prefix="/api")
 app.include_router(gamba.router, prefix="/api")

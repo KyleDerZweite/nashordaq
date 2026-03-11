@@ -71,6 +71,9 @@ export default function BankModal({ canManageBank, onClose }: Props) {
     data?.cash_balance ?? 0,
     data?.debt_outstanding ?? 0,
   );
+  const interestCadenceLabel = data
+    ? `Borrowing adds the first interest charge immediately, then compounds every ${data.interest_interval_hours.toFixed(0)} hours`
+    : "Borrowing adds an immediate interest charge, then follows a fixed rollover schedule";
 
   return (
     <div
@@ -87,7 +90,7 @@ export default function BankModal({ canManageBank, onClose }: Props) {
               Credit
             </h2>
             <p className="mt-1 font-mono text-xs uppercase tracking-[0.18em] text-hex-bronze">
-              Borrow now, interest compounds every 72 hours
+              {interestCadenceLabel}
             </p>
           </div>
           <button
@@ -210,8 +213,8 @@ export default function BankModal({ canManageBank, onClose }: Props) {
                       Borrow
                     </h3>
                     <p className="mt-1 font-mono text-xs text-hex-bronze">
-                      Borrowed cash can be used immediately, including for
-                      Gamba.
+                      Borrowed cash can be used immediately, but the first
+                      interest charge is added right away.
                     </p>
                   </div>
                   <div>

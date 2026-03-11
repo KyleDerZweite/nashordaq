@@ -95,8 +95,9 @@ For defense-in-depth, enable trusted-proxy enforcement so direct backend request
 # Header injected by Pangolin (default: Remote-User)
 NASHORDAQ_AUTH_HEADER=Remote-User
 
-# Optional spectator account that can view but not onboard or trade
-NASHORDAQ_SPECTATOR_REMOTE_USER=admin@yourdomain.com
+# Optional admin account list for the operator dashboard. Comma-separate
+# multiple usernames if you want more than one admin.
+NASHORDAQ_ADMIN_REMOTE_USERS=admin@yourdomain.com
 
 # Optional hardening (recommended in production)
 NASHORDAQ_ENFORCE_TRUSTED_PROXY=true

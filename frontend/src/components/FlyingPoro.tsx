@@ -267,7 +267,9 @@ export default function FlyingPoro({ enabled }: { enabled: boolean }) {
           src={assetSrc}
           alt=""
           className="poro-flight__image"
-          style={{ transform: shouldMirrorHorizontally ? "scaleX(-1)" : undefined }}
+          style={{
+            transform: shouldMirrorHorizontally ? "scaleX(-1)" : undefined,
+          }}
           draggable={false}
         />
       </button>

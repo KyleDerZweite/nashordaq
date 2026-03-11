@@ -230,7 +230,8 @@ export default function BalanceInsightsModal({ isOpen, onClose }: Props) {
                       Last 24h: {formatAmount(data.playing_income_last_24h)} P
                     </p>
                     <p className="mt-1 font-mono text-xs text-hex-bronze">
-                      Lifetime: {formatAmount(data.playing_income_lifetime_total)} P
+                      Lifetime:{" "}
+                      {formatAmount(data.playing_income_lifetime_total)} P
                     </p>
                   </div>
 

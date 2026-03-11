@@ -14,7 +14,7 @@ from app.models import (
     UserWealthSnapshotSource,
 )
 
-UserRole = Literal["player", "spectator"]
+UserRole = Literal["player", "admin"]
 PlayerTrend = Literal["up", "down", "flat"]
 MarketStatus = Literal["healthy", "degraded", "idle"]
 
@@ -204,6 +204,46 @@ class PortfolioResponse(BaseModel):
     debt_outstanding: float
     holdings: list[HoldingResponse]
     total_value: float
+
+
+class AdminOverviewResponse(BaseModel):
+    total_users: int
+    onboarded_users: int
+    admin_users: int
+    tracked_players: int
+    total_orders: int
+    pending_orders: int
+    executed_orders: int
+    reverted_orders: int
+    cancelled_orders: int
+    total_cash_balance: float
+    total_debt_outstanding: float
+
+
+class AdminUserSummaryResponse(BaseModel):
+    id: int
+    username: str
+    role: UserRole
+    linked_player_id: int | None
+    linked_player_name: str | None
+    onboarding_complete: bool
+    balance: float
+    holdings_value: float
+    active_gamba_value: float
+    debt_outstanding: float
+    total_value: float
+    created_at: datetime
+
+
+class AdminUserPortfolioResponse(BaseModel):
+    user_id: int
+    username: str
+    role: UserRole
+    linked_player_id: int | None
+    linked_player_name: str | None
+    onboarding_complete: bool
+    created_at: datetime
+    portfolio: PortfolioResponse
 
 
 class LeaderboardEntry(BaseModel):

@@ -121,7 +121,7 @@ Orders are validated and executed in the same request.
 
 ## 6. Bank Credit
 
-Bank debt is a separate account-level liability. Borrowing adds cash immediately, but debt-adjusted net worth does not increase because the borrowed principal is offset by the new liability.
+Bank debt is a separate account-level liability. Borrowing adds cash immediately, but debt-adjusted net worth drops slightly because the first interest charge is added at loan creation.
 
 ### Credit Limit
 
@@ -137,15 +137,16 @@ debt_adjusted_net_worth = cash_balance + holdings_value + active_gamba_mark_valu
 
 ### Interest Accrual
 
-Outstanding debt compounds every 72 hours at 2.15%.
+Outstanding debt compounds every 120 hours at 2.5%.
 
 ```
-Debt_next = Debt_current + (Debt_current * 0.0215)
+Debt_next = Debt_current + (Debt_current * 0.025)
 ```
 
+- Each new borrow also receives an immediate one-time interest charge equal to `borrow_amount * 0.025`.
 - Interest capitalizes on the full outstanding debt, including prior accrued interest.
 - Repayments always clear accrued interest before principal.
-- If the scheduler misses one or more rollover windows, the backend catches up one 72-hour interval at a time.
+- If the scheduler misses one or more rollover windows, the backend catches up one 120-hour interval at a time.
 
 Implementation: `app/banking.py`, `app/routers/bank.py`, `app/scheduler.py`
 
@@ -173,16 +174,20 @@ Current defaults:
 - `BaseRate = 0.01`
 - `OutcomeMultiplier = 1.0` on a win
 - `OutcomeMultiplier = 0.5` on a loss
+- `MinimumPayout = 0.15` per eligible match
 
 Examples:
 
 - A player with current price `42.00` earns `0.42` on a win.
 - The same player earns `0.21` on a loss.
+- A low-priced player still earns at least `0.15` for any eligible match, even when the percentage formula would be lower.
 
 ### Processing Rules
 
 - Match detection is driven by Riot Match-V5 history, not by win/loss snapshot deltas.
-- The scheduler stores the last processed match cursor per tracked player so completed matches are not rewarded twice.
+- The scheduler backfills from a configured `playing_income_start_date` and paginates through all Ranked Solo matches since that point.
+- Reward deduplication is based on immutable `playing_income_entries`, so a stale cursor cannot silently skip unpaid matches.
+- The last processed match cursor is still stored per tracked player for observability, but it is no longer the sole source of truth for payouts.
 - Reward history is stored immutably for bank-summary reporting and auditability.
 
 Implementation: `app/riot.py`, `app/scheduler.py`, `app/banking.py`, `app/routers/bank.py`

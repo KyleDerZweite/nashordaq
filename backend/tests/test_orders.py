@@ -311,7 +311,11 @@ async def test_list_recent_orders_includes_all_players(
     }
 
 
-async def test_spectator_list_orders_returns_empty_list(auth_client, tradable_player):
+async def test_admin_list_orders_returns_empty_list(
+    auth_client, tradable_player, monkeypatch
+):
+    monkeypatch.setattr(settings, "admin_remote_users", "admin-viewer")
+
     await auth_client.post(
         "/api/orders",
         json={"player_id": tradable_player.id, "side": "BUY", "quantity": 1},
@@ -321,15 +325,17 @@ async def test_spectator_list_orders_returns_empty_list(auth_client, tradable_pl
     async with AsyncClient(
         transport=transport,
         base_url="http://test",
-        headers={"Remote-User": settings.spectator_remote_user},
-    ) as spectator_client:
-        resp = await spectator_client.get("/api/orders")
+        headers={"Remote-User": "admin-viewer"},
+    ) as admin_client:
+        resp = await admin_client.get("/api/orders")
 
     assert resp.status_code == 200
     assert resp.json() == []
 
 
-async def test_spectator_can_view_recent_orders(auth_client, tradable_player):
+async def test_admin_can_view_recent_orders(auth_client, tradable_player, monkeypatch):
+    monkeypatch.setattr(settings, "admin_remote_users", "admin-viewer")
+
     await auth_client.post(
         "/api/orders",
         json={"player_id": tradable_player.id, "side": "BUY", "quantity": 1},
@@ -339,9 +345,9 @@ async def test_spectator_can_view_recent_orders(auth_client, tradable_player):
     async with AsyncClient(
         transport=transport,
         base_url="http://test",
-        headers={"Remote-User": settings.spectator_remote_user},
-    ) as spectator_client:
-        resp = await spectator_client.get("/api/orders/recent")
+        headers={"Remote-User": "admin-viewer"},
+    ) as admin_client:
+        resp = await admin_client.get("/api/orders/recent")
 
     assert resp.status_code == 200
     assert len(resp.json()) >= 1

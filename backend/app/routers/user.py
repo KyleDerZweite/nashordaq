@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import CurrentUser, get_user_role, is_spectator_user
+from app.auth import CurrentUser, get_user_role, is_admin_user
 from app.banking import build_balance_insights_summary, record_user_wealth_snapshot
 from app.config import settings
 from app.database import get_session
@@ -182,8 +182,8 @@ async def complete_onboarding(
     user: CurrentUser,
     session: SessionDep,
 ) -> UserResponse:
-    if is_spectator_user(user):
-        raise HTTPException(status_code=403, detail="Spectator users cannot onboard")
+    if is_admin_user(user):
+        raise HTTPException(status_code=403, detail="Admin users cannot onboard")
 
     if user.linked_player_id is not None:
         raise HTTPException(status_code=409, detail="Onboarding already completed")
@@ -239,10 +239,10 @@ async def update_profile(
     user: CurrentUser,
     session: SessionDep,
 ) -> UserResponse:
-    if is_spectator_user(user):
+    if is_admin_user(user):
         raise HTTPException(
             status_code=403,
-            detail="Spectator users cannot edit their profile",
+            detail="Admin users cannot edit their profile",
         )
 
     if user.linked_player_id is None:

@@ -70,7 +70,10 @@ def calculate_playing_income_amount(
     share_price: float, outcome_multiplier: float
 ) -> float:
     return round_currency(
-        share_price * settings.playing_income_base_rate * outcome_multiplier
+        max(
+            settings.playing_income_min_amount,
+            share_price * settings.playing_income_base_rate * outcome_multiplier,
+        )
     )
 
 
@@ -88,6 +91,10 @@ def interest_interval() -> timedelta:
 
 def current_outstanding_debt(user: User) -> float:
     return round_currency(user.debt_principal + user.debt_accrued_interest)
+
+
+def calculate_bank_interest(base_amount: float) -> float:
+    return round_currency(base_amount * settings.bank_interest_rate_per_interval)
 
 
 def floor_to_increment(value: float, increment: float) -> float:
@@ -140,7 +147,9 @@ def preview_debt(user: User, as_of: datetime) -> DebtPreview:
         )
 
     if next_accrual_at is None:
-        next_accrual_at = normalize_datetime(as_of) + interest_interval()
+        next_accrual_at = (
+            normalize_datetime(as_of) or datetime.now(UTC)
+        ) + interest_interval()
 
     pending_intervals = _pending_interest_intervals(next_accrual_at, as_of)
     preview_interest = accrued_interest
@@ -226,9 +235,7 @@ async def build_account_snapshot(
         max(0.0, credit_limit - debt_preview.outstanding_debt)
     )
     next_interest_amount = (
-        round_currency(
-            debt_preview.outstanding_debt * settings.bank_interest_rate_per_interval
-        )
+        calculate_bank_interest(debt_preview.outstanding_debt)
         if debt_preview.outstanding_debt > 0
         else 0.0
     )
@@ -277,7 +284,7 @@ async def build_playing_income_summary(
         )
         .limit(8)
     )
-    recent_entries = recent_entries_result.scalars().all()
+    recent_entries = list(recent_entries_result.scalars().all())
 
     linked_player = None
     if user.linked_player_id is not None:
@@ -411,9 +418,7 @@ async def apply_due_interest(
     next_accrual_at = normalize_datetime(user.debt_next_accrual_at)
     while next_accrual_at is not None and next_accrual_at <= now:
         outstanding_before = current_outstanding_debt(user)
-        interest_amount = round_currency(
-            outstanding_before * settings.bank_interest_rate_per_interval
-        )
+        interest_amount = calculate_bank_interest(outstanding_before)
         user.debt_accrued_interest = round_currency(
             user.debt_accrued_interest + interest_amount
         )
@@ -456,6 +461,25 @@ def apply_borrow(user: User, amount: float, *, at: datetime) -> BankLedgerEntry:
         amount=normalized_amount,
         principal_change=normalized_amount,
         interest_change=0.0,
+        outstanding_debt=current_outstanding_debt(user),
+        created_at=normalize_datetime(at),
+    )
+
+
+def apply_borrow_interest(
+    user: User, amount: float, *, at: datetime
+) -> BankLedgerEntry:
+    interest_amount = calculate_bank_interest(amount)
+    user.debt_accrued_interest = round_currency(
+        user.debt_accrued_interest + interest_amount
+    )
+
+    return BankLedgerEntry(
+        user_id=user.id,
+        entry_type=BankLedgerEntryType.INTEREST,
+        amount=interest_amount,
+        principal_change=0.0,
+        interest_change=interest_amount,
         outstanding_debt=current_outstanding_debt(user),
         created_at=normalize_datetime(at),
     )

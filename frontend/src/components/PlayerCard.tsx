@@ -96,7 +96,7 @@ export default function PlayerCard({
           }`}
         >
           {!canTrade
-            ? "Spectator"
+            ? "Admin"
             : isOwnStock
               ? "Own Stock"
               : canBuy

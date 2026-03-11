@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import BalanceInsightsModal from "./components/BalanceInsightsModal";
+import AdminDashboard from "./components/admin/AdminDashboard";
 import Header from "./components/Header";
 import BankModal from "./components/BankModal";
 import FlyingPoro from "./components/FlyingPoro";
@@ -18,6 +19,10 @@ import { formatAmount, formatLocalDateTime } from "./utils/format";
 
 import {
   useBankSummary,
+  useAdminOrders,
+  useAdminOverview,
+  useAdminSystemStatus,
+  useAdminUsers,
   useUser,
   usePlayers,
   usePortfolio,
@@ -46,13 +51,17 @@ export default function App() {
 
   const { data: user } = useUser();
   const onboardingComplete = user?.onboarding_complete ?? false;
-  const isSpectator = user?.role === "spectator";
+  const isAdmin = user?.role === "admin";
   const { data: players, isLoading: playersLoading } = usePlayers();
-  const { data: portfolio } = usePortfolio(onboardingComplete);
-  const { data: orders } = useOrders(Boolean(user));
-  const { data: recentOrders } = useRecentOrders(Boolean(user));
+  const { data: portfolio } = usePortfolio(onboardingComplete && !isAdmin);
+  const { data: orders } = useOrders(Boolean(user) && !isAdmin);
+  const { data: recentOrders } = useRecentOrders(Boolean(user) && !isAdmin);
   const { data: leaderboard } = useLeaderboard();
   const { data: systemStatus } = useSystemStatus();
+  const { data: adminOverview } = useAdminOverview(isAdmin);
+  const { data: adminUsers } = useAdminUsers(isAdmin);
+  const { data: adminOrders } = useAdminOrders(isAdmin);
+  const { data: adminSystemStatus } = useAdminSystemStatus(isAdmin);
   const updateUserProfile = useUpdateUserProfile();
 
   const balance = user?.balance ?? 0;
@@ -96,7 +105,8 @@ export default function App() {
     });
   }, [players, tickerSortMode]);
 
-  const marketStatusTone = systemStatus?.market_status ?? "idle";
+  const resolvedSystemStatus = isAdmin ? adminSystemStatus : systemStatus;
+  const marketStatusTone = resolvedSystemStatus?.market_status ?? "idle";
   const marketStatusLabel =
     marketStatusTone === "healthy"
       ? "Healthy"
@@ -111,10 +121,10 @@ export default function App() {
         : "border-hex-border bg-hex-bronze shadow-none";
 
   let marketStatusDetail = "Checking market service...";
-  if (systemStatus) {
-    if (systemStatus.last_market_update_at) {
-      marketStatusDetail = `Last successful market refresh ${formatLocalDateTime(systemStatus.last_market_update_at)}. Expected cadence about every ${systemStatus.expected_update_interval_minutes} min.`;
-    } else if (systemStatus.tracked_player_count === 0) {
+  if (resolvedSystemStatus) {
+    if (resolvedSystemStatus.last_market_update_at) {
+      marketStatusDetail = `Last successful market refresh ${formatLocalDateTime(resolvedSystemStatus.last_market_update_at)}. Expected cadence about every ${resolvedSystemStatus.expected_update_interval_minutes} min.`;
+    } else if (resolvedSystemStatus.tracked_player_count === 0) {
       marketStatusDetail =
         "No tracked players yet. Market polling will begin once the first player is onboarded.";
     } else {
@@ -136,7 +146,8 @@ export default function App() {
         creditAvailable={bankSummary?.available_credit ?? 0}
         username={user?.username}
         playerDisplayName={linkedPlayer?.display_name}
-        canEditProfile={Boolean(linkedPlayer) && !isSpectator}
+        canEditProfile={Boolean(linkedPlayer) && !isAdmin}
+        showCreditPanel={!isAdmin}
         onOpenBalanceInsights={() => setIsBalanceInsightsOpen(true)}
         onOpenCredit={() => setIsBankModalOpen(true)}
         onEditProfile={() => setIsProfileEditorOpen(true)}
@@ -222,37 +233,55 @@ export default function App() {
         )}
 
         {/* Main grid: market + sidebar */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          {/* Market takes 2 cols */}
-          <div className="lg:col-span-2">
+        {isAdmin ? (
+          <div className="space-y-8">
+            <AdminDashboard
+              overview={adminOverview}
+              users={adminUsers ?? []}
+              orders={adminOrders ?? []}
+              systemStatus={adminSystemStatus}
+            />
+
             <MarketGrid
               players={players ?? []}
-              onTrade={(playerId, side) => setTrade({ playerId, side })}
+              onTrade={() => undefined}
               onOpenDetails={(playerId) => setSelectedPlayerId(playerId)}
-              canTrade={canTrade}
-              ownPlayerId={user?.linked_player_id ?? null}
+              canTrade={false}
+              ownPlayerId={null}
             />
           </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+              <div className="lg:col-span-2">
+                <MarketGrid
+                  players={players ?? []}
+                  onTrade={(playerId, side) => setTrade({ playerId, side })}
+                  onOpenDetails={(playerId) => setSelectedPlayerId(playerId)}
+                  canTrade={canTrade}
+                  ownPlayerId={user?.linked_player_id ?? null}
+                />
+              </div>
 
-          {/* Sidebar */}
-          <div className="flex flex-col gap-6">
-            <Portfolio
-              portfolio={portfolio}
-              onOpenInsights={() => setIsPortfolioInsightsOpen(true)}
-            />
-            <Leaderboard entries={leaderboard ?? []} />
-            <GambaWidget balance={balance} canTrade={canTrade} />
-          </div>
-        </div>
+              <div className="flex flex-col gap-6">
+                <Portfolio
+                  portfolio={portfolio}
+                  onOpenInsights={() => setIsPortfolioInsightsOpen(true)}
+                />
+                <Leaderboard entries={leaderboard ?? []} />
+                <GambaWidget balance={balance} canTrade={canTrade} />
+              </div>
+            </div>
 
-        {/* Order history */}
-        <div className="mt-6">
-          <OrderHistory
-            ownOrders={orders ?? []}
-            allOrders={recentOrders ?? []}
-            defaultView={isSpectator ? "all" : "own"}
-          />
-        </div>
+            <div className="mt-6">
+              <OrderHistory
+                ownOrders={orders ?? []}
+                allOrders={recentOrders ?? []}
+                defaultView="own"
+              />
+            </div>
+          </>
+        )}
       </main>
 
       {/* Footer */}
@@ -351,13 +380,13 @@ export default function App() {
       )}
 
       {/* First-login onboarding modal */}
-      {isSpectator && (
+      {isAdmin && (
         <div className="pointer-events-none fixed bottom-4 right-4 border-2 border-hex-border bg-hex-panel px-3 py-2 font-mono text-xs uppercase tracking-wider text-hex-bronze">
-          Spectator Mode
+          Admin View
         </div>
       )}
 
-      {user && !user.onboarding_complete && !isSpectator && <OnboardingModal />}
+      {user && !user.onboarding_complete && !isAdmin && <OnboardingModal />}
 
       <FlyingPoro enabled={canTrade} />
     </div>

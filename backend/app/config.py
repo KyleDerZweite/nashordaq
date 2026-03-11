@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -30,7 +31,7 @@ class Settings(BaseSettings):
 
     # Auth (header injected by reverse proxy / Pangolin)
     auth_header: str = "Remote-User"
-    spectator_remote_user: str | None = None
+    admin_remote_users: str = ""
     enforce_trusted_proxy: bool = False
     trusted_proxy_cidrs: str = "127.0.0.1/32,::1/128"
 
@@ -45,8 +46,8 @@ class Settings(BaseSettings):
     gamba_max_hold_hours: float = 168.0
     gamba_settlement_multiplier: float = 2.0
     gamba_max_active_positions_per_user: int = 1
-    bank_interest_rate_per_interval: float = 0.0215
-    bank_interest_interval_hours: float = 72.0
+    bank_interest_rate_per_interval: float = 0.025
+    bank_interest_interval_hours: float = 120.0
     bank_max_borrow_absolute: float = 2500.0
     bank_max_borrow_net_worth_ratio: float = 0.25
     bank_base_credit_limit: float = 250.0
@@ -54,6 +55,8 @@ class Settings(BaseSettings):
     playing_income_base_rate: float = 0.01
     playing_income_loss_multiplier: float = 0.5
     playing_income_min_match_duration_seconds: int = 900
+    playing_income_min_amount: float = 0.15
+    playing_income_start_date: datetime = datetime(2026, 1, 1, tzinfo=UTC)
     playing_income_recent_match_count: int = 10
     poro_enabled: bool = True
     poro_min_interval_minutes: int = 30

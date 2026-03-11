@@ -1,3 +1,5 @@
+from datetime import UTC, datetime
+
 import httpx
 import pytest
 
@@ -152,6 +154,30 @@ async def test_get_recent_match_ids_success(httpx_mock):
         )
 
     assert result == ["EUW1_1", "EUW1_2", "EUW1_3"]
+
+
+async def test_get_recent_match_ids_supports_start_time(httpx_mock):
+    httpx_mock.add_response(
+        url=(
+            f"{BASE_URL}/lol/match/v5/matches/by-puuid/{PUUID}/ids"
+            "?start=0&count=2&startTime=1704067200&queue=420&type=ranked"
+        ),
+        json=["EUW1_10", "EUW1_11"],
+    )
+
+    async with httpx.AsyncClient() as client:
+        result = await get_recent_match_ids(
+            client=client,
+            base_url=BASE_URL,
+            api_key=API_KEY,
+            puuid=PUUID,
+            count=2,
+            start_time=datetime(2024, 1, 1, tzinfo=UTC),
+            queue=420,
+            type="ranked",
+        )
+
+    assert result == ["EUW1_10", "EUW1_11"]
 
 
 async def test_get_match_summary_success(httpx_mock):
