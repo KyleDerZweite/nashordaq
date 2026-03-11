@@ -11,6 +11,7 @@ export type MarketStatus = "healthy" | "degraded" | "idle";
 export type GambaStatus = "ACTIVE" | "SETTLED";
 export type BankLedgerEntryType = "BORROW" | "INTEREST" | "REPAYMENT";
 export type PlayingIncomeMatchResult = "WIN" | "LOSS";
+export type PoroSpawnStatus = "ACTIVE" | "CLAIMED" | "EXPIRED";
 export type UserWealthSnapshotSource =
   | "ONBOARDING"
   | "MARKET_UPDATE"
@@ -236,4 +237,39 @@ export interface MarketAccountResponse {
   game_name: string;
   tag_line: string;
   puuid: string;
+}
+
+export interface PoroSpawnResponse {
+  spawn_id: string;
+  tier: number;
+  tier_label: string;
+  reward_amount: number;
+  asset_key: string;
+  start_x: number;
+  start_y: number;
+  end_x: number;
+  end_y: number;
+  duration_ms: number;
+  spawned_at: string;
+  expires_at: string;
+  status: PoroSpawnStatus;
+}
+
+export interface PoroStateResponse {
+  enabled: boolean;
+  server_time: string;
+  next_roll_at: string | null;
+  active_spawn: PoroSpawnResponse | null;
+}
+
+export interface PoroClaimRequest {
+  spawn_id: string;
+}
+
+export interface PoroClaimResponse {
+  spawn_id: string;
+  tier: number;
+  reward_amount: number;
+  claimed_at: string;
+  balance: number;
 }

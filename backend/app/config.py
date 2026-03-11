@@ -55,6 +55,11 @@ class Settings(BaseSettings):
     playing_income_loss_multiplier: float = 0.5
     playing_income_min_match_duration_seconds: int = 900
     playing_income_recent_match_count: int = 10
+    poro_enabled: bool = True
+    poro_min_interval_minutes: int = 30
+    poro_max_interval_minutes: int = 180
+    poro_spawn_min_duration_seconds: float = 10.0
+    poro_spawn_max_duration_seconds: float = 18.0
 
 
 settings = Settings()

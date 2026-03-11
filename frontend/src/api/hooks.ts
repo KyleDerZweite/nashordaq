@@ -12,6 +12,9 @@ import type {
   PlayerDetail,
   OrderResponse,
   OrderCreate,
+  PoroClaimRequest,
+  PoroClaimResponse,
+  PoroStateResponse,
   UserOnboardingCreate,
   UserProfileUpdate,
   PortfolioResponse,
@@ -34,6 +37,7 @@ export const queryKeys = {
   gamba: ["gamba"] as const,
   bank: ["bank"] as const,
   balanceInsights: ["balanceInsights"] as const,
+  poro: ["poro"] as const,
 };
 
 // ---- Queries ----
@@ -141,6 +145,15 @@ export function useBalanceInsights(enabled = true) {
   });
 }
 
+export function usePoroState(enabled = true) {
+  return useQuery<PoroStateResponse>({
+    queryKey: queryKeys.poro,
+    queryFn: () => get<PoroStateResponse>("/poro"),
+    enabled,
+    refetchInterval: 20_000,
+  });
+}
+
 // ---- Mutations ----
 
 export function usePlaceOrder() {
@@ -243,6 +256,21 @@ export function useRepayBankDebt() {
     mutationFn: (body) => post<BankSummaryResponse>("/bank/repay", body),
     onSuccess: () => {
       invalidateBankRelatedQueries(qc);
+    },
+  });
+}
+
+export function useClaimPoro() {
+  const qc = useQueryClient();
+  return useMutation<PoroClaimResponse, Error, PoroClaimRequest>({
+    mutationFn: (body) => post<PoroClaimResponse>("/poro/claim", body),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.poro });
+      void qc.invalidateQueries({ queryKey: queryKeys.user });
+      void qc.invalidateQueries({ queryKey: queryKeys.balanceInsights });
+      void qc.invalidateQueries({ queryKey: queryKeys.portfolio });
+      void qc.invalidateQueries({ queryKey: queryKeys.bank });
+      void qc.invalidateQueries({ queryKey: queryKeys.leaderboard });
     },
   });
 }

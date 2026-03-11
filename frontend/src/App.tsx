@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import BalanceInsightsModal from "./components/BalanceInsightsModal";
 import Header from "./components/Header";
 import BankModal from "./components/BankModal";
+import FlyingPoro from "./components/FlyingPoro";
 import MarketGrid from "./components/MarketGrid";
 import Portfolio from "./components/Portfolio";
 import PortfolioInsightsModal from "./components/PortfolioInsightsModal";
@@ -357,6 +358,8 @@ export default function App() {
       )}
 
       {user && !user.onboarding_complete && !isSpectator && <OnboardingModal />}
+
+      <FlyingPoro enabled={canTrade} />
     </div>
   );
 }

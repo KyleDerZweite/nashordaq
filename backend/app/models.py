@@ -42,6 +42,21 @@ class PlayingIncomeMatchResult(enum.StrEnum):
     LOSS = "LOSS"
 
 
+class PoroTier(enum.StrEnum):
+    TIER_1 = "TIER_1"
+    TIER_2 = "TIER_2"
+    TIER_3 = "TIER_3"
+    TIER_4 = "TIER_4"
+    TIER_5 = "TIER_5"
+    TIER_6 = "TIER_6"
+
+
+class PoroSpawnStatus(enum.StrEnum):
+    ACTIVE = "ACTIVE"
+    CLAIMED = "CLAIMED"
+    EXPIRED = "EXPIRED"
+
+
 class UserWealthSnapshotSource(enum.StrEnum):
     ONBOARDING = "ONBOARDING"
     MARKET_UPDATE = "MARKET_UPDATE"
@@ -75,6 +90,12 @@ class User(Base):
     )
     wealth_snapshots: Mapped[list["UserWealthSnapshot"]] = relationship(
         back_populates="user"
+    )
+    poro_spawns: Mapped[list["PoroSpawn"]] = relationship(back_populates="user")
+    poro_state: Mapped["UserPoroState | None"] = relationship(
+        back_populates="user",
+        uselist=False,
+        foreign_keys="UserPoroState.user_id",
     )
     linked_player: Mapped["TrackedPlayer | None"] = relationship(
         foreign_keys=[linked_player_id],
@@ -272,6 +293,63 @@ class PlayingIncomeEntry(Base):
     user: Mapped["User"] = relationship()
     player: Mapped["TrackedPlayer"] = relationship(
         back_populates="playing_income_entries"
+    )
+
+
+class PoroSpawn(Base):
+    __tablename__ = "poro_spawns"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    public_id: Mapped[str] = mapped_column(String(32), unique=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    tier: Mapped[PoroTier] = mapped_column(Enum(PoroTier))
+    reward_amount: Mapped[float] = mapped_column(Float)
+    asset_key: Mapped[str] = mapped_column(String(32))
+    start_x: Mapped[float] = mapped_column(Float)
+    start_y: Mapped[float] = mapped_column(Float)
+    end_x: Mapped[float] = mapped_column(Float)
+    end_y: Mapped[float] = mapped_column(Float)
+    duration_ms: Mapped[int] = mapped_column(Integer)
+    spawned_at: Mapped[datetime] = mapped_column(insert_default=func.now(), index=True)
+    expires_at: Mapped[datetime] = mapped_column(index=True)
+    claimed_at: Mapped[datetime | None] = mapped_column(default=None)
+    status: Mapped[PoroSpawnStatus] = mapped_column(
+        Enum(PoroSpawnStatus),
+        default=PoroSpawnStatus.ACTIVE,
+        index=True,
+    )
+
+    user: Mapped["User"] = relationship(back_populates="poro_spawns")
+    state_links: Mapped[list["UserPoroState"]] = relationship(
+        back_populates="active_spawn",
+        foreign_keys="UserPoroState.active_spawn_id",
+    )
+
+
+class UserPoroState(Base):
+    __tablename__ = "user_poro_states"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"), unique=True, index=True
+    )
+    next_roll_at: Mapped[datetime | None] = mapped_column(default=None, index=True)
+    active_spawn_id: Mapped[int | None] = mapped_column(
+        ForeignKey("poro_spawns.id"),
+        default=None,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        insert_default=func.now(),
+        server_default=func.now(),
+    )
+
+    user: Mapped["User"] = relationship(
+        back_populates="poro_state",
+        foreign_keys=[user_id],
+    )
+    active_spawn: Mapped["PoroSpawn | None"] = relationship(
+        back_populates="state_links",
+        foreign_keys=[active_spawn_id],
     )
 
 

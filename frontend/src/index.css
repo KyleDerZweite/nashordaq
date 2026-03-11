@@ -95,3 +95,57 @@ body {
     rgba(0, 0, 0, 0.05) 4px
   );
 }
+
+.poro-flight {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 100;
+  display: block;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  will-change: transform;
+}
+
+.poro-flight__image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+  filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.4));
+}
+
+.poro-reward-burst {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 101;
+  pointer-events: none;
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: var(--color-hex-gold);
+  text-transform: uppercase;
+  text-shadow: 0 0 14px rgba(200, 170, 110, 0.55);
+  animation: poro-reward-rise 1.6s ease-out forwards;
+}
+
+@keyframes poro-reward-rise {
+  0% {
+    opacity: 0;
+  }
+
+  12% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate3d(0, -24px, 0);
+  }
+}

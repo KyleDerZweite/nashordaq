@@ -10,6 +10,7 @@ from app.models import (
     OrderSource,
     OrderStatus,
     PlayingIncomeMatchResult,
+    PoroSpawnStatus,
     UserWealthSnapshotSource,
 )
 
@@ -224,3 +225,38 @@ class MarketAccountResponse(BaseModel):
     game_name: str
     tag_line: str
     puuid: str
+
+
+class PoroSpawnResponse(BaseModel):
+    spawn_id: str
+    tier: int
+    tier_label: str
+    reward_amount: float
+    asset_key: str
+    start_x: float
+    start_y: float
+    end_x: float
+    end_y: float
+    duration_ms: int
+    spawned_at: datetime
+    expires_at: datetime
+    status: PoroSpawnStatus
+
+
+class PoroStateResponse(BaseModel):
+    enabled: bool
+    server_time: datetime
+    next_roll_at: datetime | None
+    active_spawn: PoroSpawnResponse | None
+
+
+class PoroClaimRequest(BaseModel):
+    spawn_id: str = Field(min_length=1, max_length=32)
+
+
+class PoroClaimResponse(BaseModel):
+    spawn_id: str
+    tier: int
+    reward_amount: float
+    claimed_at: datetime
+    balance: float

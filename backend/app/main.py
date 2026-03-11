@@ -18,7 +18,16 @@ from app.riot import (
     get_account_by_riot_id,
     get_rank,
 )
-from app.routers import bank, gamba, leaderboard, market, orders, portfolio, user
+from app.routers import (
+    bank,
+    gamba,
+    leaderboard,
+    market,
+    orders,
+    poro,
+    portfolio,
+    user,
+)
 from app.scheduler import (
     classify_market_status,
     get_last_market_update_at,
@@ -70,6 +79,7 @@ app.include_router(market.router, prefix="/api")
 app.include_router(orders.router, prefix="/api")
 app.include_router(gamba.router, prefix="/api")
 app.include_router(bank.router, prefix="/api")
+app.include_router(poro.router, prefix="/api")
 app.include_router(portfolio.router, prefix="/api")
 app.include_router(leaderboard.router, prefix="/api")
 

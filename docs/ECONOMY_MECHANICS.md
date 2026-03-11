@@ -186,3 +186,34 @@ Examples:
 - Reward history is stored immutably for bank-summary reporting and auditability.
 
 Implementation: `app/riot.py`, `app/scheduler.py`, `app/banking.py`, `app/routers/bank.py`
+
+## 8. Poro Flyby Reward
+
+Nashordaq can occasionally spawn a small clickable poro that flies across the UI and grants a flat cash reward when claimed before it leaves the screen.
+
+### Spawn Rules
+
+- Scheduling is per-user and server-authoritative.
+- Each completed interval rolls a result between `30 minutes` and `3 hours`.
+- Some intervals intentionally produce no poro.
+- Only one active poro can exist per user at a time.
+- Rewards can be claimed once and expire when the poro flight ends.
+
+### Current Tier Odds And Flat Rewards
+
+- `No spawn`: `55.0%`
+- `Tier 1`: `26.0%`, reward `2`
+- `Tier 2`: `11.0%`, reward `4`
+- `Tier 3`: `4.5%`, reward `7`
+- `Tier 4`: `2.2%`, reward `12`
+- `Tier 5`: `1.0%`, reward `18`
+- `Tier 6`: `0.3%`, reward `30`
+
+### Processing Rules
+
+- Claim validation happens on the backend, not in the browser.
+- A poro claim credits cash immediately and records the change in user wealth history.
+- Duplicate or expired claims are rejected.
+- This mechanic is intentionally small and separate from LP-driven pricing, order execution, bank debt, and Playing Income.
+
+Implementation: `app/poro.py`, `app/routers/poro.py`, `frontend/src/components/FlyingPoro.tsx`
