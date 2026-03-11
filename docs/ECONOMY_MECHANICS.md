@@ -203,15 +203,15 @@ Nashordaq can occasionally spawn a small clickable poro that flies across the UI
 
 ### Current Tier Odds And Flat Rewards
 
-- `No spawn`: `57.0%`
-- `Tier 1`: `26.0%`, reward `6`
-- `Tier 2`: `10.0%`, reward `12`
-- `Tier 3`: `4.5%`, reward `24`
-- `Tier 4`: `1.7%`, reward `50`
-- `Tier 5`: `0.7%`, reward `100`
-- `Tier 6`: `0.1%`, reward `220`
+- `No spawn`: `50.2864%`
+- `Tier 1`: `20.0%`, reward `5`
+- `Tier 2`: `12.5%`, reward `8`
+- `Tier 3`: `7.6923%`, reward `13`
+- `Tier 4`: `4.7619%`, reward `21`
+- `Tier 5`: `2.9412%`, reward `34`
+- `Tier 6`: `1.8182%`, reward `55`
 
-This table yields an average payout of about `5.61` per roll, including `No spawn` outcomes, with a much stronger jackpot shape at the top end.
+This table uses `1 / reward` as the spawn probability for each reward tier, with the remainder allocated to `No spawn`. That yields an average payout of about `6.0` per roll, including `No spawn` outcomes.
 
 ### Processing Rules
 

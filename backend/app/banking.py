@@ -361,9 +361,10 @@ async def build_balance_insights_summary(
 ) -> BalanceInsightsSummary:
     snapshot = await build_account_snapshot(session, user, as_of=as_of)
     playing_income = await build_playing_income_summary(session, user, as_of=as_of)
-    poro_rewards_last_24h, poro_rewards_lifetime_total = (
-        await build_poro_rewards_summary(session, user, as_of=as_of)
-    )
+    (
+        poro_rewards_last_24h,
+        poro_rewards_lifetime_total,
+    ) = await build_poro_rewards_summary(session, user, as_of=as_of)
     history_result = await session.execute(
         select(UserWealthSnapshot)
         .where(UserWealthSnapshot.user_id == user.id)
