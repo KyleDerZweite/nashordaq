@@ -260,6 +260,65 @@ class AdminUserPortfolioResponse(BaseModel):
     portfolio: PortfolioResponse
 
 
+class AdminPlayerPlayingIncomeEntryResponse(BaseModel):
+    match_id: str
+    match_result: PlayingIncomeMatchResult
+    match_completed_at: datetime
+    amount: float
+    share_price: float
+    outcome_multiplier: float
+
+
+class AdminPlayerPoroRewardResponse(BaseModel):
+    spawn_id: str
+    reward_amount: float
+    spawned_at: datetime
+    claimed_at: datetime | None
+    status: PoroSpawnStatus
+
+
+class AdminPlayerInsightResponse(BaseModel):
+    player_id: int
+    display_name: str
+    game_name: str
+    tag_line: str
+    linked_user_id: int | None
+    linked_username: str | None
+    linked_user_balance: float | None
+    linked_user_holdings_value: float | None
+    linked_user_active_gamba_value: float | None
+    linked_user_debt_outstanding: float | None
+    linked_user_net_worth: float | None
+    current_price: float
+    lp_abs: int
+    previous_lp_abs: int
+    lp_delta: int
+    streak: int
+    effective_positive_streak: int
+    gamma_factor: float
+    ranked_wins_snapshot: int | None
+    ranked_losses_snapshot: int | None
+    estimated_win_rate: float | None
+    estimated_win_rate_multiplier: float | None
+    avg_lp_gain_on_win: float | None
+    avg_lp_loss_on_loss: float | None
+    estimated_lp_ratio_raw: float | None
+    estimated_lp_ratio_clamped: float
+    estimated_streak_multiplier: float
+    shareholder_count: int
+    total_shares_held: int
+    active_gamba_positions: int
+    active_gamba_cash: float
+    playing_income_game_count: int
+    playing_income_lifetime_total: float
+    playing_income_average_per_game: float | None
+    playing_income_last_24h: float
+    poro_claim_count: int
+    poro_rewards_total: float
+    recent_playing_income_entries: list[AdminPlayerPlayingIncomeEntryResponse]
+    recent_poro_rewards: list[AdminPlayerPoroRewardResponse]
+
+
 class LeaderboardEntry(BaseModel):
     display_name: str
     game_name: str

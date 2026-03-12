@@ -11,6 +11,7 @@ interface Props {
   onOpenDetails: (playerId: number) => void;
   canTrade?: boolean;
   ownPlayerId?: number | null;
+  showTradeActions?: boolean;
 }
 
 export default function MarketGrid({
@@ -19,6 +20,7 @@ export default function MarketGrid({
   onOpenDetails,
   canTrade = true,
   ownPlayerId = null,
+  showTradeActions = true,
 }: Props) {
   const [sortField, setSortField] = useState<MarketSortField>("value");
   const [sortDirection, setSortDirection] =
@@ -120,6 +122,7 @@ export default function MarketGrid({
             onOpenDetails={onOpenDetails}
             canTrade={canTrade}
             isOwnStock={ownPlayerId === p.id}
+            showTradeActions={showTradeActions}
           />
         ))}
       </div>

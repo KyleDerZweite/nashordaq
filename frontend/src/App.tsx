@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import BalanceInsightsModal from "./components/BalanceInsightsModal";
 import AdminDashboard from "./components/admin/AdminDashboard";
 import Header from "./components/Header";
@@ -23,6 +23,7 @@ import {
   useBankSummary,
   useAdminOrders,
   useAdminOverview,
+  useAdminPlayerInsights,
   useAdminSystemStatus,
   useAdminUsers,
   useUser,
@@ -41,6 +42,18 @@ interface TradeTarget {
 }
 
 type TickerSortMode = "value" | "name";
+type AdminViewMode = "spectator" | "admin";
+
+const ADMIN_VIEW_MODE_STORAGE_KEY = "nashordaq.adminViewMode";
+
+function getInitialAdminViewMode(): AdminViewMode {
+  if (typeof window === "undefined") {
+    return "spectator";
+  }
+
+  const storedValue = window.localStorage.getItem(ADMIN_VIEW_MODE_STORAGE_KEY);
+  return storedValue === "admin" ? "admin" : "spectator";
+}
 
 export default function App() {
   const { isStreamerMode } = useStreamerMode();
@@ -51,6 +64,9 @@ export default function App() {
   const [isBalanceInsightsOpen, setIsBalanceInsightsOpen] = useState(false);
   const [isBankModalOpen, setIsBankModalOpen] = useState(false);
   const [isPortfolioInsightsOpen, setIsPortfolioInsightsOpen] = useState(false);
+  const [adminViewMode, setAdminViewMode] = useState<AdminViewMode>(
+    getInitialAdminViewMode,
+  );
 
   const { data: user } = useUser();
   const onboardingComplete = user?.onboarding_complete ?? false;
@@ -65,12 +81,27 @@ export default function App() {
   const { data: adminUsers } = useAdminUsers(isAdmin);
   const { data: adminOrders } = useAdminOrders(isAdmin);
   const { data: adminSystemStatus } = useAdminSystemStatus(isAdmin);
+  const { data: adminPlayerInsights } = useAdminPlayerInsights(
+    isAdmin && adminViewMode === "admin",
+  );
   const updateUserProfile = useUpdateUserProfile();
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.localStorage.setItem(ADMIN_VIEW_MODE_STORAGE_KEY, adminViewMode);
+  }, [adminViewMode]);
 
   const balance = user?.balance ?? 0;
   const canTrade =
     Boolean(user) && user?.role === "player" && onboardingComplete;
   const canManageBank = canTrade;
+  const effectiveAdminViewMode: AdminViewMode = isAdmin
+    ? adminViewMode
+    : "spectator";
+  const isAdminSpectator = isAdmin && effectiveAdminViewMode === "spectator";
   const { data: bankSummary } = useBankSummary(canManageBank);
 
   const tradePlayer =
@@ -149,13 +180,20 @@ export default function App() {
         playerDisplayName={linkedPlayer?.display_name}
         playerGameName={linkedPlayer?.game_name}
         canEditProfile={Boolean(linkedPlayer) && !isAdmin}
+        canToggleAdminView={isAdmin}
+        adminViewMode={effectiveAdminViewMode}
         onOpenBalanceInsights={() => setIsBalanceInsightsOpen(true)}
         onEditProfile={() => setIsProfileEditorOpen(true)}
+        onToggleAdminView={() =>
+          setAdminViewMode((current) =>
+            current === "admin" ? "spectator" : "admin",
+          )
+        }
       />
 
       <main className="mx-auto w-full max-w-[88rem] flex-1 px-6 py-8">
         {/* Market ticker bar */}
-        {players && players.length > 0 && (
+        {players && players.length > 0 && (!isAdmin || isAdminSpectator) && (
           <div className="mb-8 overflow-hidden border-2 border-hex-border bg-hex-bg-alt">
             <div className="flex items-center justify-between border-b-2 border-hex-border px-4 py-2">
               <span className="font-mono text-xs font-bold uppercase tracking-wider text-hex-bronze">
@@ -236,22 +274,69 @@ export default function App() {
 
         {/* Main grid: market + sidebar */}
         {isAdmin ? (
-          <div className="space-y-8">
-            <AdminDashboard
-              overview={adminOverview}
-              users={adminUsers ?? []}
-              orders={adminOrders ?? []}
-              systemStatus={adminSystemStatus}
-            />
+          isAdminSpectator ? (
+            <>
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+                <div className="lg:col-span-2">
+                  <MarketGrid
+                    players={players ?? []}
+                    onTrade={() => undefined}
+                    onOpenDetails={(playerId) => setSelectedPlayerId(playerId)}
+                    canTrade={false}
+                    ownPlayerId={null}
+                    showTradeActions={false}
+                  />
+                </div>
 
-            <MarketGrid
-              players={players ?? []}
-              onTrade={() => undefined}
-              onOpenDetails={(playerId) => setSelectedPlayerId(playerId)}
-              canTrade={false}
-              ownPlayerId={null}
-            />
-          </div>
+                <div className="flex flex-col gap-6">
+                  <section className="border-2 border-hex-gold-dim bg-hex-panel px-5 py-4">
+                    <h2 className="font-serif text-xl font-bold text-hex-gold">
+                      Spectator Mode
+                    </h2>
+                    <p className="mt-2 font-mono text-sm leading-6 text-hex-bronze">
+                      Admin is viewing the player-facing market shell in
+                      read-only mode. Trading, selling, gamba, and other player
+                      actions stay disabled here.
+                    </p>
+                    <div className="mt-4 grid gap-3 font-mono text-xs text-hex-bronze">
+                      <div className="border border-hex-border bg-hex-bg-alt px-3 py-2">
+                        Market status:{" "}
+                        {adminSystemStatus?.market_status ?? "idle"}
+                      </div>
+                      <div className="border border-hex-border bg-hex-bg-alt px-3 py-2">
+                        Scheduler:{" "}
+                        {adminSystemStatus?.scheduler_running
+                          ? "Running"
+                          : "Stopped"}
+                      </div>
+                    </div>
+                  </section>
+
+                  <Leaderboard entries={leaderboard ?? []} />
+                </div>
+              </div>
+
+              <div className="mt-6">
+                <OrderHistory
+                  ownOrders={adminOrders ?? []}
+                  allOrders={adminOrders ?? []}
+                  defaultView="all"
+                  allowViewToggle={false}
+                  title="Market Activity"
+                />
+              </div>
+            </>
+          ) : (
+            <div className="space-y-8">
+              <AdminDashboard
+                overview={adminOverview}
+                users={adminUsers ?? []}
+                orders={adminOrders ?? []}
+                systemStatus={adminSystemStatus}
+                playerInsights={adminPlayerInsights ?? []}
+              />
+            </div>
+          )
         ) : (
           <>
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -391,7 +476,9 @@ export default function App() {
       {/* First-login onboarding modal */}
       {isAdmin && (
         <div className="pointer-events-none fixed bottom-4 right-4 border-2 border-hex-border bg-hex-panel px-3 py-2 font-mono text-xs uppercase tracking-wider text-hex-bronze">
-          Admin View
+          {effectiveAdminViewMode === "admin"
+            ? "Admin View"
+            : "Admin Spectator"}
         </div>
       )}
 

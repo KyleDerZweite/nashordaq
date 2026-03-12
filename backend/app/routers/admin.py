@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -7,8 +7,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import CurrentAdminUser, get_user_role
 from app.banking import build_account_snapshot, restore_rescue_loan_use
+from app.config import settings
 from app.database import get_session
-from app.models import Order, OrderStatus, TrackedPlayer, User
+from app.models import (
+    GambaPosition,
+    GambaStatus,
+    Holding,
+    Order,
+    OrderStatus,
+    PlayingIncomeEntry,
+    PoroSpawn,
+    PoroSpawnStatus,
+    TrackedPlayer,
+    User,
+)
+from app.pricing import BETA, WIN_RATE_NEUTRAL, calculate_win_rate
 from app.routers.orders import build_order_responses
 from app.routers.portfolio import build_portfolio_response
 from app.scheduler import (
@@ -19,6 +32,9 @@ from app.scheduler import (
 )
 from app.schemas import (
     AdminOverviewResponse,
+    AdminPlayerInsightResponse,
+    AdminPlayerPlayingIncomeEntryResponse,
+    AdminPlayerPoroRewardResponse,
     AdminUserPortfolioResponse,
     AdminUserSummaryResponse,
     OrderResponse,
@@ -69,6 +85,60 @@ async def _build_admin_user_portfolio_response(
         rescue_loan_block_reason=snapshot.rescue_loan_block_reason,
         portfolio=await build_portfolio_response(session, user),
     )
+
+
+def _clamp(value: float, lower: float, upper: float) -> float:
+    return max(lower, min(upper, value))
+
+
+def _estimate_ratio_metrics(
+    player: TrackedPlayer,
+) -> tuple[float | None, float, int, float]:
+    raw_ratio: float | None = None
+    if (
+        player.avg_lp_loss_on_loss is not None
+        and player.avg_lp_gain_on_win is not None
+        and player.avg_lp_loss_on_loss > 0
+        and player.avg_lp_gain_on_win > 0
+    ):
+        raw_ratio = player.avg_lp_loss_on_loss / player.avg_lp_gain_on_win
+
+    clamped_ratio = (
+        settings.pricing_win_streak_lp_ratio_default
+        if raw_ratio is None
+        else _clamp(
+            raw_ratio,
+            settings.pricing_win_streak_lp_ratio_min,
+            settings.pricing_win_streak_lp_ratio_max,
+        )
+    )
+    effective_positive_streak = min(
+        max(player.streak, 0),
+        max(1, settings.pricing_max_effective_streak),
+    )
+    streak_multiplier = 1 + (BETA * effective_positive_streak * clamped_ratio)
+    return raw_ratio, clamped_ratio, effective_positive_streak, streak_multiplier
+
+
+def _estimate_win_rate_metrics(
+    player: TrackedPlayer,
+) -> tuple[float | None, float | None]:
+    if (
+        player.ranked_wins_snapshot is None
+        or player.ranked_losses_snapshot is None
+        or player.ranked_wins_snapshot < 0
+        or player.ranked_losses_snapshot < 0
+    ):
+        return None, None
+
+    estimated_win_rate = calculate_win_rate(
+        player.ranked_wins_snapshot,
+        player.ranked_losses_snapshot,
+    )
+    estimated_win_rate_multiplier = 1 + (
+        (estimated_win_rate - WIN_RATE_NEUTRAL) * settings.pricing_win_rate_price_weight
+    )
+    return estimated_win_rate, estimated_win_rate_multiplier
 
 
 @router.get("/overview", response_model=AdminOverviewResponse)
@@ -173,6 +243,215 @@ async def list_admin_users(
         )
 
     return sorted(summaries, key=lambda summary: summary.total_value, reverse=True)
+
+
+@router.get("/players/insights", response_model=list[AdminPlayerInsightResponse])
+async def list_admin_player_insights(
+    admin_user: CurrentAdminUser,
+    session: SessionDep,
+) -> list[AdminPlayerInsightResponse]:
+    del admin_user
+
+    players_result = await session.execute(
+        select(TrackedPlayer).order_by(
+            TrackedPlayer.current_price.desc(),
+            TrackedPlayer.display_name.asc(),
+        )
+    )
+    players = players_result.scalars().all()
+
+    users_result = await session.execute(select(User))
+    users = users_result.scalars().all()
+    user_by_linked_player = {
+        user.linked_player_id: user
+        for user in users
+        if user.linked_player_id is not None
+    }
+
+    shareholder_result = await session.execute(
+        select(
+            Holding.player_id,
+            func.count(Holding.user_id.distinct()),
+            func.coalesce(func.sum(Holding.quantity), 0),
+        ).group_by(Holding.player_id)
+    )
+    shareholder_map = {
+        player_id: (shareholder_count or 0, total_shares or 0)
+        for player_id, shareholder_count, total_shares in shareholder_result.all()
+    }
+
+    gamba_result = await session.execute(
+        select(
+            GambaPosition.player_id,
+            func.count(GambaPosition.id),
+            func.coalesce(func.sum(GambaPosition.cash_amount), 0.0),
+        )
+        .where(GambaPosition.status == GambaStatus.ACTIVE)
+        .group_by(GambaPosition.player_id)
+    )
+    gamba_map = {
+        player_id: (active_positions or 0, active_cash or 0.0)
+        for player_id, active_positions, active_cash in gamba_result.all()
+    }
+
+    now = datetime.now(UTC)
+    last_24h = now.replace(tzinfo=UTC) - timedelta(hours=24)
+    insights: list[AdminPlayerInsightResponse] = []
+
+    for player in players:
+        linked_user = user_by_linked_player.get(player.id)
+        linked_snapshot = (
+            await build_account_snapshot(session, linked_user)
+            if linked_user is not None
+            else None
+        )
+
+        shareholder_count, total_shares = shareholder_map.get(player.id, (0, 0))
+        active_gamba_positions, active_gamba_cash = gamba_map.get(player.id, (0, 0.0))
+
+        playing_income_entries_result = await session.execute(
+            select(PlayingIncomeEntry)
+            .where(PlayingIncomeEntry.player_id == player.id)
+            .order_by(PlayingIncomeEntry.match_completed_at.desc())
+        )
+        playing_income_entries = playing_income_entries_result.scalars().all()
+        playing_income_lifetime_total = round(
+            sum(entry.amount for entry in playing_income_entries), 2
+        )
+        playing_income_game_count = len(playing_income_entries)
+        playing_income_average_per_game = (
+            round(playing_income_lifetime_total / playing_income_game_count, 2)
+            if playing_income_game_count > 0
+            else None
+        )
+        playing_income_last_24h = round(
+            sum(
+                entry.amount
+                for entry in playing_income_entries
+                if (
+                    entry.match_completed_at.replace(tzinfo=UTC)
+                    if entry.match_completed_at.tzinfo is None
+                    else entry.match_completed_at.astimezone(UTC)
+                )
+                >= last_24h
+            ),
+            2,
+        )
+
+        poro_rewards: list[PoroSpawn] = []
+        poro_rewards_total = 0.0
+        poro_claim_count = 0
+        if linked_user is not None:
+            poro_rewards_result = await session.execute(
+                select(PoroSpawn)
+                .where(PoroSpawn.user_id == linked_user.id)
+                .order_by(PoroSpawn.spawned_at.desc())
+            )
+            poro_rewards = poro_rewards_result.scalars().all()
+            claimed_rewards = [
+                spawn
+                for spawn in poro_rewards
+                if spawn.status == PoroSpawnStatus.CLAIMED
+            ]
+            poro_rewards_total = round(
+                sum(spawn.reward_amount for spawn in claimed_rewards),
+                2,
+            )
+            poro_claim_count = len(claimed_rewards)
+
+        raw_ratio, clamped_ratio, effective_positive_streak, streak_multiplier = (
+            _estimate_ratio_metrics(player)
+        )
+        estimated_win_rate, estimated_win_rate_multiplier = _estimate_win_rate_metrics(
+            player
+        )
+
+        insights.append(
+            AdminPlayerInsightResponse(
+                player_id=player.id,
+                display_name=player.display_name,
+                game_name=player.game_name,
+                tag_line=player.tag_line,
+                linked_user_id=linked_user.id if linked_user is not None else None,
+                linked_username=(
+                    linked_user.username if linked_user is not None else None
+                ),
+                linked_user_balance=(
+                    linked_snapshot.cash_balance
+                    if linked_snapshot is not None
+                    else None
+                ),
+                linked_user_holdings_value=(
+                    linked_snapshot.holdings_value
+                    if linked_snapshot is not None
+                    else None
+                ),
+                linked_user_active_gamba_value=(
+                    linked_snapshot.active_gamba_value
+                    if linked_snapshot is not None
+                    else None
+                ),
+                linked_user_debt_outstanding=(
+                    linked_snapshot.debt_outstanding
+                    if linked_snapshot is not None
+                    else None
+                ),
+                linked_user_net_worth=(
+                    linked_snapshot.debt_adjusted_net_worth
+                    if linked_snapshot is not None
+                    else None
+                ),
+                current_price=player.current_price,
+                lp_abs=player.lp_abs,
+                previous_lp_abs=player.previous_lp_abs,
+                lp_delta=player.lp_abs - player.previous_lp_abs,
+                streak=player.streak,
+                effective_positive_streak=effective_positive_streak,
+                gamma_factor=player.gamma_factor,
+                ranked_wins_snapshot=player.ranked_wins_snapshot,
+                ranked_losses_snapshot=player.ranked_losses_snapshot,
+                estimated_win_rate=estimated_win_rate,
+                estimated_win_rate_multiplier=estimated_win_rate_multiplier,
+                avg_lp_gain_on_win=player.avg_lp_gain_on_win,
+                avg_lp_loss_on_loss=player.avg_lp_loss_on_loss,
+                estimated_lp_ratio_raw=raw_ratio,
+                estimated_lp_ratio_clamped=clamped_ratio,
+                estimated_streak_multiplier=streak_multiplier,
+                shareholder_count=shareholder_count,
+                total_shares_held=total_shares,
+                active_gamba_positions=active_gamba_positions,
+                active_gamba_cash=round(active_gamba_cash, 2),
+                playing_income_game_count=playing_income_game_count,
+                playing_income_lifetime_total=playing_income_lifetime_total,
+                playing_income_average_per_game=playing_income_average_per_game,
+                playing_income_last_24h=playing_income_last_24h,
+                poro_claim_count=poro_claim_count,
+                poro_rewards_total=poro_rewards_total,
+                recent_playing_income_entries=[
+                    AdminPlayerPlayingIncomeEntryResponse(
+                        match_id=entry.match_id,
+                        match_result=entry.match_result,
+                        match_completed_at=entry.match_completed_at,
+                        amount=entry.amount,
+                        share_price=entry.share_price,
+                        outcome_multiplier=entry.outcome_multiplier,
+                    )
+                    for entry in playing_income_entries[:5]
+                ],
+                recent_poro_rewards=[
+                    AdminPlayerPoroRewardResponse(
+                        spawn_id=spawn.public_id,
+                        reward_amount=spawn.reward_amount,
+                        spawned_at=spawn.spawned_at,
+                        claimed_at=spawn.claimed_at,
+                        status=spawn.status,
+                    )
+                    for spawn in poro_rewards[:5]
+                ],
+            )
+        )
+
+    return insights
 
 
 @router.get("/users/{user_id}/portfolio", response_model=AdminUserPortfolioResponse)

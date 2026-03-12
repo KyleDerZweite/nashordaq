@@ -10,8 +10,11 @@ export default function Header({
   playerDisplayName,
   playerGameName,
   canEditProfile = false,
+  canToggleAdminView = false,
+  adminViewMode = "spectator",
   onOpenBalanceInsights,
   onEditProfile,
+  onToggleAdminView,
 }: {
   balance: number;
   netWorth?: number;
@@ -19,8 +22,11 @@ export default function Header({
   playerDisplayName?: string;
   playerGameName?: string;
   canEditProfile?: boolean;
+  canToggleAdminView?: boolean;
+  adminViewMode?: "spectator" | "admin";
   onOpenBalanceInsights?: () => void;
   onEditProfile?: () => void;
+  onToggleAdminView?: () => void;
 }) {
   const { isStreamerMode, toggleStreamerMode } = useStreamerMode();
   const initial = username ? username[0].toUpperCase() : "?";
@@ -99,6 +105,17 @@ export default function Header({
                 >
                   Streamer Mode: {isStreamerMode ? "On" : "Off"}
                 </button>
+
+                {canToggleAdminView && (
+                  <button
+                    type="button"
+                    onClick={onToggleAdminView}
+                    className="mt-3 w-full border border-hex-border px-3 py-2 text-left font-mono text-xs font-bold uppercase tracking-wider text-hex-bronze transition-colors hover:border-hex-gold hover:text-hex-gold"
+                  >
+                    View Mode:{" "}
+                    {adminViewMode === "admin" ? "Admin" : "Spectator"}
+                  </button>
+                )}
 
                 <button
                   type="button"

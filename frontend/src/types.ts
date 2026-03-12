@@ -258,6 +258,65 @@ export interface AdminUserPortfolioResponse {
   portfolio: PortfolioResponse;
 }
 
+export interface AdminPlayerPlayingIncomeEntryResponse {
+  match_id: string;
+  match_result: PlayingIncomeMatchResult;
+  match_completed_at: string;
+  amount: number;
+  share_price: number;
+  outcome_multiplier: number;
+}
+
+export interface AdminPlayerPoroRewardResponse {
+  spawn_id: string;
+  reward_amount: number;
+  spawned_at: string;
+  claimed_at: string | null;
+  status: PoroSpawnStatus;
+}
+
+export interface AdminPlayerInsightResponse {
+  player_id: number;
+  display_name: string;
+  game_name: string;
+  tag_line: string;
+  linked_user_id: number | null;
+  linked_username: string | null;
+  linked_user_balance: number | null;
+  linked_user_holdings_value: number | null;
+  linked_user_active_gamba_value: number | null;
+  linked_user_debt_outstanding: number | null;
+  linked_user_net_worth: number | null;
+  current_price: number;
+  lp_abs: number;
+  previous_lp_abs: number;
+  lp_delta: number;
+  streak: number;
+  effective_positive_streak: number;
+  gamma_factor: number;
+  ranked_wins_snapshot: number | null;
+  ranked_losses_snapshot: number | null;
+  estimated_win_rate: number | null;
+  estimated_win_rate_multiplier: number | null;
+  avg_lp_gain_on_win: number | null;
+  avg_lp_loss_on_loss: number | null;
+  estimated_lp_ratio_raw: number | null;
+  estimated_lp_ratio_clamped: number;
+  estimated_streak_multiplier: number;
+  shareholder_count: number;
+  total_shares_held: number;
+  active_gamba_positions: number;
+  active_gamba_cash: number;
+  playing_income_game_count: number;
+  playing_income_lifetime_total: number;
+  playing_income_average_per_game: number | null;
+  playing_income_last_24h: number;
+  poro_claim_count: number;
+  poro_rewards_total: number;
+  recent_playing_income_entries: AdminPlayerPlayingIncomeEntryResponse[];
+  recent_poro_rewards: AdminPlayerPoroRewardResponse[];
+}
+
 export interface LeaderboardEntry {
   display_name: string;
   game_name: string;

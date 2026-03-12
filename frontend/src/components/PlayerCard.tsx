@@ -9,6 +9,7 @@ interface Props {
   onOpenDetails: (playerId: number) => void;
   canTrade?: boolean;
   isOwnStock?: boolean;
+  showTradeActions?: boolean;
 }
 
 export default function PlayerCard({
@@ -17,6 +18,7 @@ export default function PlayerCard({
   onOpenDetails,
   canTrade = true,
   isOwnStock = false,
+  showTradeActions = true,
 }: Props) {
   const { isStreamerMode } = useStreamerMode();
   const canBuy = canTrade && player.last_updated !== null && !isOwnStock;
@@ -91,45 +93,46 @@ export default function PlayerCard({
         </div>
       </button>
 
-      {/* Action row */}
-      <div className="mt-4 flex gap-2">
-        <button
-          disabled={!canBuy}
-          onClick={() => onTrade(player.id, "BUY")}
-          className={`flex-1 border-2 py-1.5 font-mono text-xs font-bold uppercase tracking-wider transition-colors ${
-            canBuy
-              ? "border-hex-magic bg-transparent text-hex-magic hover:bg-hex-magic hover:text-hex-bg"
-              : "cursor-not-allowed border-hex-border text-hex-border"
-          }`}
-        >
-          {!canTrade
-            ? "Admin"
-            : isOwnStock
-              ? "Own Stock"
-              : canBuy
-                ? "Buy"
-                : "Awaiting Update"}
-        </button>
-        <button
-          disabled={!canTrade}
-          onClick={() => onTrade(player.id, "SELL")}
-          className={`flex-1 border-2 py-1.5 font-mono text-xs font-bold uppercase tracking-wider transition-colors ${
-            canTrade
-              ? "border-hex-zaun bg-transparent text-hex-zaun hover:bg-hex-zaun hover:text-hex-bg"
-              : "cursor-not-allowed border-hex-border text-hex-border"
-          }`}
-        >
-          Sell
-        </button>
-      </div>
+      {showTradeActions && (
+        <div className="mt-4 flex gap-2">
+          <button
+            disabled={!canBuy}
+            onClick={() => onTrade(player.id, "BUY")}
+            className={`flex-1 border-2 py-1.5 font-mono text-xs font-bold uppercase tracking-wider transition-colors ${
+              canBuy
+                ? "border-hex-magic bg-transparent text-hex-magic hover:bg-hex-magic hover:text-hex-bg"
+                : "cursor-not-allowed border-hex-border text-hex-border"
+            }`}
+          >
+            {!canTrade
+              ? "Admin"
+              : isOwnStock
+                ? "Own Stock"
+                : canBuy
+                  ? "Buy"
+                  : "Awaiting Update"}
+          </button>
+          <button
+            disabled={!canTrade}
+            onClick={() => onTrade(player.id, "SELL")}
+            className={`flex-1 border-2 py-1.5 font-mono text-xs font-bold uppercase tracking-wider transition-colors ${
+              canTrade
+                ? "border-hex-zaun bg-transparent text-hex-zaun hover:bg-hex-zaun hover:text-hex-bg"
+                : "cursor-not-allowed border-hex-border text-hex-border"
+            }`}
+          >
+            Sell
+          </button>
+        </div>
+      )}
 
-      {player.last_updated === null && (
+      {showTradeActions && player.last_updated === null && (
         <p className="mt-3 font-mono text-xs text-hex-bronze">
           Buying unlocks after the first market update.
         </p>
       )}
 
-      {isOwnStock && (
+      {showTradeActions && isOwnStock && (
         <p className="mt-3 font-mono text-xs text-hex-bronze">
           You cannot buy your own stock.
         </p>

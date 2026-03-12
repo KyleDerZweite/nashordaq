@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { get, post, put, del } from "./client";
 import type {
   AdminOverviewResponse,
+  AdminPlayerInsightResponse,
   AdminUserPortfolioResponse,
   AdminUserSummaryResponse,
   BalanceInsightsResponse,
@@ -42,6 +43,7 @@ export const queryKeys = {
   adminUsers: ["adminUsers"] as const,
   adminOrders: ["adminOrders"] as const,
   adminSystemStatus: ["adminSystemStatus"] as const,
+  adminPlayerInsights: ["adminPlayerInsights"] as const,
   adminUserPortfolio: (userId: number) =>
     ["adminUserPortfolio", userId] as const,
   gamba: ["gamba"] as const,
@@ -244,6 +246,15 @@ export function useAdminSystemStatus(enabled = true) {
   return useQuery<SystemStatusResponse>({
     queryKey: queryKeys.adminSystemStatus,
     queryFn: () => get<SystemStatusResponse>("/admin/system/status"),
+    enabled,
+    refetchInterval: 30_000,
+  });
+}
+
+export function useAdminPlayerInsights(enabled = true) {
+  return useQuery<AdminPlayerInsightResponse[]>({
+    queryKey: queryKeys.adminPlayerInsights,
+    queryFn: () => get<AdminPlayerInsightResponse[]>("/admin/players/insights"),
     enabled,
     refetchInterval: 30_000,
   });

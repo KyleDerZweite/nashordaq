@@ -1,8 +1,18 @@
+from datetime import UTC, datetime
+
 from httpx import ASGITransport, AsyncClient
 
 from app.config import settings
 from app.main import app
-from app.models import User
+from app.models import (
+    PlayingIncomeEntry,
+    PlayingIncomeMatchResult,
+    PoroSpawn,
+    PoroSpawnStatus,
+    PoroTier,
+    TrackedPlayer,
+    User,
+)
 
 
 async def test_admin_overview_requires_admin(auth_client):
@@ -129,3 +139,80 @@ async def test_admin_can_restore_a_spent_rescue_use(
     assert data["rescue_loan_uses_remaining"] == 1
     assert data["rescue_loan_available"] is True
     assert data["rescue_loan_block_reason"] is None
+
+
+async def test_admin_can_view_player_insights(auth_client, db_session, monkeypatch):
+    monkeypatch.setattr(settings, "admin_remote_users", "testuser")
+
+    me_resp = await auth_client.get("/api/user/me")
+    assert me_resp.status_code == 200
+    user_id = me_resp.json()["id"]
+
+    user = await db_session.get(User, user_id)
+    assert user is not None
+    player = TrackedPlayer(
+        game_name="insight-admin",
+        tag_line="EUW",
+        display_name="Insight Admin",
+        current_price=25.0,
+        lp_abs=1500,
+        previous_lp_abs=1470,
+    )
+    db_session.add(player)
+    await db_session.flush()
+    user.linked_player_id = player.id
+
+    player.avg_lp_gain_on_win = 30.0
+    player.avg_lp_loss_on_loss = 10.0
+    player.ranked_wins_snapshot = 12
+    player.ranked_losses_snapshot = 6
+    player.streak = 4
+
+    db_session.add(
+        PlayingIncomeEntry(
+            user_id=user.id,
+            player_id=player.id,
+            match_id="EUW1_123",
+            match_result=PlayingIncomeMatchResult.WIN,
+            match_duration_seconds=1800,
+            match_completed_at=datetime(2026, 3, 13, 10, 0, tzinfo=UTC),
+            share_price=25.0,
+            base_rate=0.0125,
+            outcome_multiplier=1.0,
+            amount=0.36,
+        )
+    )
+    db_session.add(
+        PoroSpawn(
+            public_id="poro123",
+            user_id=user.id,
+            tier=PoroTier.TIER_2,
+            reward_amount=8.0,
+            asset_key="poro2",
+            start_x=0.0,
+            start_y=0.0,
+            end_x=1.0,
+            end_y=1.0,
+            duration_ms=6000,
+            spawned_at=datetime(2026, 3, 13, 9, 0, tzinfo=UTC),
+            expires_at=datetime(2026, 3, 13, 9, 10, tzinfo=UTC),
+            claimed_at=datetime(2026, 3, 13, 9, 1, tzinfo=UTC),
+            status=PoroSpawnStatus.CLAIMED,
+        )
+    )
+    await db_session.commit()
+
+    resp = await auth_client.get("/api/admin/players/insights")
+
+    assert resp.status_code == 200
+    data = resp.json()
+    tracked = next(item for item in data if item["player_id"] == player.id)
+    assert tracked["linked_username"] == "testuser"
+    assert tracked["avg_lp_gain_on_win"] == 30.0
+    assert tracked["avg_lp_loss_on_loss"] == 10.0
+    assert tracked["estimated_lp_ratio_clamped"] == 0.3333333333333333
+    assert tracked["effective_positive_streak"] == 4
+    assert tracked["playing_income_lifetime_total"] == 0.36
+    assert tracked["poro_rewards_total"] == 8.0
+    assert tracked["recent_playing_income_entries"][0]["match_id"] == "EUW1_123"
+    assert tracked["recent_poro_rewards"][0]["spawn_id"] == "poro123"

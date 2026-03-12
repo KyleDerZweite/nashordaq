@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { useStreamerMode } from "../../contexts/useStreamerMode";
 import type {
+  AdminPlayerInsightResponse,
   AdminOverviewResponse,
   AdminUserSummaryResponse,
   OrderResponse,
@@ -9,7 +10,7 @@ import type {
 } from "../../types";
 import { getStreamerSafeName } from "../../utils/streamerMode";
 import { formatAmount, formatLocalDateTime } from "../../utils/format";
-import OrderHistory from "../OrderHistory";
+import AdminPlayerInsightsPanel from "./AdminPlayerInsightsPanel";
 import AdminPortfolioModal from "./AdminPortfolioModal";
 
 interface Props {
@@ -17,6 +18,7 @@ interface Props {
   users: AdminUserSummaryResponse[];
   orders: OrderResponse[];
   systemStatus?: SystemStatusResponse;
+  playerInsights: AdminPlayerInsightResponse[];
 }
 
 export default function AdminDashboard({
@@ -24,6 +26,7 @@ export default function AdminDashboard({
   users,
   orders,
   systemStatus,
+  playerInsights,
 }: Props) {
   const { isStreamerMode } = useStreamerMode();
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
@@ -249,13 +252,7 @@ export default function AdminDashboard({
         </section>
       </div>
 
-      <OrderHistory
-        ownOrders={orders}
-        allOrders={orders}
-        defaultView="all"
-        allowViewToggle={false}
-        title="Market Activity"
-      />
+      <AdminPlayerInsightsPanel insights={playerInsights} />
 
       {selectedUserId !== null && (
         <AdminPortfolioModal
