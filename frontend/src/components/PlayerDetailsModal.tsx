@@ -483,7 +483,7 @@ export default function PlayerDetailsModal({
                               : "text-hex-gold"
                         }`}
                       >
-                        {formatSignedAmount(metrics.rangeChange)} G
+                        {formatSignedAmount(metrics.rangeChange)} P
                       </div>
                       <div className="font-mono text-xs text-hex-bronze">
                         {formatSignedPercent(metrics.rangePercent)}
@@ -526,7 +526,7 @@ export default function PlayerDetailsModal({
                           color: "#d8c48a",
                           strokeWidth: 3.5,
                           fillOpacity: 0.28,
-                          formatValue: (value) => `${formatAmount(value)} G`,
+                          formatValue: (value) => `${formatAmount(value)} P`,
                         },
                       ]}
                       className="p-4"

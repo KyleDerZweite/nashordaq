@@ -7,6 +7,36 @@ interface Props {
   onClose: () => void;
 }
 
+const LOW_TIER_MAX = 500;
+const MID_TIER_MAX = 1000;
+const LOW_TIER_RATE = 0.025;
+const MID_TIER_RATE = 0.0275;
+const HIGH_TIER_RATE = 0.03;
+
+function getInterestTier(amount: number): {
+  rate: number;
+  label: string;
+} {
+  if (amount < LOW_TIER_MAX) {
+    return {
+      rate: LOW_TIER_RATE,
+      label: `< ${formatAmount(LOW_TIER_MAX)} P debt`,
+    };
+  }
+
+  if (amount <= MID_TIER_MAX) {
+    return {
+      rate: MID_TIER_RATE,
+      label: `${formatAmount(LOW_TIER_MAX)} P to ${formatAmount(MID_TIER_MAX)} P debt`,
+    };
+  }
+
+  return {
+    rate: HIGH_TIER_RATE,
+    label: `> ${formatAmount(MID_TIER_MAX)} P debt`,
+  };
+}
+
 function entryLabel(type: string): string {
   if (type === "BORROW") {
     return "Borrowed";
@@ -71,9 +101,11 @@ export default function BankModal({ canManageBank, onClose }: Props) {
     data?.cash_balance ?? 0,
     data?.debt_outstanding ?? 0,
   );
+  const currentInterestTier = getInterestTier(data?.debt_outstanding ?? 0);
+  const borrowTierPreview = getInterestTier(parsedBorrowAmount);
   const interestCadenceLabel = data
-    ? `Borrowing adds the first interest charge immediately, then compounds every ${data.interest_interval_hours.toFixed(0)} hours`
-    : "Borrowing adds an immediate interest charge, then follows a fixed rollover schedule";
+    ? `Immediate interest on borrow, then tiered rollover every ${data.interest_interval_hours.toFixed(0)} hours`
+    : "Borrowing adds an immediate interest charge, then follows a tiered rollover schedule";
 
   return (
     <div
@@ -175,6 +207,9 @@ export default function BankModal({ canManageBank, onClose }: Props) {
                   <p className="font-mono text-xs text-hex-bronze">
                     Cash available: {formatAmount(data.cash_balance)} P
                   </p>
+                  <p className="font-mono text-xs text-hex-bronze">
+                    Formula: 300 base + 15% net worth, capped at 1.500 P
+                  </p>
                 </div>
 
                 <div className="space-y-2 border border-hex-border px-4 py-3">
@@ -182,9 +217,12 @@ export default function BankModal({ canManageBank, onClose }: Props) {
                     Next Rollover
                   </h3>
                   <p className="font-mono text-xs text-hex-bronze">
-                    Interest rate:{" "}
+                    Current tier:{" "}
                     {(data.interest_rate_per_interval * 100).toFixed(2)}% /{" "}
                     {data.interest_interval_hours.toFixed(0)}h
+                  </p>
+                  <p className="font-mono text-xs text-hex-bronze">
+                    Applies at: {currentInterestTier.label}
                   </p>
                   <p className="font-mono text-xs text-hex-bronze">
                     Next accrual:{" "}
@@ -200,6 +238,10 @@ export default function BankModal({ canManageBank, onClose }: Props) {
                     Current net worth:{" "}
                     {formatAmount(data.debt_adjusted_net_worth)} P
                   </p>
+                  <p className="font-mono text-xs text-hex-bronze">
+                    Tiers: 2.50% &lt; 500 P, 2.75% up to 1.000 P, 3.00% above
+                    1.000 P
+                  </p>
                 </div>
               </div>
 
@@ -213,8 +255,8 @@ export default function BankModal({ canManageBank, onClose }: Props) {
                       Borrow
                     </h3>
                     <p className="mt-1 font-mono text-xs text-hex-bronze">
-                      Borrowed cash can be used immediately, but the first
-                      interest charge is added right away.
+                      Borrowed cash can be used immediately. The first charge is
+                      added right away using the borrow amount tier.
                     </p>
                   </div>
                   <div>
@@ -251,6 +293,12 @@ export default function BankModal({ canManageBank, onClose }: Props) {
                     </div>
                     <p className="mt-2 font-mono text-xs text-hex-bronze">
                       Available now: {formatAmount(data.available_credit)} P
+                    </p>
+                    <p className="mt-1 font-mono text-xs text-hex-bronze">
+                      {Number.isFinite(parsedBorrowAmount) &&
+                      parsedBorrowAmount > 0
+                        ? `This borrow starts at ${(borrowTierPreview.rate * 100).toFixed(2)}% (${borrowTierPreview.label})`
+                        : "Borrow tiers: 2.50% below 500 P, 2.75% up to 1.000 P, 3.00% above 1.000 P"}
                     </p>
                   </div>
                   {borrowFromBank.isError && (
