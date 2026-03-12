@@ -55,6 +55,7 @@ async def test_admin_can_view_overview_users_and_orders(
     assert orders_resp.status_code == 200
     assert len(orders_resp.json()) >= 1
     assert orders_resp.json()[0]["user_name"] == "Test Player"
+    assert orders_resp.json()[0]["user_game_name"] == "TestPlayer"
 
     assert status_resp.status_code == 200
     assert status_resp.json()["service_status"] == "ok"
@@ -78,7 +79,9 @@ async def test_admin_can_view_user_portfolio(auth_client, tradable_player, monke
     assert resp.status_code == 200
     data = resp.json()
     assert data["role"] == "admin"
+    assert data["linked_player_game_name"] == "TestPlayer"
     assert data["portfolio"]["holdings"][0]["player_name"] == "Tradable Player"
+    assert data["portfolio"]["holdings"][0]["player_game_name"] == "TradablePlayer"
     assert data["portfolio"]["holdings"][0]["quantity"] == 2
 
 

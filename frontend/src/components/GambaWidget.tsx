@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useCreateGambaPosition, useGambaPositions } from "../api";
 import { useStreamerMode } from "../contexts/useStreamerMode";
 import GambaModal from "./GambaModal";
-import { obfuscateName } from "../utils/streamerMode";
+import { getStreamerSafeName } from "../utils/streamerMode";
 import {
   formatAmount,
   formatLocalDateTime,
@@ -180,7 +180,10 @@ export default function GambaWidget({ balance, canTrade }: Props) {
                       <td className="px-3 py-2 font-mono text-xs text-hex-white">
                         <div className="truncate font-semibold">
                           {isStreamerMode
-                            ? obfuscateName(position.player_name)
+                            ? getStreamerSafeName(
+                                position.player_game_name,
+                                position.player_name,
+                              )
                             : position.player_name}
                         </div>
                         <div className="truncate text-[11px] text-hex-bronze">

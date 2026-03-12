@@ -20,6 +20,7 @@ async def test_place_buy_order(auth_client, tradable_player):
     assert data["quantity"] == 2
     assert data["status"] == "EXECUTED"
     assert data["player_name"] == "Tradable Player"
+    assert data["player_game_name"] == "TradablePlayer"
     assert data["execution_price"] == 25.0
 
     me_resp = await auth_client.get("/api/user/me")
@@ -231,6 +232,7 @@ async def test_list_orders(auth_client, tradable_player):
     assert resp.status_code == 200
     assert len(resp.json()) == 2
     assert resp.json()[0]["user_name"] == "Test Player"
+    assert resp.json()[0]["user_game_name"] == "TestPlayer"
 
 
 async def test_list_orders_filter_status(auth_client, tradable_player):

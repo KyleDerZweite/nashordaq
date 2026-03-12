@@ -1,6 +1,6 @@
 import { useStreamerMode } from "../contexts/useStreamerMode";
 import { useOrderDetail } from "../api";
-import { obfuscateName } from "../utils/streamerMode";
+import { getStreamerSafeName } from "../utils/streamerMode";
 import {
   formatAmount,
   formatLocalDateTime,
@@ -70,7 +70,10 @@ export default function OrderDetailsModal({ orderId, onClose }: Props) {
                   {
                     label: "Stock",
                     value: isStreamerMode
-                      ? obfuscateName(order.player_name)
+                      ? getStreamerSafeName(
+                          order.player_game_name,
+                          order.player_name,
+                        )
                       : order.player_name,
                   },
                   { label: "Side", value: order.side },

@@ -1,6 +1,6 @@
 import { useStreamerMode } from "../../contexts/useStreamerMode";
 import { useAdminUserPortfolio, useRestoreAdminRescue } from "../../api";
-import { obfuscateName } from "../../utils/streamerMode";
+import { getStreamerSafeName } from "../../utils/streamerMode";
 import { formatAmount, formatLocalDateTime } from "../../utils/format";
 
 interface Props {
@@ -29,12 +29,16 @@ export default function AdminPortfolioModal({ userId, onClose }: Props) {
             </h2>
             {data && (
               <p className="mt-1 font-mono text-xs uppercase tracking-[0.18em] text-hex-bronze">
-                {data.username} ·{" "}
                 {data.linked_player_name
                   ? isStreamerMode
-                    ? obfuscateName(data.linked_player_name)
+                    ? getStreamerSafeName(
+                        data.linked_player_game_name,
+                        data.linked_player_name,
+                      )
                     : data.linked_player_name
-                  : "No linked player"}
+                  : isStreamerMode
+                    ? data.username
+                    : `${data.username} · No linked player`}
               </p>
             )}
           </div>
@@ -75,7 +79,10 @@ export default function AdminPortfolioModal({ userId, onClose }: Props) {
                     label: "Linked Player",
                     value: data.linked_player_name
                       ? isStreamerMode
-                        ? obfuscateName(data.linked_player_name)
+                        ? getStreamerSafeName(
+                            data.linked_player_game_name,
+                            data.linked_player_name,
+                          )
                         : data.linked_player_name
                       : "None",
                   },
@@ -191,7 +198,10 @@ export default function AdminPortfolioModal({ userId, onClose }: Props) {
                       >
                         <td className="px-4 py-2.5 font-mono text-sm text-hex-white">
                           {isStreamerMode
-                            ? obfuscateName(holding.player_name)
+                            ? getStreamerSafeName(
+                                holding.player_game_name,
+                                holding.player_name,
+                              )
                             : holding.player_name}
                         </td>
                         <td className="px-4 py-2.5 text-right font-mono text-sm text-hex-bronze">

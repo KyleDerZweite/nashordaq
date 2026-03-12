@@ -28,11 +28,13 @@ SessionDep = Annotated[AsyncSession, Depends(get_session)]
 def _position_response(
     position: GambaPosition,
     player_name: str,
+    player_game_name: str,
 ) -> GambaPositionResponse:
     return GambaPositionResponse(
         id=position.id,
         player_id=position.player_id,
         player_name=player_name,
+        player_game_name=player_game_name,
         cash_amount=position.cash_amount,
         quantity=position.quantity,
         entry_price=position.entry_price,
@@ -117,7 +119,7 @@ async def create_gamba_position(
     await session.commit()
     await session.refresh(position)
 
-    return _position_response(position, player.display_name)
+    return _position_response(position, player.display_name, player.game_name)
 
 
 @router.get("/gamba", response_model=list[GambaPositionResponse])
@@ -136,5 +138,6 @@ async def list_gamba_positions(
     )
     rows = result.all()
     return [
-        _position_response(position, player.display_name) for position, player in rows
+        _position_response(position, player.display_name, player.game_name)
+        for position, player in rows
     ]

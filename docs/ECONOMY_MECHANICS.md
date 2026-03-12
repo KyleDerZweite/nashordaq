@@ -20,7 +20,7 @@ Implementation: `app/pricing.py::calculate_lp_abs()`
 Sets the starting share price when a player's LP data is first fetched.
 
 ```
-P_initial = ((LP_abs / 100) + 10) * (1 + WinRatePremium + StatusPremium)
+P_initial = ((LP_abs / 100) + 10) * (1 + WinRatePremium)
 ```
 
 This is applied once per player (when `lp_abs == 0` and `current_price <= 10.0`). After the IPO, all subsequent updates use the dynamic formula.
@@ -30,9 +30,6 @@ This is applied once per player (when `lp_abs == 0` and `current_price <= 10.0`)
 - `WinRatePremium = max(0, WinRate - 0.50) * 0.40`
 	- Neutral at 50% win rate.
 	- Only upward pressure is applied at IPO; weak win rates do not reduce the initial listing price.
-- `StatusPremium`
-	- `+0.01` if Riot marks the player as `veteran`
-	- `+0.02` if Riot marks the player as `freshBlood`
 
 Implementation: `app/pricing.py::calculate_ipo_price()`
 
@@ -47,7 +44,7 @@ EffectiveDeltaLP =
 	-24 + ((Delta_LP_abs + 24) * 0.50)       if Delta_LP_abs < -24
 
 LossAdjustedDeltaLP = EffectiveDeltaLP * 1.10 if EffectiveDeltaLP < 0 else EffectiveDeltaLP
-P_new = (P_old + (LossAdjustedDeltaLP * Alpha * StreakMultiplier) * Gamma * WinRateMultiplier) * StatusMultiplier
+P_new = P_old + (LossAdjustedDeltaLP * Alpha * StreakMultiplier) * Gamma * WinRateMultiplier
 ```
 
 If `Delta_LP_abs == 0`, the market state is left unchanged for that cycle.
@@ -69,9 +66,6 @@ If `Delta_LP_abs == 0`, the market state is left unchanged for that cycle.
 	- The first `-24 LP` of a negative refresh count at full strength; additional LP only count at `50%` efficiency.
 - Negative LP bias
 	- Negative refreshes are multiplied by `1.10` after the LP efficiency taper, so losses hit a bit harder than similarly sized gains.
-- `StatusMultiplier`
-	- `+0.01` if `veteran`
-	- `+0.02` if `freshBlood`
 - `hotStreak`
 	- Adds an extra `+0.05` momentum bonus on top of the internal streak multiplier.
 - Flat LP cycle

@@ -65,9 +65,7 @@ async def test_market_update_job_skips_persistence_without_lp_change(
             wins=10,
             losses=10,
             hot_streak=False,
-            veteran=True,
             inactive=True,
-            fresh_blood=True,
         )
 
     http_client = httpx.AsyncClient()
@@ -154,9 +152,7 @@ async def test_market_update_job_accrues_due_bank_interest(db_engine, monkeypatc
             wins=10,
             losses=10,
             hot_streak=False,
-            veteran=True,
             inactive=True,
-            fresh_blood=True,
         )
 
     http_client = httpx.AsyncClient()
@@ -239,9 +235,7 @@ async def test_market_update_job_uses_rescue_interest_rate_at_five_hundred_debt(
             wins=10,
             losses=10,
             hot_streak=False,
-            veteran=True,
             inactive=True,
-            fresh_blood=True,
         )
 
     http_client = httpx.AsyncClient()
@@ -339,9 +333,7 @@ async def test_market_update_job_applies_playing_income_once_per_new_match(
             wins=10,
             losses=10,
             hot_streak=False,
-            veteran=False,
             inactive=False,
-            fresh_blood=False,
         )
 
     async def fake_get_recent_match_ids(**_: object) -> list[str]:
@@ -475,9 +467,7 @@ async def test_market_update_job_backfills_playing_income_from_start_date(
             wins=10,
             losses=10,
             hot_streak=False,
-            veteran=False,
             inactive=False,
-            fresh_blood=False,
         )
 
     match_id_calls: list[dict[str, object]] = []
@@ -624,9 +614,7 @@ async def test_market_update_job_applies_minimum_playing_income_amount(
             wins=10,
             losses=10,
             hot_streak=False,
-            veteran=False,
             inactive=False,
-            fresh_blood=False,
         )
 
     async def fake_get_recent_match_ids(**_: object) -> list[str]:
@@ -771,9 +759,7 @@ async def test_market_update_job_reduces_playing_income_after_three_games_in_day
             wins=10,
             losses=10,
             hot_streak=False,
-            veteran=False,
             inactive=False,
-            fresh_blood=False,
         )
 
     async def fake_get_recent_match_ids(**_: object) -> list[str]:
@@ -895,9 +881,7 @@ async def test_market_update_job_falls_back_when_start_time_query_is_rejected(
             wins=10,
             losses=10,
             hot_streak=False,
-            veteran=False,
             inactive=False,
-            fresh_blood=False,
         )
 
     request_calls: list[dict[str, object]] = []
@@ -1033,9 +1017,7 @@ async def test_market_update_job_refreshes_stale_puuid_before_match_history(
             wins=10,
             losses=10,
             hot_streak=False,
-            veteran=False,
             inactive=False,
-            fresh_blood=False,
         )
 
     request_puuids: list[str] = []
@@ -1118,9 +1100,7 @@ async def test_market_update_job_skips_malformed_match_summary_and_continues(
             wins=10,
             losses=10,
             hot_streak=False,
-            veteran=False,
             inactive=False,
-            fresh_blood=False,
         )
 
     async def fake_get_recent_match_ids(**_: object) -> list[str]:
@@ -1244,9 +1224,7 @@ async def test_market_update_job_skips_short_match_playing_income(
             wins=10,
             losses=10,
             hot_streak=False,
-            veteran=False,
             inactive=False,
-            fresh_blood=False,
         )
 
     async def fake_get_recent_match_ids(**_: object) -> list[str]:
@@ -1343,9 +1321,7 @@ async def test_market_update_job_records_wealth_snapshots(db_engine, monkeypatch
             wins=10,
             losses=10,
             hot_streak=False,
-            veteran=False,
             inactive=False,
-            fresh_blood=False,
         )
 
     async def fake_get_recent_match_ids(**_: object) -> list[str]:

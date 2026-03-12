@@ -2,7 +2,7 @@ import { useMemo } from "react";
 
 import { useStreamerMode } from "../contexts/useStreamerMode";
 import type { GambaPositionResponse } from "../types";
-import { obfuscateName } from "../utils/streamerMode";
+import { getStreamerSafeName } from "../utils/streamerMode";
 import {
   formatAmount,
   formatLocalDateTime,
@@ -164,7 +164,10 @@ export default function GambaModal({ positions, onClose }: Props) {
                     <td className="px-4 py-3 font-mono text-sm font-medium text-hex-white">
                       <span className="block truncate">
                         {isStreamerMode
-                          ? obfuscateName(position.player_name)
+                          ? getStreamerSafeName(
+                              position.player_game_name,
+                              position.player_name,
+                            )
                           : position.player_name}
                       </span>
                     </td>
@@ -222,7 +225,10 @@ export default function GambaModal({ positions, onClose }: Props) {
                     </div>
                     <h3 className="mt-1 font-serif text-lg font-bold text-hex-white">
                       {isStreamerMode
-                        ? obfuscateName(position.player_name)
+                        ? getStreamerSafeName(
+                            position.player_game_name,
+                            position.player_name,
+                          )
                         : position.player_name}
                     </h3>
                   </div>

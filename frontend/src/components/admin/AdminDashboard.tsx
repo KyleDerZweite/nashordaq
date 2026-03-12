@@ -7,7 +7,7 @@ import type {
   OrderResponse,
   SystemStatusResponse,
 } from "../../types";
-import { obfuscateName } from "../../utils/streamerMode";
+import { getStreamerSafeName } from "../../utils/streamerMode";
 import { formatAmount, formatLocalDateTime } from "../../utils/format";
 import OrderHistory from "../OrderHistory";
 import AdminPortfolioModal from "./AdminPortfolioModal";
@@ -182,13 +182,18 @@ export default function AdminDashboard({
                       <div>
                         {user.linked_player_name
                           ? isStreamerMode
-                            ? obfuscateName(user.linked_player_name)
+                            ? getStreamerSafeName(
+                                user.linked_player_game_name,
+                                user.linked_player_name,
+                              )
                             : user.linked_player_name
                           : user.username}
                       </div>
-                      <div className="text-[11px] text-hex-bronze">
-                        {user.username}
-                      </div>
+                      {!isStreamerMode && (
+                        <div className="text-[11px] text-hex-bronze">
+                          {user.username}
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-2.5">
                       <span
@@ -204,7 +209,10 @@ export default function AdminDashboard({
                     <td className="px-4 py-2.5 font-mono text-sm text-hex-bronze">
                       {user.linked_player_name
                         ? isStreamerMode
-                          ? obfuscateName(user.linked_player_name)
+                          ? getStreamerSafeName(
+                              user.linked_player_game_name,
+                              user.linked_player_name,
+                            )
                           : user.linked_player_name
                         : "Not onboarded"}
                     </td>

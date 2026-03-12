@@ -37,9 +37,7 @@ async def test_get_rank_success(httpx_mock):
                 "wins": 70,
                 "losses": 30,
                 "hotStreak": True,
-                "veteran": True,
                 "inactive": False,
-                "freshBlood": False,
             },
             {
                 "queueType": "RANKED_FLEX_SR",
@@ -68,9 +66,7 @@ async def test_get_rank_success(httpx_mock):
     assert result.wins == 70
     assert result.losses == 30
     assert result.hot_streak is True
-    assert result.veteran is True
     assert result.inactive is False
-    assert result.fresh_blood is False
 
 
 async def test_get_rank_player_not_found(httpx_mock):
@@ -111,9 +107,7 @@ async def test_get_rank_fallback_to_by_puuid(httpx_mock):
                 "wins": 10,
                 "losses": 5,
                 "hotStreak": False,
-                "veteran": False,
                 "inactive": False,
-                "freshBlood": True,
             }
         ],
     )
@@ -133,7 +127,6 @@ async def test_get_rank_fallback_to_by_puuid(httpx_mock):
     assert result.league_points == 1200
     assert result.puuid == PUUID
     assert result.summoner_id == PUUID
-    assert result.fresh_blood is True
 
 
 async def test_get_recent_match_ids_success(httpx_mock):

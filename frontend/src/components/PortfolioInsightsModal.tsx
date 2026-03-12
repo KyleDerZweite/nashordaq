@@ -2,7 +2,7 @@ import { useMemo } from "react";
 
 import { useStreamerMode } from "../contexts/useStreamerMode";
 import type { HoldingResponse, OrderSide, PortfolioResponse } from "../types";
-import { obfuscateName } from "../utils/streamerMode";
+import { getStreamerSafeName } from "../utils/streamerMode";
 import { formatAmount } from "../utils/format";
 
 interface Props {
@@ -48,7 +48,7 @@ function PortfolioInsightRow({
     <tr className="border-b border-hex-border/50 transition-colors hover:bg-hex-bg-alt/80">
       <td className="px-4 py-3 font-mono text-sm font-medium text-hex-white">
         {isStreamerMode
-          ? obfuscateName(holding.player_name)
+          ? getStreamerSafeName(holding.player_game_name, holding.player_name)
           : holding.player_name}
       </td>
       <td className="px-4 py-3 text-right font-mono text-sm text-hex-bronze">

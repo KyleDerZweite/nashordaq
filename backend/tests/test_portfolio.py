@@ -38,6 +38,7 @@ async def test_portfolio_with_holdings(auth_client, seeded_player, db_session):
     assert resp.status_code == 200
     data = resp.json()
     assert len(data["holdings"]) == 1
+    assert data["holdings"][0]["player_game_name"] == "TestPlayer"
     assert data["holdings"][0]["quantity"] == 10
     assert data["holdings"][0]["average_buy_price"] == 0.0
     assert data["holdings"][0]["current_price"] == 25.0
@@ -68,6 +69,7 @@ async def test_portfolio_shows_buy_price_vs_current(
     data = resp.json()
 
     assert len(data["holdings"]) == 1
+    assert data["holdings"][0]["player_game_name"] == "TradablePlayer"
     assert data["holdings"][0]["average_buy_price"] == 25.0
     assert data["holdings"][0]["current_price"] == 30.0
     assert data["holdings"][0]["cost_basis"] == 50.0

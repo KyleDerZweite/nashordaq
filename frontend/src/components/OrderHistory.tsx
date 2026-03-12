@@ -3,7 +3,7 @@ import { useStreamerMode } from "../contexts/useStreamerMode";
 import type { OrderResponse } from "../types";
 import { useCancelOrder } from "../api";
 import OrderDetailsModal from "./OrderDetailsModal";
-import { obfuscateName } from "../utils/streamerMode";
+import { getStreamerSafeName } from "../utils/streamerMode";
 import { formatAmount, formatQuantity } from "../utils/format";
 
 interface Props {
@@ -41,16 +41,24 @@ export default function OrderHistory({
     }
 
     return orders.filter((order) => {
-      const stockMatch = order.player_name
+      const stockMatch = (
+        isStreamerMode
+          ? getStreamerSafeName(order.player_game_name, order.player_name)
+          : order.player_name
+      )
         .toLocaleLowerCase()
         .includes(normalizedFilterQuery);
-      const playerMatch = (order.user_name ?? "")
+      const playerMatch = (
+        isStreamerMode
+          ? (order.user_game_name ?? order.user_name ?? "")
+          : (order.user_name ?? "")
+      )
         .toLocaleLowerCase()
         .includes(normalizedFilterQuery);
 
       return stockMatch || playerMatch;
     });
-  }, [normalizedFilterQuery, orders]);
+  }, [isStreamerMode, normalizedFilterQuery, orders]);
 
   const showScrollbar = filteredOrders.length > 30;
 
@@ -134,7 +142,7 @@ export default function OrderHistory({
                 </td>
                 <td className="px-4 py-2.5 font-mono text-sm text-hex-white">
                   {isStreamerMode
-                    ? obfuscateName(o.player_name)
+                    ? getStreamerSafeName(o.player_game_name, o.player_name)
                     : o.player_name}
                   {o.source === "GAMBA" && (
                     <span className="ml-2 inline-block border border-hex-gold-dim px-1.5 py-0.5 align-middle font-mono text-[10px] font-bold uppercase tracking-wider text-hex-gold">
@@ -144,7 +152,9 @@ export default function OrderHistory({
                 </td>
                 {view === "all" && (
                   <td className="px-4 py-2.5 font-mono text-sm text-hex-bronze">
-                    {o.user_name ?? "--"}
+                    {isStreamerMode
+                      ? (o.user_game_name ?? o.user_name ?? "--")
+                      : (o.user_name ?? "--")}
                   </td>
                 )}
                 <td className="px-4 py-2.5">

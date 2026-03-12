@@ -32,6 +32,7 @@ async def test_create_gamba_position_creates_recent_order(
     assert resp.status_code == 201
     data = resp.json()
     assert data["player_name"] == tradable_player.display_name
+    assert data["player_game_name"] == tradable_player.game_name
     assert data["cash_amount"] == 100
     assert data["quantity"] == pytest.approx(4.0)
     assert data["status"] == "ACTIVE"
@@ -139,9 +140,7 @@ async def test_market_update_job_settles_due_gamba_position(db_engine, monkeypat
             wins=10,
             losses=10,
             hot_streak=False,
-            veteran=True,
             inactive=True,
-            fresh_blood=True,
         )
 
     http_client = httpx.AsyncClient()

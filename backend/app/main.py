@@ -150,9 +150,7 @@ async def quote(
         "wins": rank_data.wins,
         "losses": rank_data.losses,
         "hotStreak": rank_data.hot_streak,
-        "veteran": rank_data.veteran,
         "inactive": rank_data.inactive,
-        "freshBlood": rank_data.fresh_blood,
     }
 
 

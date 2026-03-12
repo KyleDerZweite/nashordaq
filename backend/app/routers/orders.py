@@ -58,13 +58,17 @@ def _pending_sells_query(user_id: int, player_id: int) -> Select[tuple[Order]]:
 def _order_response(
     order: Order,
     player_name: str,
+    player_game_name: str,
     user_name: str | None = None,
+    user_game_name: str | None = None,
 ) -> OrderResponse:
     return OrderResponse(
         id=order.id,
         player_id=order.player_id,
         player_name=player_name,
+        player_game_name=player_game_name,
         user_name=user_name,
+        user_game_name=user_game_name,
         side=order.side,
         quantity=(
             order.quantity_value
@@ -82,7 +86,9 @@ def _order_response(
 def _order_detail_response(
     order: Order,
     player_name: str,
+    player_game_name: str,
     user_name: str | None = None,
+    user_game_name: str | None = None,
 ) -> OrderDetailResponse:
     quantity = (
         order.quantity_value
@@ -97,7 +103,9 @@ def _order_detail_response(
         id=order.id,
         player_id=order.player_id,
         player_name=player_name,
+        player_game_name=player_game_name,
         user_name=user_name,
+        user_game_name=user_game_name,
         side=order.side,
         quantity=quantity,
         status=order.status,
@@ -127,7 +135,10 @@ async def build_order_responses(
     players_result = await session.execute(
         select(TrackedPlayer).where(TrackedPlayer.id.in_(player_ids))
     )
-    player_map = {p.id: p.display_name for p in players_result.scalars()}
+    player_map = {
+        player.id: (player.display_name, player.game_name)
+        for player in players_result.scalars()
+    }
 
     users_result = await session.execute(select(User).where(User.id.in_(user_ids)))
     users = users_result.scalars().all()
@@ -137,12 +148,27 @@ async def build_order_responses(
     linked_players_result = await session.execute(
         select(TrackedPlayer).where(TrackedPlayer.id.in_(linked_player_ids))
     )
-    linked_player_name_map = {
-        player.id: player.display_name for player in linked_players_result.scalars()
+    linked_player_identity_map = {
+        player.id: (player.display_name, player.game_name)
+        for player in linked_players_result.scalars()
     }
     user_name_map = {
         user.id: (
-            linked_player_name_map.get(user.linked_player_id, user.username)
+            linked_player_identity_map.get(
+                user.linked_player_id,
+                (user.username, user.username),
+            )[0]
+            if user.linked_player_id is not None
+            else user.username
+        )
+        for user in users
+    }
+    user_game_name_map = {
+        user.id: (
+            linked_player_identity_map.get(
+                user.linked_player_id,
+                (user.username, user.username),
+            )[1]
             if user.linked_player_id is not None
             else user.username
         )
@@ -152,8 +178,10 @@ async def build_order_responses(
     return [
         _order_response(
             order,
-            player_map.get(order.player_id, ""),
+            player_map.get(order.player_id, ("", ""))[0],
+            player_map.get(order.player_id, ("", ""))[1],
             user_name_map.get(order.user_id),
+            user_game_name_map.get(order.user_id),
         )
         for order in orders
     ]
@@ -355,7 +383,7 @@ async def place_order(
     await session.commit()
     await session.refresh(order)
 
-    return _order_response(order, player.display_name)
+    return _order_response(order, player.display_name, player.game_name)
 
 
 @router.get("/orders", response_model=list[OrderResponse])
@@ -420,6 +448,7 @@ async def get_order_detail(
         raise HTTPException(status_code=404, detail="Order not found")
 
     user_name = order_user.username
+    user_game_name = order_user.username
     if order_user.linked_player_id is not None:
         linked_player_result = await session.execute(
             select(TrackedPlayer).where(TrackedPlayer.id == order_user.linked_player_id)
@@ -427,8 +456,15 @@ async def get_order_detail(
         linked_player = linked_player_result.scalar_one_or_none()
         if linked_player is not None:
             user_name = linked_player.display_name
+            user_game_name = linked_player.game_name
 
-    return _order_detail_response(order, player.display_name, user_name)
+    return _order_detail_response(
+        order,
+        player.display_name,
+        player.game_name,
+        user_name,
+        user_game_name,
+    )
 
 
 @router.delete("/orders/{order_id}", response_model=OrderResponse)
@@ -454,7 +490,7 @@ async def cancel_order(
         order.status = OrderStatus.CANCELLED
         await session.commit()
         await session.refresh(order)
-        return _order_response(order, player.display_name)
+        return _order_response(order, player.display_name, player.game_name)
 
     if order.source != OrderSource.MANUAL:
         raise HTTPException(status_code=400, detail="Order cannot be cancelled")
@@ -509,4 +545,4 @@ async def cancel_order(
     await session.commit()
     await session.refresh(order)
 
-    return _order_response(order, player.display_name)
+    return _order_response(order, player.display_name, player.game_name)

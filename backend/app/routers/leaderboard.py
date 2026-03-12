@@ -23,14 +23,25 @@ async def get_leaderboard(session: SessionDep) -> list[LeaderboardEntry]:
     )
     users = users_result.all()
 
-    entries: list[tuple[str, float]] = []
+    entries: list[tuple[str, str, float]] = []
     for user, tracked_player in users:
         snapshot = await build_account_snapshot(session, user)
-        entries.append((tracked_player.display_name, snapshot.debt_adjusted_net_worth))
+        entries.append(
+            (
+                tracked_player.display_name,
+                tracked_player.game_name,
+                snapshot.debt_adjusted_net_worth,
+            )
+        )
 
-    entries.sort(key=lambda e: e[1], reverse=True)
+    entries.sort(key=lambda entry: entry[2], reverse=True)
 
     return [
-        LeaderboardEntry(display_name=display_name, total_value=total, rank=i + 1)
-        for i, (display_name, total) in enumerate(entries)
+        LeaderboardEntry(
+            display_name=display_name,
+            game_name=game_name,
+            total_value=total,
+            rank=i + 1,
+        )
+        for i, (display_name, game_name, total) in enumerate(entries)
     ]

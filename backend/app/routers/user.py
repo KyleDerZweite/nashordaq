@@ -101,8 +101,6 @@ async def _initialize_player_market_state(
     player.current_price = calculate_ipo_price(
         new_lp_abs,
         win_rate,
-        veteran=rank_data.veteran,
-        fresh_blood=rank_data.fresh_blood,
     )
     player.lp_abs = new_lp_abs
     player.previous_lp_abs = new_lp_abs

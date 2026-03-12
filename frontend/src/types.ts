@@ -148,7 +148,9 @@ export interface OrderResponse {
   id: number;
   player_id: number;
   player_name: string;
+  player_game_name: string;
   user_name: string | null;
+  user_game_name: string | null;
   side: OrderSide;
   quantity: number;
   status: OrderStatus;
@@ -175,6 +177,7 @@ export interface GambaPositionResponse {
   id: number;
   player_id: number;
   player_name: string;
+  player_game_name: string;
   cash_amount: number;
   quantity: number;
   entry_price: number;
@@ -191,6 +194,7 @@ export interface GambaPositionResponse {
 export interface HoldingResponse {
   player_id: number;
   player_name: string;
+  player_game_name: string;
   quantity: number;
   average_buy_price: number;
   current_price: number;
@@ -229,6 +233,7 @@ export interface AdminUserSummaryResponse {
   role: "player" | "admin";
   linked_player_id: number | null;
   linked_player_name: string | null;
+  linked_player_game_name: string | null;
   onboarding_complete: boolean;
   balance: number;
   holdings_value: number;
@@ -244,6 +249,7 @@ export interface AdminUserPortfolioResponse {
   role: "player" | "admin";
   linked_player_id: number | null;
   linked_player_name: string | null;
+  linked_player_game_name: string | null;
   onboarding_complete: boolean;
   created_at: string;
   rescue_loan_uses_remaining: number;
@@ -254,6 +260,7 @@ export interface AdminUserPortfolioResponse {
 
 export interface LeaderboardEntry {
   display_name: string;
+  game_name: string;
   total_value: number;
   rank: number;
 }
@@ -276,9 +283,7 @@ export interface MarketQuoteResponse {
   wins: number;
   losses: number;
   hotStreak: boolean;
-  veteran: boolean;
   inactive: boolean;
-  freshBlood: boolean;
 }
 
 export interface MarketAccountResponse {

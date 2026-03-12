@@ -49,14 +49,9 @@ def test_win_rate():
     assert calculate_win_rate(7, 3) == 0.7
 
 
-def test_ipo_price_with_win_rate_and_status_bonus():
-    price = calculate_ipo_price(
-        1000,
-        0.7,
-        veteran=True,
-        fresh_blood=True,
-    )
-    assert price == pytest.approx(22.2)
+def test_ipo_price_with_win_rate_bonus():
+    price = calculate_ipo_price(1000, 0.7)
+    assert price == pytest.approx(21.6)
 
 
 def test_gamma_base():
@@ -92,7 +87,7 @@ def test_price_floor():
     assert price == 1.0
 
 
-def test_new_price_with_status_and_win_rate_modifiers():
+def test_new_price_with_win_rate_and_hot_streak_modifiers():
     with patch("app.pricing.generate_epsilon", return_value=0.0):
         price = calculate_new_price(
             old_price=20.0,
@@ -101,11 +96,9 @@ def test_new_price_with_status_and_win_rate_modifiers():
             gamma_base=1.0,
             win_rate=0.7,
             hot_streak=True,
-            veteran=True,
-            fresh_blood=True,
         )
 
-    assert price == pytest.approx(26.05076)
+    assert price == pytest.approx(25.292)
 
 
 def test_new_price_unchanged_without_lp_change():
@@ -115,9 +108,7 @@ def test_new_price_unchanged_without_lp_change():
             delta_lp=0,
             streak=0,
             gamma_base=1.0,
-            veteran=True,
             inactive=True,
-            fresh_blood=True,
         )
 
     assert price == 20.0

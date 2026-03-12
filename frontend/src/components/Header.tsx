@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { useStreamerMode } from "../contexts/useStreamerMode";
 import { formatAmount } from "../utils/format";
-import { obfuscateName } from "../utils/streamerMode";
+import { getStreamerSafeName } from "../utils/streamerMode";
 
 export default function Header({
   balance,
   netWorth = 0,
   username,
   playerDisplayName,
+  playerGameName,
   canEditProfile = false,
   onOpenBalanceInsights,
   onEditProfile,
@@ -16,6 +17,7 @@ export default function Header({
   netWorth?: number;
   username?: string;
   playerDisplayName?: string;
+  playerGameName?: string;
   canEditProfile?: boolean;
   onOpenBalanceInsights?: () => void;
   onEditProfile?: () => void;
@@ -80,12 +82,12 @@ export default function Header({
                   <p className="mt-1 break-all font-mono text-sm font-bold text-hex-white">
                     {username ?? "Unknown User"}
                   </p>
-                  {playerDisplayName && (
+                  {(playerDisplayName || playerGameName) && (
                     <p className="mt-2 font-mono text-xs text-hex-bronze">
                       Summoner:{" "}
                       {isStreamerMode
-                        ? obfuscateName(playerDisplayName)
-                        : playerDisplayName}
+                        ? getStreamerSafeName(playerGameName, playerDisplayName)
+                        : (playerDisplayName ?? playerGameName)}
                     </p>
                   )}
                 </div>

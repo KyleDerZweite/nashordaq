@@ -119,9 +119,7 @@ async def test_quote_success(client):
         wins=12,
         losses=8,
         hot_streak=True,
-        veteran=False,
         inactive=False,
-        fresh_blood=True,
     )
 
     with patch("app.main.get_rank", new_callable=AsyncMock, return_value=mock_rank):

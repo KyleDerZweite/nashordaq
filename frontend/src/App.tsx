@@ -17,7 +17,7 @@ import OnboardingModal from "./components/OnboardingModal";
 import { useStreamerMode } from "./contexts/useStreamerMode";
 import type { OrderSide } from "./types";
 import { formatAmount, formatLocalDateTime } from "./utils/format";
-import { obfuscateName } from "./utils/streamerMode";
+import { getStreamerSafeName } from "./utils/streamerMode";
 
 import {
   useBankSummary,
@@ -147,6 +147,7 @@ export default function App() {
         }
         username={user?.username}
         playerDisplayName={linkedPlayer?.display_name}
+        playerGameName={linkedPlayer?.game_name}
         canEditProfile={Boolean(linkedPlayer) && !isAdmin}
         onOpenBalanceInsights={() => setIsBalanceInsightsOpen(true)}
         onEditProfile={() => setIsProfileEditorOpen(true)}
@@ -196,7 +197,7 @@ export default function App() {
                 <div key={p.id} className="flex items-center gap-3 px-5 py-2.5">
                   <span className="font-mono text-xs font-bold text-hex-white">
                     {isStreamerMode
-                      ? obfuscateName(p.display_name)
+                      ? getStreamerSafeName(p.game_name, p.display_name)
                       : p.display_name}
                   </span>
                   <span

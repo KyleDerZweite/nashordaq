@@ -26,8 +26,6 @@ BETA = 0.1
 PRICE_FLOOR = 1.0
 WIN_RATE_NEUTRAL = 0.5
 WIN_RATE_IPO_WEIGHT = 0.4
-VETERAN_BONUS = 0.01
-FRESH_BLOOD_BONUS = 0.02
 
 
 def _max_effective_streak() -> int:
@@ -66,19 +64,11 @@ def calculate_win_rate(wins: int, losses: int) -> float:
 def calculate_ipo_price(
     lp_abs: int,
     win_rate: float = WIN_RATE_NEUTRAL,
-    *,
-    veteran: bool = False,
-    fresh_blood: bool = False,
 ) -> float:
     base_price = (lp_abs / 100) + 10
     win_rate_premium = max(0.0, win_rate - WIN_RATE_NEUTRAL) * WIN_RATE_IPO_WEIGHT
-    status_premium = 0.0
-    if veteran:
-        status_premium += VETERAN_BONUS
-    if fresh_blood:
-        status_premium += FRESH_BLOOD_BONUS
 
-    return max(base_price * (1 + win_rate_premium + status_premium), PRICE_FLOOR)
+    return max(base_price * (1 + win_rate_premium), PRICE_FLOOR)
 
 
 def generate_gamma_base(account_identifier: int) -> float:
@@ -97,9 +87,7 @@ def calculate_new_price(
     *,
     win_rate: float = WIN_RATE_NEUTRAL,
     hot_streak: bool = False,
-    veteran: bool = False,
     inactive: bool = False,
-    fresh_blood: bool = False,
 ) -> float:
     if delta_lp == 0:
         return max(old_price, PRICE_FLOOR)
@@ -115,11 +103,6 @@ def calculate_new_price(
     win_rate_multiplier = 1 + (
         (win_rate - WIN_RATE_NEUTRAL) * settings.pricing_win_rate_price_weight
     )
-    status_multiplier = 1.0
-    if veteran:
-        status_multiplier += VETERAN_BONUS
-    if fresh_blood:
-        status_multiplier += FRESH_BLOOD_BONUS
 
     lp_move = (
         effective_delta_lp
@@ -131,7 +114,7 @@ def calculate_new_price(
     if effective_delta_lp < 0:
         lp_move *= settings.pricing_loss_move_multiplier
 
-    new_price = (old_price + lp_move) * status_multiplier
+    new_price = old_price + lp_move
 
     return max(new_price, PRICE_FLOOR)
 

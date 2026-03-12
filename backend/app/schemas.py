@@ -150,7 +150,9 @@ class OrderResponse(BaseModel):
     id: int
     player_id: int
     player_name: str
+    player_game_name: str
     user_name: str | None = None
+    user_game_name: str | None = None
     side: OrderSide
     quantity: float
     status: OrderStatus
@@ -177,6 +179,7 @@ class GambaPositionResponse(BaseModel):
     id: int
     player_id: int
     player_name: str
+    player_game_name: str
     cash_amount: float
     quantity: float
     entry_price: float
@@ -193,6 +196,7 @@ class GambaPositionResponse(BaseModel):
 class HoldingResponse(BaseModel):
     player_id: int
     player_name: str
+    player_game_name: str
     quantity: int
     average_buy_price: float
     current_price: float
@@ -231,6 +235,7 @@ class AdminUserSummaryResponse(BaseModel):
     role: UserRole
     linked_player_id: int | None
     linked_player_name: str | None
+    linked_player_game_name: str | None
     onboarding_complete: bool
     balance: float
     holdings_value: float
@@ -246,6 +251,7 @@ class AdminUserPortfolioResponse(BaseModel):
     role: UserRole
     linked_player_id: int | None
     linked_player_name: str | None
+    linked_player_game_name: str | None
     onboarding_complete: bool
     created_at: datetime
     rescue_loan_uses_remaining: int
@@ -256,6 +262,7 @@ class AdminUserPortfolioResponse(BaseModel):
 
 class LeaderboardEntry(BaseModel):
     display_name: str
+    game_name: str
     total_value: float
     rank: int
 

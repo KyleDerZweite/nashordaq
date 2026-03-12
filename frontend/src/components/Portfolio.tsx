@@ -2,7 +2,7 @@ import { useEffect, useEffectEvent, useRef, useState } from "react";
 
 import { useStreamerMode } from "../contexts/useStreamerMode";
 import type { PortfolioResponse } from "../types";
-import { obfuscateName } from "../utils/streamerMode";
+import { getStreamerSafeName } from "../utils/streamerMode";
 import { formatAmount } from "../utils/format";
 
 const SUMMARY_GRID_INTERNAL_BORDERS = 6;
@@ -203,7 +203,7 @@ export default function Portfolio({ portfolio, onOpenInsights }: Props) {
               >
                 <td className="px-4 py-2.5 font-mono text-sm font-medium text-hex-white">
                   {isStreamerMode
-                    ? obfuscateName(h.player_name)
+                    ? getStreamerSafeName(h.player_game_name, h.player_name)
                     : h.player_name}
                 </td>
                 <td className="px-4 py-2.5 text-right font-mono text-sm text-hex-bronze">

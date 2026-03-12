@@ -1,6 +1,6 @@
 import { useStreamerMode } from "../contexts/useStreamerMode";
 import type { LeaderboardEntry } from "../types";
-import { obfuscateName } from "../utils/streamerMode";
+import { getStreamerSafeName } from "../utils/streamerMode";
 import { formatAmount } from "../utils/format";
 
 interface Props {
@@ -58,7 +58,7 @@ export default function Leaderboard({ entries }: Props) {
                 </td>
                 <td className="px-4 py-2.5 font-mono text-sm font-medium text-hex-white">
                   {isStreamerMode
-                    ? obfuscateName(e.display_name)
+                    ? getStreamerSafeName(e.game_name, e.display_name)
                     : e.display_name}
                 </td>
                 <td className="px-4 py-2.5 text-right font-mono text-sm font-bold text-hex-gold">

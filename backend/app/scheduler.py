@@ -466,8 +466,6 @@ async def market_update_job() -> None:
                 player.current_price = calculate_ipo_price(
                     new_lp_abs,
                     win_rate,
-                    veteran=rank_data.veteran,
-                    fresh_blood=rank_data.fresh_blood,
                 )
                 player.lp_abs = new_lp_abs
                 player.previous_lp_abs = new_lp_abs
@@ -499,9 +497,7 @@ async def market_update_job() -> None:
                         player.gamma_factor,
                         win_rate=win_rate,
                         hot_streak=rank_data.hot_streak,
-                        veteran=rank_data.veteran,
                         inactive=rank_data.inactive,
-                        fresh_blood=rank_data.fresh_blood,
                     )
                     should_record_market_update = True
                     logger.info(

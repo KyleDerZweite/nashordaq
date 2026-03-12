@@ -30,9 +30,16 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 
-async def _linked_player_name_map(session: AsyncSession) -> dict[int, str]:
-    result = await session.execute(select(TrackedPlayer.id, TrackedPlayer.display_name))
-    return {player_id: display_name for player_id, display_name in result.all()}
+async def _linked_player_identity_map(
+    session: AsyncSession,
+) -> dict[int, tuple[str, str]]:
+    result = await session.execute(
+        select(TrackedPlayer.id, TrackedPlayer.display_name, TrackedPlayer.game_name)
+    )
+    return {
+        player_id: (display_name, game_name)
+        for player_id, display_name, game_name in result.all()
+    }
 
 
 async def _build_admin_user_portfolio_response(
@@ -40,9 +47,11 @@ async def _build_admin_user_portfolio_response(
     user: User,
 ) -> AdminUserPortfolioResponse:
     linked_player_name = None
+    linked_player_game_name = None
     if user.linked_player_id is not None:
         linked_player = await session.get(TrackedPlayer, user.linked_player_id)
         linked_player_name = linked_player.display_name if linked_player else None
+        linked_player_game_name = linked_player.game_name if linked_player else None
 
     snapshot = await build_account_snapshot(session, user)
 
@@ -52,6 +61,7 @@ async def _build_admin_user_portfolio_response(
         role=get_user_role(user.username),
         linked_player_id=user.linked_player_id,
         linked_player_name=linked_player_name,
+        linked_player_game_name=linked_player_game_name,
         onboarding_complete=user.linked_player_id is not None,
         created_at=user.created_at,
         rescue_loan_uses_remaining=snapshot.rescue_loan_uses_remaining,
@@ -131,7 +141,7 @@ async def list_admin_users(
         select(User).order_by(User.created_at.asc(), User.id.asc())
     )
     users = user_result.scalars().all()
-    linked_player_names = await _linked_player_name_map(session)
+    linked_player_identities = await _linked_player_identity_map(session)
 
     summaries: list[AdminUserSummaryResponse] = []
     for user in users:
@@ -143,7 +153,12 @@ async def list_admin_users(
                 role=get_user_role(user.username),
                 linked_player_id=user.linked_player_id,
                 linked_player_name=(
-                    linked_player_names.get(user.linked_player_id)
+                    linked_player_identities.get(user.linked_player_id, (None, None))[0]
+                    if user.linked_player_id is not None
+                    else None
+                ),
+                linked_player_game_name=(
+                    linked_player_identities.get(user.linked_player_id, (None, None))[1]
                     if user.linked_player_id is not None
                     else None
                 ),

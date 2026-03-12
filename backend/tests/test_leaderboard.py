@@ -18,5 +18,6 @@ async def test_leaderboard_single_user(auth_client):
     data = resp.json()
     assert len(data) == 1
     assert data[0]["display_name"] == "Board User"
+    assert data[0]["game_name"] == "boardUser"
     assert data[0]["total_value"] == settings.starting_balance
     assert data[0]["rank"] == 1

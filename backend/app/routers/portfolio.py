@@ -69,6 +69,7 @@ async def build_portfolio_response(
             HoldingResponse(
                 player_id=player.id,
                 player_name=player.display_name,
+                player_game_name=player.game_name,
                 quantity=holding.quantity,
                 average_buy_price=average_buy_price,
                 current_price=player.current_price,
