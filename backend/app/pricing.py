@@ -32,6 +32,30 @@ def _max_effective_streak() -> int:
     return max(1, settings.pricing_max_effective_streak)
 
 
+def _clamp(value: float, low: float, high: float) -> float:
+    return max(low, min(high, value))
+
+
+def _win_streak_lp_ratio_multiplier(
+    avg_lp_loss_on_loss: float | None,
+    avg_lp_gain_on_win: float | None,
+) -> float:
+    if (
+        avg_lp_loss_on_loss is None
+        or avg_lp_gain_on_win is None
+        or avg_lp_loss_on_loss <= 0
+        or avg_lp_gain_on_win <= 0
+    ):
+        return settings.pricing_win_streak_lp_ratio_default
+
+    raw_ratio = avg_lp_loss_on_loss / avg_lp_gain_on_win
+    return _clamp(
+        raw_ratio,
+        settings.pricing_win_streak_lp_ratio_min,
+        settings.pricing_win_streak_lp_ratio_max,
+    )
+
+
 def _apply_lp_efficiency(delta_lp: int) -> float:
     if delta_lp > 0:
         capped_component = min(delta_lp, settings.pricing_positive_lp_soft_cap)
@@ -86,7 +110,8 @@ def calculate_new_price(
     gamma_base: float,
     *,
     win_rate: float = WIN_RATE_NEUTRAL,
-    hot_streak: bool = False,
+    avg_lp_loss_on_loss: float | None = None,
+    avg_lp_gain_on_win: float | None = None,
     inactive: bool = False,
 ) -> float:
     if delta_lp == 0:
@@ -95,10 +120,12 @@ def calculate_new_price(
     effective_delta_lp = _apply_lp_efficiency(delta_lp)
     epsilon = generate_epsilon()
     gamma = gamma_base + epsilon
-    effective_streak = min(abs(streak), _max_effective_streak())
-    streak_multiplier = 1 + BETA * effective_streak
-    if hot_streak:
-        streak_multiplier += settings.pricing_hot_streak_bonus
+    effective_streak = min(max(0, streak), _max_effective_streak())
+    win_streak_ratio = _win_streak_lp_ratio_multiplier(
+        avg_lp_loss_on_loss,
+        avg_lp_gain_on_win,
+    )
+    streak_multiplier = 1 + (BETA * effective_streak * win_streak_ratio)
 
     win_rate_multiplier = 1 + (
         (win_rate - WIN_RATE_NEUTRAL) * settings.pricing_win_rate_price_weight

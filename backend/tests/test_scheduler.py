@@ -191,6 +191,203 @@ async def test_market_update_job_accrues_due_bank_interest(db_engine, monkeypatc
 
 
 @pytest.mark.asyncio
+async def test_market_update_job_learns_win_lp_average_and_passes_to_pricing(
+    db_engine, monkeypatch
+):
+    session_factory = async_sessionmaker(
+        db_engine, class_=AsyncSession, expire_on_commit=False
+    )
+
+    async with session_factory() as session:
+        player = TrackedPlayer(
+            game_name="AvgWinPlayer",
+            tag_line="EUW",
+            display_name="Avg Win Player",
+            puuid="avg-win-puuid",
+            summoner_id="avg-win-summoner",
+            current_price=25.0,
+            lp_abs=1500,
+            previous_lp_abs=1500,
+            streak=0,
+            gamma_factor=1.0,
+            ranked_wins_snapshot=10,
+            ranked_losses_snapshot=10,
+        )
+        session.add(player)
+        await session.commit()
+
+    async def fake_get_rank(**_: object) -> RankData:
+        return RankData(
+            puuid="avg-win-puuid",
+            summoner_id="avg-win-summoner",
+            tier="GOLD",
+            rank="I",
+            league_points=60,
+            wins=12,
+            losses=10,
+            hot_streak=False,
+            inactive=False,
+        )
+
+    captured_kwargs: dict[str, float | None] = {}
+
+    def fake_calculate_new_price(
+        old_price: float,
+        delta_lp: int,
+        streak: int,
+        gamma_base: float,
+        *,
+        win_rate: float,
+        avg_lp_loss_on_loss: float | None,
+        avg_lp_gain_on_win: float | None,
+        inactive: bool,
+    ) -> float:
+        del delta_lp, streak, gamma_base, win_rate, inactive
+        captured_kwargs["avg_lp_loss_on_loss"] = avg_lp_loss_on_loss
+        captured_kwargs["avg_lp_gain_on_win"] = avg_lp_gain_on_win
+        return old_price + 5.0
+
+    async def fake_get_recent_match_ids(**_: object) -> list[str]:
+        return []
+
+    http_client = httpx.AsyncClient()
+    monkeypatch.setattr(scheduler_module, "SessionLocal", session_factory)
+    monkeypatch.setattr(scheduler_module, "get_rank", fake_get_rank)
+    monkeypatch.setattr(
+        scheduler_module,
+        "get_recent_match_ids",
+        fake_get_recent_match_ids,
+    )
+    monkeypatch.setattr(
+        scheduler_module, "calculate_new_price", fake_calculate_new_price
+    )
+    monkeypatch.setattr(
+        scheduler_module,
+        "_app",
+        SimpleNamespace(state=SimpleNamespace(http_client=http_client)),
+    )
+    monkeypatch.setattr(scheduler_module, "_last_market_update_at", None)
+
+    try:
+        await scheduler_module.market_update_job()
+    finally:
+        await http_client.aclose()
+
+    async with session_factory() as session:
+        player = await session.scalar(
+            select(TrackedPlayer).where(TrackedPlayer.game_name == "AvgWinPlayer")
+        )
+
+    assert player is not None
+    assert player.avg_lp_gain_on_win == pytest.approx(30.0)
+    assert player.avg_lp_loss_on_loss is None
+    assert player.ranked_wins_snapshot == 12
+    assert player.ranked_losses_snapshot == 10
+    assert captured_kwargs["avg_lp_gain_on_win"] == pytest.approx(30.0)
+    assert captured_kwargs["avg_lp_loss_on_loss"] is None
+
+
+@pytest.mark.asyncio
+async def test_market_update_job_learns_loss_lp_average_with_ema(
+    db_engine, monkeypatch
+):
+    session_factory = async_sessionmaker(
+        db_engine, class_=AsyncSession, expire_on_commit=False
+    )
+
+    async with session_factory() as session:
+        player = TrackedPlayer(
+            game_name="AvgLossPlayer",
+            tag_line="EUW",
+            display_name="Avg Loss Player",
+            puuid="avg-loss-puuid",
+            summoner_id="avg-loss-summoner",
+            current_price=25.0,
+            lp_abs=1500,
+            previous_lp_abs=1500,
+            streak=0,
+            gamma_factor=1.0,
+            ranked_wins_snapshot=12,
+            ranked_losses_snapshot=10,
+            avg_lp_gain_on_win=28.0,
+            avg_lp_loss_on_loss=20.0,
+        )
+        session.add(player)
+        await session.commit()
+
+    async def fake_get_rank(**_: object) -> RankData:
+        return RankData(
+            puuid="avg-loss-puuid",
+            summoner_id="avg-loss-summoner",
+            tier="GOLD",
+            rank="I",
+            league_points=-10,
+            wins=12,
+            losses=11,
+            hot_streak=False,
+            inactive=False,
+        )
+
+    captured_kwargs: dict[str, float | None] = {}
+
+    def fake_calculate_new_price(
+        old_price: float,
+        delta_lp: int,
+        streak: int,
+        gamma_base: float,
+        *,
+        win_rate: float,
+        avg_lp_loss_on_loss: float | None,
+        avg_lp_gain_on_win: float | None,
+        inactive: bool,
+    ) -> float:
+        del delta_lp, streak, gamma_base, win_rate, inactive
+        captured_kwargs["avg_lp_loss_on_loss"] = avg_lp_loss_on_loss
+        captured_kwargs["avg_lp_gain_on_win"] = avg_lp_gain_on_win
+        return old_price - 2.0
+
+    async def fake_get_recent_match_ids(**_: object) -> list[str]:
+        return []
+
+    http_client = httpx.AsyncClient()
+    monkeypatch.setattr(scheduler_module, "SessionLocal", session_factory)
+    monkeypatch.setattr(scheduler_module, "get_rank", fake_get_rank)
+    monkeypatch.setattr(
+        scheduler_module,
+        "get_recent_match_ids",
+        fake_get_recent_match_ids,
+    )
+    monkeypatch.setattr(
+        scheduler_module, "calculate_new_price", fake_calculate_new_price
+    )
+    monkeypatch.setattr(
+        scheduler_module,
+        "_app",
+        SimpleNamespace(state=SimpleNamespace(http_client=http_client)),
+    )
+    monkeypatch.setattr(scheduler_module, "_last_market_update_at", None)
+
+    try:
+        await scheduler_module.market_update_job()
+    finally:
+        await http_client.aclose()
+
+    async with session_factory() as session:
+        player = await session.scalar(
+            select(TrackedPlayer).where(TrackedPlayer.game_name == "AvgLossPlayer")
+        )
+
+    # EMA update: 20.0 -> (1 - 0.35) * 20 + 0.35 * 10 = 16.5
+    assert player is not None
+    assert player.avg_lp_gain_on_win == pytest.approx(28.0)
+    assert player.avg_lp_loss_on_loss == pytest.approx(16.5)
+    assert player.ranked_wins_snapshot == 12
+    assert player.ranked_losses_snapshot == 11
+    assert captured_kwargs["avg_lp_gain_on_win"] == pytest.approx(28.0)
+    assert captured_kwargs["avg_lp_loss_on_loss"] == pytest.approx(16.5)
+
+
+@pytest.mark.asyncio
 async def test_market_update_job_uses_rescue_interest_rate_at_five_hundred_debt(
     db_engine, monkeypatch
 ):

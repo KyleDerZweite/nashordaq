@@ -76,7 +76,7 @@ def test_new_price_negative_delta():
             old_price=20.0, delta_lp=-50, streak=-1, gamma_base=1.0
         )
     # First -24 LP are full strength; the remaining -26 LP apply at 50% efficiency.
-    assert price == pytest.approx(14.6276)
+    assert price == pytest.approx(15.116)
 
 
 def test_price_floor():
@@ -87,7 +87,7 @@ def test_price_floor():
     assert price == 1.0
 
 
-def test_new_price_with_win_rate_and_hot_streak_modifiers():
+def test_new_price_with_win_rate_modifier():
     with patch("app.pricing.generate_epsilon", return_value=0.0):
         price = calculate_new_price(
             old_price=20.0,
@@ -95,10 +95,9 @@ def test_new_price_with_win_rate_and_hot_streak_modifiers():
             streak=0,
             gamma_base=1.0,
             win_rate=0.7,
-            hot_streak=True,
         )
 
-    assert price == pytest.approx(25.292)
+    assert price == pytest.approx(25.04)
 
 
 def test_new_price_unchanged_without_lp_change():
@@ -117,18 +116,18 @@ def test_new_price_unchanged_without_lp_change():
 def test_streak_positive():
     assert update_streak(0, 10) == 1
     assert update_streak(1, 10) == 2
-    assert update_streak(3, 10) == 4
+    assert update_streak(9, 10) == 10
 
 
 def test_streak_negative():
     assert update_streak(0, -10) == -1
     assert update_streak(-1, -10) == -2
-    assert update_streak(-3, -10) == -4
+    assert update_streak(-9, -10) == -10
 
 
 def test_streak_is_capped_in_both_directions():
-    assert update_streak(4, 10) == 4
-    assert update_streak(-4, -10) == -4
+    assert update_streak(10, 10) == 10
+    assert update_streak(-10, -10) == -10
 
 
 def test_streak_direction_change():
@@ -150,7 +149,35 @@ def test_new_price_uses_capped_streak_multiplier():
             gamma_base=1.0,
         )
 
-    assert price == pytest.approx(26.72)
+    assert price == pytest.approx(29.6)
+
+
+def test_new_price_ratio_scales_win_streak_bonus():
+    with patch("app.pricing.generate_epsilon", return_value=0.0):
+        price = calculate_new_price(
+            old_price=20.0,
+            delta_lp=100,
+            streak=10,
+            gamma_base=1.0,
+            avg_lp_loss_on_loss=10.0,
+            avg_lp_gain_on_win=30.0,
+        )
+
+    assert price == pytest.approx(26.4)
+
+
+def test_new_price_ratio_is_clamped_to_configured_minimum():
+    with patch("app.pricing.generate_epsilon", return_value=0.0):
+        price = calculate_new_price(
+            old_price=20.0,
+            delta_lp=100,
+            streak=10,
+            gamma_base=1.0,
+            avg_lp_loss_on_loss=2.0,
+            avg_lp_gain_on_win=100.0,
+        )
+
+    assert price == pytest.approx(26.0)
 
 
 def test_new_price_softens_positive_lp_above_threshold_before_pricing():

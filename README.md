@@ -34,7 +34,7 @@ Users trade shares in League of Legends players using virtual currency. Share pr
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/youruser/nashordaq.git
+git clone https://github.com/KyleDerZweite/nashordaq.git
 cd nashordaq
 ```
 

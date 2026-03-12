@@ -50,11 +50,14 @@ class Settings(BaseSettings):
     bank_interest_interval_hours: float = 120.0
     bank_rescue_loan_amount: float = 750.0
     bank_rescue_net_worth_threshold: float = 250.0
-    pricing_max_effective_streak: int = 4
+    pricing_max_effective_streak: int = 10
     pricing_alpha: float = 0.12
-    pricing_hot_streak_bonus: float = 0.05
     pricing_win_rate_price_weight: float = 0.25
     pricing_loss_move_multiplier: float = 1.10
+    pricing_win_streak_lp_ratio_default: float = 1.0
+    pricing_win_streak_lp_ratio_min: float = 0.25
+    pricing_win_streak_lp_ratio_max: float = 1.0
+    pricing_lp_average_ema_alpha: float = 0.35
     pricing_positive_lp_soft_cap: int = 20
     pricing_negative_lp_soft_cap: int = 24
     pricing_positive_lp_excess_efficiency: float = 0.25

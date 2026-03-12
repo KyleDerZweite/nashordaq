@@ -35,7 +35,7 @@ nashordaq/
       main.py            # App entrypoint, lifespan, router mounts
       config.py          # Pydantic settings (NASHORDAQ_ env prefix)
       database.py        # Async SQLAlchemy engine + session factory
-      models.py          # ORM models (6 tables)
+      models.py          # ORM models and table definitions
       schemas.py         # Pydantic request/response schemas
       auth.py            # Remote-User auth dependency
       pricing.py         # Pure pricing functions

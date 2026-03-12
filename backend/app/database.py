@@ -92,6 +92,28 @@ async def init_db() -> None:
                     "ADD COLUMN last_playing_income_match_end_at DATETIME"
                 )
             )
+        if "ranked_wins_snapshot" not in tracked_player_columns:
+            await conn.execute(
+                text(
+                    "ALTER TABLE tracked_players "
+                    "ADD COLUMN ranked_wins_snapshot INTEGER"
+                )
+            )
+        if "ranked_losses_snapshot" not in tracked_player_columns:
+            await conn.execute(
+                text(
+                    "ALTER TABLE tracked_players "
+                    "ADD COLUMN ranked_losses_snapshot INTEGER"
+                )
+            )
+        if "avg_lp_gain_on_win" not in tracked_player_columns:
+            await conn.execute(
+                text("ALTER TABLE tracked_players ADD COLUMN avg_lp_gain_on_win FLOAT")
+            )
+        if "avg_lp_loss_on_loss" not in tracked_player_columns:
+            await conn.execute(
+                text("ALTER TABLE tracked_players ADD COLUMN avg_lp_loss_on_loss FLOAT")
+            )
 
         result = await conn.execute(text("PRAGMA table_info(holding_lots)"))
         columns = {row[1] for row in result.fetchall()}

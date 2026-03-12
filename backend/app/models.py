@@ -118,6 +118,10 @@ class TrackedPlayer(Base):
     previous_lp_abs: Mapped[int] = mapped_column(Integer, default=0)
     streak: Mapped[int] = mapped_column(Integer, default=0)
     gamma_factor: Mapped[float] = mapped_column(Float, default=1.0)
+    ranked_wins_snapshot: Mapped[int | None] = mapped_column(Integer, default=None)
+    ranked_losses_snapshot: Mapped[int | None] = mapped_column(Integer, default=None)
+    avg_lp_gain_on_win: Mapped[float | None] = mapped_column(Float, default=None)
+    avg_lp_loss_on_loss: Mapped[float | None] = mapped_column(Float, default=None)
     last_updated: Mapped[datetime | None] = mapped_column(default=None)
     last_playing_income_match_id: Mapped[str | None] = mapped_column(
         String(64), default=None

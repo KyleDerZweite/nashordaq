@@ -131,6 +131,63 @@ def _normalize_datetime(value: datetime) -> datetime:
     return value.astimezone(UTC)
 
 
+def _ema(previous: float | None, sample: float, alpha: float) -> float:
+    if previous is None:
+        return sample
+    return ((1 - alpha) * previous) + (alpha * sample)
+
+
+def _learn_player_lp_averages(
+    player: TrackedPlayer,
+    *,
+    wins: int,
+    losses: int,
+    delta_lp: int,
+) -> None:
+    prev_wins = player.ranked_wins_snapshot
+    prev_losses = player.ranked_losses_snapshot
+
+    # Bootstrap snapshots before learning to avoid fabricating early samples.
+    if prev_wins is None or prev_losses is None:
+        player.ranked_wins_snapshot = wins
+        player.ranked_losses_snapshot = losses
+        return
+
+    win_delta = wins - prev_wins
+    loss_delta = losses - prev_losses
+
+    # Seasonal resets or profile corrections can move counters backward.
+    if win_delta < 0 or loss_delta < 0:
+        player.ranked_wins_snapshot = wins
+        player.ranked_losses_snapshot = losses
+        return
+
+    alpha = min(max(settings.pricing_lp_average_ema_alpha, 0.0), 1.0)
+
+    # Learn per-win LP only from pure win-side updates.
+    if win_delta > 0 and loss_delta == 0 and delta_lp > 0:
+        sample_gain = delta_lp / win_delta
+        if sample_gain > 0:
+            player.avg_lp_gain_on_win = _ema(
+                player.avg_lp_gain_on_win,
+                sample_gain,
+                alpha,
+            )
+
+    # Learn per-loss LP only from pure loss-side updates.
+    if loss_delta > 0 and win_delta == 0 and delta_lp < 0:
+        sample_loss = abs(delta_lp) / loss_delta
+        if sample_loss > 0:
+            player.avg_lp_loss_on_loss = _ema(
+                player.avg_lp_loss_on_loss,
+                sample_loss,
+                alpha,
+            )
+
+    player.ranked_wins_snapshot = wins
+    player.ranked_losses_snapshot = losses
+
+
 async def _get_playing_income_history_start(
     session: AsyncSession,
     player: TrackedPlayer,
@@ -470,6 +527,8 @@ async def market_update_job() -> None:
                 player.lp_abs = new_lp_abs
                 player.previous_lp_abs = new_lp_abs
                 player.gamma_factor = generate_gamma_base(hash(player.puuid) % 10000)
+                player.ranked_wins_snapshot = rank_data.wins
+                player.ranked_losses_snapshot = rank_data.losses
                 should_record_market_update = True
                 logger.info(
                     "Initialized price for %s#%s at %.2f",
@@ -479,6 +538,12 @@ async def market_update_job() -> None:
                 )
             else:
                 delta_lp = new_lp_abs - player.lp_abs
+                _learn_player_lp_averages(
+                    player,
+                    wins=rank_data.wins,
+                    losses=rank_data.losses,
+                    delta_lp=delta_lp,
+                )
 
                 if delta_lp == 0:
                     logger.info(
@@ -496,7 +561,8 @@ async def market_update_job() -> None:
                         player.streak,
                         player.gamma_factor,
                         win_rate=win_rate,
-                        hot_streak=rank_data.hot_streak,
+                        avg_lp_loss_on_loss=player.avg_lp_loss_on_loss,
+                        avg_lp_gain_on_win=player.avg_lp_gain_on_win,
                         inactive=rank_data.inactive,
                     )
                     should_record_market_update = True

@@ -43,8 +43,15 @@ EffectiveDeltaLP =
 	20 + ((Delta_LP_abs - 20) * 0.25)        if Delta_LP_abs > 20
 	-24 + ((Delta_LP_abs + 24) * 0.50)       if Delta_LP_abs < -24
 
-LossAdjustedDeltaLP = EffectiveDeltaLP * 1.10 if EffectiveDeltaLP < 0 else EffectiveDeltaLP
-P_new = P_old + (LossAdjustedDeltaLP * Alpha * StreakMultiplier) * Gamma * WinRateMultiplier
+WinStreakLpRatio = clamp(AvgLpLossOnLoss / AvgLpGainOnWin, 0.25, 1.0)
+WinStreakLpRatio = 1.0 when averages are unavailable
+
+EffectiveStreak = min(max(S, 0), 10)
+StreakMultiplier = 1 + (Beta * EffectiveStreak * WinStreakLpRatio)
+
+PriceDelta = (EffectiveDeltaLP * Alpha * StreakMultiplier) * Gamma * WinRateMultiplier
+PriceDelta = PriceDelta * 1.10 if EffectiveDeltaLP < 0 else PriceDelta
+P_new = P_old + PriceDelta
 ```
 
 If `Delta_LP_abs == 0`, the market state is left unchanged for that cycle.
@@ -53,7 +60,7 @@ If `Delta_LP_abs == 0`, the market state is left unchanged for that cycle.
 |---|---|---|
 | Delta_LP_abs | Change in Absolute LP since last update | Computed per cycle |
 | Alpha | Base volatility scalar | 0.12 |
-| StreakMultiplier | Internal streak momentum plus Riot `hotStreak` bonus | See below |
+| StreakMultiplier | Internal streak momentum scaled by LP loss/win ratio factor | See below |
 | Gamma | Obfuscation factor | `gamma_base + epsilon` |
 
 ### League-V4 Risk Adjustments
@@ -66,23 +73,32 @@ If `Delta_LP_abs == 0`, the market state is left unchanged for that cycle.
 	- The first `-24 LP` of a negative refresh count at full strength; additional LP only count at `50%` efficiency.
 - Negative LP bias
 	- Negative refreshes are multiplied by `1.10` after the LP efficiency taper, so losses hit a bit harder than similarly sized gains.
-- `hotStreak`
-	- Adds an extra `+0.05` momentum bonus on top of the internal streak multiplier.
+- Win streak LP ratio factor
+	- The streak bonus is multiplied by `AvgLpLossOnLoss / AvgLpGainOnWin`, clamped to `[0.25, 1.0]`.
+	- If these average values are unavailable, the factor defaults to `1.0`.
+	- The scheduler persists rolling LP averages per tracked player using an EMA (`alpha = 0.35` default).
+	- Samples are learned from pure refresh directions only:
+		- Wins-only refresh (`wins` increased, `losses` unchanged, `Delta_LP_abs > 0`) updates `AvgLpGainOnWin`.
+		- Losses-only refresh (`losses` increased, `wins` unchanged, `Delta_LP_abs < 0`) updates `AvgLpLossOnLoss`.
+	- Mixed or ambiguous refreshes still update snapshot counters but do not create LP-per-win/loss samples.
 - Flat LP cycle
 	- If Riot reports the same Absolute LP as the previous refresh, Nashordaq does not change price, streak, `last_updated`, or stored price history for that cycle.
 
-**Internal streak:** A signed integer tracking consecutive same-direction updates. Positive for consecutive LP gains and negative for consecutive losses. Resets to +1 or -1 on direction change, and is capped at `+4` / `-4` so momentum stops compounding after four same-direction refreshes. It is only recalculated on cycles where LP changes.
+**Internal streak:** A signed integer tracking consecutive same-direction updates. Positive for consecutive LP gains and negative for consecutive losses. Resets to +1 or -1 on direction change, and is capped at `+10` / `-10`. It is only recalculated on cycles where LP changes. Only positive streak contributes to price momentum.
 
 ```
-EffectiveStreak = min(|S|, 4)
-StreakMultiplier = 1 + (Beta * EffectiveStreak) + (0.05 if hotStreak else 0)
+WinStreakLpRatio = clamp(AvgLpLossOnLoss / AvgLpGainOnWin, 0.25, 1.0)
+WinStreakLpRatio = 1.0 when averages are unavailable
+EffectiveStreak = min(max(S, 0), 10)
+StreakMultiplier = 1 + (Beta * EffectiveStreak * WinStreakLpRatio)
 
 EffectiveDeltaLP =
 	Delta_LP_abs                              if -24 <= Delta_LP_abs <= 20
 	20 + ((Delta_LP_abs - 20) * 0.25)        if Delta_LP_abs > 20
 	-24 + ((Delta_LP_abs + 24) * 0.50)       if Delta_LP_abs < -24
 
-LossAdjustedDeltaLP = EffectiveDeltaLP * 1.10 if EffectiveDeltaLP < 0 else EffectiveDeltaLP
+PriceDelta = (EffectiveDeltaLP * Alpha * StreakMultiplier) * Gamma * WinRateMultiplier
+PriceDelta = PriceDelta * 1.10 if EffectiveDeltaLP < 0 else PriceDelta
 ```
 
 **Gamma base:** Deterministic per-player value generated once from `hash(puuid) % 10000`:
@@ -98,7 +114,7 @@ epsilon = random.uniform(-0.03, 0.03)
 
 **Floor:** `P_new` cannot drop below 1.00.
 
-Implementation: `app/pricing.py::calculate_new_price()`, `calculate_win_rate()`, `update_streak()`
+Implementation: `app/pricing.py::calculate_new_price()`, `calculate_win_rate()`, `update_streak()`, `app/scheduler.py::_learn_player_lp_averages()`
 
 ## 4. Immediate Execution + Holding Adjustment
 
