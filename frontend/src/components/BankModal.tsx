@@ -7,63 +7,16 @@ interface Props {
   onClose: () => void;
 }
 
-const LOW_TIER_MAX = 500;
-const MID_TIER_MAX = 1000;
-const LOW_TIER_RATE = 0.025;
-const MID_TIER_RATE = 0.0275;
-const HIGH_TIER_RATE = 0.03;
-
-function getInterestTier(amount: number): {
-  rate: number;
-  label: string;
-} {
-  if (amount < LOW_TIER_MAX) {
-    return {
-      rate: LOW_TIER_RATE,
-      label: `< ${formatAmount(LOW_TIER_MAX)} P debt`,
-    };
-  }
-
-  if (amount <= MID_TIER_MAX) {
-    return {
-      rate: MID_TIER_RATE,
-      label: `${formatAmount(LOW_TIER_MAX)} P to ${formatAmount(MID_TIER_MAX)} P debt`,
-    };
-  }
-
-  return {
-    rate: HIGH_TIER_RATE,
-    label: `> ${formatAmount(MID_TIER_MAX)} P debt`,
-  };
-}
-
-function entryLabel(type: string): string {
-  if (type === "BORROW") {
-    return "Borrowed";
-  }
-  if (type === "INTEREST") {
-    return "Interest";
-  }
-  if (type === "REPAYMENT") {
-    return "Repaid";
-  }
-  return type;
-}
-
 export default function BankModal({ canManageBank, onClose }: Props) {
-  const [borrowAmount, setBorrowAmount] = useState("");
   const [repayAmount, setRepayAmount] = useState("");
   const { data, isLoading, isError, error } = useBankSummary(canManageBank);
   const borrowFromBank = useBorrowFromBank();
   const repayBankDebt = useRepayBankDebt();
 
-  const parsedBorrowAmount = Number(borrowAmount);
   const parsedRepayAmount = Number(repayAmount);
   const canSubmitBorrow =
     canManageBank &&
-    Number.isFinite(parsedBorrowAmount) &&
-    parsedBorrowAmount > 0 &&
-    parsedBorrowAmount <= (data?.available_credit ?? 0) &&
+    Boolean(data?.rescue_loan_available) &&
     !borrowFromBank.isPending;
   const canSubmitRepay =
     canManageBank &&
@@ -75,14 +28,11 @@ export default function BankModal({ canManageBank, onClose }: Props) {
 
   function handleBorrowSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!canSubmitBorrow) {
+    if (!canSubmitBorrow || !data) {
       return;
     }
 
-    borrowFromBank.mutate(
-      { amount: parsedBorrowAmount },
-      { onSuccess: () => setBorrowAmount("") },
-    );
+    borrowFromBank.mutate({ amount: data.rescue_loan_amount });
   }
 
   function handleRepaySubmit(e: React.FormEvent) {
@@ -101,11 +51,9 @@ export default function BankModal({ canManageBank, onClose }: Props) {
     data?.cash_balance ?? 0,
     data?.debt_outstanding ?? 0,
   );
-  const currentInterestTier = getInterestTier(data?.debt_outstanding ?? 0);
-  const borrowTierPreview = getInterestTier(parsedBorrowAmount);
   const interestCadenceLabel = data
-    ? `Immediate interest on borrow, then tiered rollover every ${data.interest_interval_hours.toFixed(0)} hours`
-    : "Borrowing adds an immediate interest charge, then follows a tiered rollover schedule";
+    ? `Failsafe debt opens with ${(data.rescue_loan_interest_rate * 100).toFixed(2)}% interest, then rolls every ${data.interest_interval_hours.toFixed(0)} hours`
+    : "Failsafe debt opens with interest, then follows the regular rollover schedule";
 
   return (
     <div
@@ -119,7 +67,7 @@ export default function BankModal({ canManageBank, onClose }: Props) {
         <div className="flex items-center justify-between border-b-4 border-hex-gold px-5 py-3">
           <div>
             <h2 className="font-serif text-xl font-bold text-hex-gold">
-              Credit
+              Failsafe Bank
             </h2>
             <p className="mt-1 font-mono text-xs uppercase tracking-[0.18em] text-hex-bronze">
               {interestCadenceLabel}
@@ -136,14 +84,14 @@ export default function BankModal({ canManageBank, onClose }: Props) {
         <div className="px-5 py-4">
           {!canManageBank && (
             <p className="font-mono text-sm text-hex-bronze">
-              Complete onboarding as a player to unlock credit borrowing and
+              Complete onboarding as a player to unlock rescue debt and
               repayment.
             </p>
           )}
 
           {canManageBank && isLoading && (
             <p className="font-mono text-sm text-hex-bronze">
-              Loading credit account...
+              Loading bank account...
             </p>
           )}
 
@@ -156,12 +104,12 @@ export default function BankModal({ canManageBank, onClose }: Props) {
               <div className="grid gap-3 md:grid-cols-4">
                 {[
                   {
-                    label: "Credit Limit",
-                    value: `${formatAmount(data.credit_limit)} P`,
+                    label: "Failsafe",
+                    value: `${formatAmount(data.rescue_loan_amount)} P`,
                   },
                   {
-                    label: "Available",
-                    value: `${formatAmount(data.available_credit)} P`,
+                    label: "Net Worth Gate",
+                    value: `${formatAmount(data.rescue_net_worth_threshold)} P`,
                   },
                   {
                     label: "Outstanding",
@@ -189,7 +137,7 @@ export default function BankModal({ canManageBank, onClose }: Props) {
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2 border border-hex-border px-4 py-3">
                   <h3 className="font-mono text-xs uppercase tracking-[0.18em] text-hex-gold">
-                    Credit Breakdown
+                    Rescue Rules
                   </h3>
                   <p className="font-mono text-xs text-hex-bronze">
                     Principal: {formatAmount(data.debt_principal)} P
@@ -208,21 +156,26 @@ export default function BankModal({ canManageBank, onClose }: Props) {
                     Cash available: {formatAmount(data.cash_balance)} P
                   </p>
                   <p className="font-mono text-xs text-hex-bronze">
-                    Formula: 300 base + 15% net worth, capped at 1.500 P
+                    Unlocks once debt-adjusted net worth falls to{" "}
+                    {formatAmount(data.rescue_net_worth_threshold)} P or below
+                  </p>
+                  <p className="font-mono text-xs text-hex-bronze">
+                    Uses remaining: {data.rescue_loan_uses_remaining}
                   </p>
                 </div>
 
                 <div className="space-y-2 border border-hex-border px-4 py-3">
                   <h3 className="font-mono text-xs uppercase tracking-[0.18em] text-hex-gold">
-                    Next Rollover
+                    Rescue Terms
                   </h3>
                   <p className="font-mono text-xs text-hex-bronze">
-                    Current tier:{" "}
+                    Rescue rate:{" "}
                     {(data.interest_rate_per_interval * 100).toFixed(2)}% /{" "}
                     {data.interest_interval_hours.toFixed(0)}h
                   </p>
                   <p className="font-mono text-xs text-hex-bronze">
-                    Applies at: {currentInterestTier.label}
+                    Opening charge:{" "}
+                    {formatAmount(data.rescue_loan_upfront_interest_amount)} P
                   </p>
                   <p className="font-mono text-xs text-hex-bronze">
                     Next accrual:{" "}
@@ -239,8 +192,10 @@ export default function BankModal({ canManageBank, onClose }: Props) {
                     {formatAmount(data.debt_adjusted_net_worth)} P
                   </p>
                   <p className="font-mono text-xs text-hex-bronze">
-                    Tiers: 2.50% &lt; 500 P, 2.75% up to 1.000 P, 3.00% above
-                    1.000 P
+                    {data.rescue_loan_available
+                      ? "Failsafe is ready to claim."
+                      : (data.rescue_loan_block_reason ??
+                        "Failsafe is currently unavailable.")}
                   </p>
                 </div>
               </div>
@@ -252,53 +207,31 @@ export default function BankModal({ canManageBank, onClose }: Props) {
                 >
                   <div>
                     <h3 className="font-serif text-lg font-bold text-hex-gold">
-                      Borrow
+                      Claim Failsafe
                     </h3>
                     <p className="mt-1 font-mono text-xs text-hex-bronze">
-                      Borrowed cash can be used immediately. The first charge is
-                      added right away using the borrow amount tier.
+                      This is a one-time rescue. Cash lands instantly and the
+                      opening interest is added right away. Once spent, an admin
+                      has to restore it before it can be claimed again.
                     </p>
                   </div>
-                  <div>
-                    <label className="mb-1 block font-mono text-xs uppercase tracking-wider text-hex-bronze">
-                      Amount
-                    </label>
-                    <div className="flex gap-2">
-                      <input
-                        type="number"
-                        min="0.01"
-                        step="0.01"
-                        value={borrowAmount}
-                        onChange={(e) => setBorrowAmount(e.target.value)}
-                        className="w-full border-2 border-hex-border bg-hex-bg px-3 py-2 font-mono text-sm text-hex-white outline-none focus:border-hex-gold"
-                      />
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setBorrowAmount(
-                            data.available_credit > 0
-                              ? data.available_credit.toFixed(2)
-                              : "",
-                          )
-                        }
-                        disabled={data.available_credit <= 0}
-                        className={`shrink-0 border-2 px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider transition-colors ${
-                          data.available_credit > 0
-                            ? "border-hex-gold text-hex-gold hover:bg-hex-gold hover:text-hex-bg"
-                            : "cursor-not-allowed border-hex-border text-hex-border"
-                        }`}
-                      >
-                        Max
-                      </button>
-                    </div>
-                    <p className="mt-2 font-mono text-xs text-hex-bronze">
-                      Available now: {formatAmount(data.available_credit)} P
+                  <div className="space-y-2 border border-hex-border bg-hex-bg-alt px-3 py-3">
+                    <p className="font-mono text-xs uppercase tracking-wider text-hex-bronze">
+                      Rescue Package
                     </p>
-                    <p className="mt-1 font-mono text-xs text-hex-bronze">
-                      {Number.isFinite(parsedBorrowAmount) &&
-                      parsedBorrowAmount > 0
-                        ? `This borrow starts at ${(borrowTierPreview.rate * 100).toFixed(2)}% (${borrowTierPreview.label})`
-                        : "Borrow tiers: 2.50% below 500 P, 2.75% up to 1.000 P, 3.00% above 1.000 P"}
+                    <p className="font-mono text-sm font-bold text-hex-white">
+                      {formatAmount(data.rescue_loan_amount)} P cash
+                    </p>
+                    <p className="font-mono text-xs text-hex-bronze">
+                      Immediate charge:{" "}
+                      {formatAmount(data.rescue_loan_upfront_interest_amount)} P
+                    </p>
+                    <p className="font-mono text-xs text-hex-bronze">
+                      Availability:{" "}
+                      {data.rescue_loan_available ? "Ready" : "Locked"}
+                    </p>
+                    <p className="font-mono text-xs text-hex-bronze">
+                      Uses left: {data.rescue_loan_uses_remaining}
                     </p>
                   </div>
                   {borrowFromBank.isError && (
@@ -316,8 +249,8 @@ export default function BankModal({ canManageBank, onClose }: Props) {
                     }`}
                   >
                     {borrowFromBank.isPending
-                      ? "Borrowing..."
-                      : "Borrow Credit"}
+                      ? "Claiming..."
+                      : "Claim Failsafe"}
                   </button>
                 </form>
 
@@ -381,51 +314,9 @@ export default function BankModal({ canManageBank, onClose }: Props) {
                         : "cursor-not-allowed border-hex-border text-hex-border"
                     }`}
                   >
-                    {repayBankDebt.isPending ? "Repaying..." : "Repay Credit"}
+                    {repayBankDebt.isPending ? "Repaying..." : "Repay Debt"}
                   </button>
                 </form>
-              </div>
-
-              <div className="border border-hex-border px-4 py-3">
-                <h3 className="font-mono text-xs uppercase tracking-[0.18em] text-hex-gold">
-                  Recent Credit Activity
-                </h3>
-                <div
-                  className={`mt-3 space-y-2 ${
-                    data.recent_entries.length > 5
-                      ? "max-h-80 overflow-y-auto pr-1"
-                      : ""
-                  }`}
-                >
-                  {data.recent_entries.length === 0 && (
-                    <p className="font-mono text-xs text-hex-bronze">
-                      No credit activity yet.
-                    </p>
-                  )}
-                  {data.recent_entries.map((entry) => (
-                    <div
-                      key={entry.id}
-                      className="flex items-center justify-between border border-hex-border/60 bg-hex-bg-alt px-3 py-2"
-                    >
-                      <div>
-                        <p className="font-mono text-xs font-bold uppercase tracking-[0.18em] text-hex-white">
-                          {entryLabel(entry.entry_type)}
-                        </p>
-                        <p className="font-mono text-[11px] text-hex-bronze">
-                          {formatLocalDateTime(entry.created_at)}
-                        </p>
-                      </div>
-                      <div className="text-right font-mono text-xs">
-                        <div className="font-bold text-hex-gold">
-                          {formatAmount(entry.amount)} P
-                        </div>
-                        <div className="text-hex-bronze">
-                          Credit: {formatAmount(entry.outstanding_debt)} P
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
               </div>
             </div>
           )}

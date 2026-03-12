@@ -12,7 +12,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.banking import (
     apply_due_interest,
     calculate_playing_income_amount,
+    get_playing_income_daily_multiplier,
+    get_playing_income_minimum_amount,
+    get_playing_income_outcome_multiplier,
     record_user_wealth_snapshot,
+    start_of_utc_day,
 )
 from app.config import settings
 from app.database import SessionLocal
@@ -318,8 +322,11 @@ async def _apply_playing_income_for_player(
         player.last_playing_income_match_end_at = _match_completed_at(latest_summary)
         return
 
+    daily_rewarded_match_counts: dict[datetime, int] = {}
+
     for summary in summaries:
         completed_at = _match_completed_at(summary)
+        day_start = start_of_utc_day(completed_at)
 
         if summary.queue_id != RANKED_SOLO_QUEUE_ID:
             continue
@@ -329,16 +336,34 @@ async def _apply_playing_income_for_player(
         ):
             continue
 
-        outcome_multiplier = (
-            1.0 if summary.win else settings.playing_income_loss_multiplier
+        if day_start not in daily_rewarded_match_counts:
+            day_end = day_start + timedelta(days=1)
+            rewarded_count_result = await session.scalar(
+                select(func.count(PlayingIncomeEntry.id)).where(
+                    PlayingIncomeEntry.user_id == user.id,
+                    PlayingIncomeEntry.match_completed_at >= day_start,
+                    PlayingIncomeEntry.match_completed_at < day_end,
+                )
+            )
+            daily_rewarded_match_counts[day_start] = int(rewarded_count_result or 0)
+
+        match_number_for_day = daily_rewarded_match_counts[day_start] + 1
+        daily_multiplier = get_playing_income_daily_multiplier(match_number_for_day)
+        outcome_multiplier = get_playing_income_outcome_multiplier(
+            summary.win,
+            match_number_for_day,
         )
         amount = calculate_playing_income_amount(
-            player.current_price, outcome_multiplier
+            player.current_price,
+            outcome_multiplier,
+            minimum_amount=get_playing_income_minimum_amount(summary.win),
+            daily_multiplier=daily_multiplier,
         )
         if amount <= 0:
             continue
 
         user.balance += amount
+        daily_rewarded_match_counts[day_start] = match_number_for_day
         session.add(
             PlayingIncomeEntry(
                 user_id=user.id,

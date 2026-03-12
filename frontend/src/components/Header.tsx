@@ -1,31 +1,26 @@
 import { useState } from "react";
+import { useStreamerMode } from "../contexts/useStreamerMode";
 import { formatAmount } from "../utils/format";
+import { obfuscateName } from "../utils/streamerMode";
 
 export default function Header({
   balance,
   netWorth = 0,
-  creditOutstanding = 0,
-  creditAvailable = 0,
   username,
   playerDisplayName,
   canEditProfile = false,
-  showCreditPanel = true,
   onOpenBalanceInsights,
-  onOpenCredit,
   onEditProfile,
 }: {
   balance: number;
   netWorth?: number;
-  creditOutstanding?: number;
-  creditAvailable?: number;
   username?: string;
   playerDisplayName?: string;
   canEditProfile?: boolean;
-  showCreditPanel?: boolean;
   onOpenBalanceInsights?: () => void;
-  onOpenCredit?: () => void;
   onEditProfile?: () => void;
 }) {
+  const { isStreamerMode, toggleStreamerMode } = useStreamerMode();
   const initial = username ? username[0].toUpperCase() : "?";
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -66,29 +61,6 @@ export default function Header({
                 Net worth {formatAmount(netWorth)} P
               </p>
             </button>
-
-            {showCreditPanel && (
-              <button
-                type="button"
-                onClick={onOpenCredit}
-                className="min-w-44 border-2 border-hex-gold-dim px-3.5 py-1.5 text-left shadow-brutal-sm transition-colors hover:border-hex-gold hover:bg-hex-bg-alt/70"
-              >
-                <div className="text-xs uppercase tracking-wider text-hex-bronze">
-                  Credit
-                </div>
-                <p
-                  className={`font-mono text-lg font-bold ${
-                    creditOutstanding > 0 ? "text-red-400" : "text-hex-gold"
-                  }`}
-                >
-                  {formatAmount(creditOutstanding)}
-                  <span className="ml-1 text-xs text-hex-bronze">P</span>
-                </p>
-                <p className="mt-1 font-mono text-[11px] text-hex-bronze">
-                  Available {formatAmount(creditAvailable)} P
-                </p>
-              </button>
-            )}
           </div>
           <div className="relative">
             <button
@@ -110,10 +82,21 @@ export default function Header({
                   </p>
                   {playerDisplayName && (
                     <p className="mt-2 font-mono text-xs text-hex-bronze">
-                      Summoner: {playerDisplayName}
+                      Summoner:{" "}
+                      {isStreamerMode
+                        ? obfuscateName(playerDisplayName)
+                        : playerDisplayName}
                     </p>
                   )}
                 </div>
+
+                <button
+                  type="button"
+                  onClick={toggleStreamerMode}
+                  className="mt-3 w-full border border-hex-border px-3 py-2 text-left font-mono text-xs font-bold uppercase tracking-wider text-hex-bronze transition-colors hover:border-hex-gold hover:text-hex-gold"
+                >
+                  Streamer Mode: {isStreamerMode ? "On" : "Off"}
+                </button>
 
                 <button
                   type="button"

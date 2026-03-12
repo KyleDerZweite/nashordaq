@@ -1,4 +1,6 @@
+import { useStreamerMode } from "../contexts/useStreamerMode";
 import type { LeaderboardEntry } from "../types";
+import { obfuscateName } from "../utils/streamerMode";
 import { formatAmount } from "../utils/format";
 
 interface Props {
@@ -6,6 +8,8 @@ interface Props {
 }
 
 export default function Leaderboard({ entries }: Props) {
+  const { isStreamerMode } = useStreamerMode();
+
   return (
     <section className="border-2 border-hex-gold-dim bg-hex-panel">
       <div className="border-b-2 border-hex-gold-dim px-5 py-3">
@@ -53,7 +57,9 @@ export default function Leaderboard({ entries }: Props) {
                   </span>
                 </td>
                 <td className="px-4 py-2.5 font-mono text-sm font-medium text-hex-white">
-                  {e.display_name}
+                  {isStreamerMode
+                    ? obfuscateName(e.display_name)
+                    : e.display_name}
                 </td>
                 <td className="px-4 py-2.5 text-right font-mono text-sm font-bold text-hex-gold">
                   {formatAmount(e.total_value)}

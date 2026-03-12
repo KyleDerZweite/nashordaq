@@ -22,19 +22,32 @@ DIVISION_MAP: dict[str, int] = {
     "I": 3,
 }
 
-ALPHA = 0.15
 BETA = 0.1
 PRICE_FLOOR = 1.0
 WIN_RATE_NEUTRAL = 0.5
 WIN_RATE_IPO_WEIGHT = 0.4
-WIN_RATE_PRICE_WEIGHT = 0.25
-HOT_STREAK_BONUS = 0.15
 VETERAN_BONUS = 0.01
 FRESH_BLOOD_BONUS = 0.02
 
 
 def _max_effective_streak() -> int:
     return max(1, settings.pricing_max_effective_streak)
+
+
+def _apply_lp_efficiency(delta_lp: int) -> float:
+    if delta_lp > 0:
+        capped_component = min(delta_lp, settings.pricing_positive_lp_soft_cap)
+        excess_component = max(0, delta_lp - settings.pricing_positive_lp_soft_cap)
+        return capped_component + (
+            excess_component * settings.pricing_positive_lp_excess_efficiency
+        )
+    if delta_lp < 0:
+        capped_component = max(delta_lp, -settings.pricing_negative_lp_soft_cap)
+        excess_component = min(0, delta_lp + settings.pricing_negative_lp_soft_cap)
+        return capped_component + (
+            excess_component * settings.pricing_negative_lp_excess_efficiency
+        )
+    return 0
 
 
 def calculate_lp_abs(tier: str, rank: str, league_points: int) -> int:
@@ -91,23 +104,34 @@ def calculate_new_price(
     if delta_lp == 0:
         return max(old_price, PRICE_FLOOR)
 
+    effective_delta_lp = _apply_lp_efficiency(delta_lp)
     epsilon = generate_epsilon()
     gamma = gamma_base + epsilon
     effective_streak = min(abs(streak), _max_effective_streak())
     streak_multiplier = 1 + BETA * effective_streak
     if hot_streak:
-        streak_multiplier += HOT_STREAK_BONUS
+        streak_multiplier += settings.pricing_hot_streak_bonus
 
-    win_rate_multiplier = 1 + ((win_rate - WIN_RATE_NEUTRAL) * WIN_RATE_PRICE_WEIGHT)
+    win_rate_multiplier = 1 + (
+        (win_rate - WIN_RATE_NEUTRAL) * settings.pricing_win_rate_price_weight
+    )
     status_multiplier = 1.0
     if veteran:
         status_multiplier += VETERAN_BONUS
     if fresh_blood:
         status_multiplier += FRESH_BLOOD_BONUS
 
-    new_price = (
-        old_price + (delta_lp * ALPHA * streak_multiplier) * gamma * win_rate_multiplier
-    ) * status_multiplier
+    lp_move = (
+        effective_delta_lp
+        * settings.pricing_alpha
+        * streak_multiplier
+        * gamma
+        * win_rate_multiplier
+    )
+    if effective_delta_lp < 0:
+        lp_move *= settings.pricing_loss_move_multiplier
+
+    new_price = (old_price + lp_move) * status_multiplier
 
     return max(new_price, PRICE_FLOOR)
 

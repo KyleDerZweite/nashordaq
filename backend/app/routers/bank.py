@@ -56,8 +56,13 @@ async def _build_bank_summary(
         debt_accrued_interest=snapshot.debt_accrued_interest,
         debt_outstanding=snapshot.debt_outstanding,
         debt_adjusted_net_worth=snapshot.debt_adjusted_net_worth,
-        credit_limit=snapshot.credit_limit,
-        available_credit=snapshot.available_credit,
+        rescue_loan_amount=snapshot.rescue_loan_amount,
+        rescue_loan_uses_remaining=snapshot.rescue_loan_uses_remaining,
+        rescue_loan_interest_rate=snapshot.rescue_loan_interest_rate,
+        rescue_loan_upfront_interest_amount=snapshot.rescue_loan_upfront_interest_amount,
+        rescue_net_worth_threshold=snapshot.rescue_net_worth_threshold,
+        rescue_loan_available=snapshot.rescue_loan_available,
+        rescue_loan_block_reason=snapshot.rescue_loan_block_reason,
         next_interest_accrual_at=snapshot.next_interest_accrual_at,
         next_interest_amount=snapshot.next_interest_amount,
         interest_rate_per_interval=snapshot.interest_rate_per_interval,
@@ -115,10 +120,19 @@ async def borrow_from_bank(
     snapshot = await build_account_snapshot(session, user, as_of=now)
     amount = round_currency(body.amount)
 
-    if amount > snapshot.available_credit:
+    if amount != snapshot.rescue_loan_amount:
         raise HTTPException(
             status_code=400,
-            detail="Borrow amount exceeds available credit",
+            detail=(
+                f"Rescue loan amount is fixed at {snapshot.rescue_loan_amount:.2f} P"
+            ),
+        )
+
+    if not snapshot.rescue_loan_available:
+        raise HTTPException(
+            status_code=400,
+            detail=snapshot.rescue_loan_block_reason
+            or "Rescue loan is not currently available",
         )
 
     session.add(apply_borrow(user, amount, at=now))

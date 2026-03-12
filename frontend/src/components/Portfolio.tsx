@@ -1,6 +1,8 @@
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 
+import { useStreamerMode } from "../contexts/useStreamerMode";
 import type { PortfolioResponse } from "../types";
+import { obfuscateName } from "../utils/streamerMode";
 import { formatAmount } from "../utils/format";
 
 const SUMMARY_GRID_INTERNAL_BORDERS = 6;
@@ -28,6 +30,7 @@ interface Props {
 }
 
 export default function Portfolio({ portfolio, onOpenInsights }: Props) {
+  const { isStreamerMode } = useStreamerMode();
   const holdings = portfolio?.holdings ?? [];
   const balance = portfolio?.balance ?? 0;
   const holdingsValue = portfolio?.holdings_value ?? 0;
@@ -199,7 +202,9 @@ export default function Portfolio({ portfolio, onOpenInsights }: Props) {
                 className="border-b border-hex-border/50 transition-colors hover:bg-hex-bg-alt"
               >
                 <td className="px-4 py-2.5 font-mono text-sm font-medium text-hex-white">
-                  {h.player_name}
+                  {isStreamerMode
+                    ? obfuscateName(h.player_name)
+                    : h.player_name}
                 </td>
                 <td className="px-4 py-2.5 text-right font-mono text-sm text-hex-bronze">
                   {h.quantity}

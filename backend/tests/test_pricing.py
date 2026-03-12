@@ -71,8 +71,8 @@ def test_new_price_positive_delta():
         price = calculate_new_price(
             old_price=20.0, delta_lp=100, streak=0, gamma_base=1.0
         )
-    # 20 + (100 * 0.15 * (1 + 0.1*0) * 1.0) = 20 + 15 = 35
-    assert price == 35.0
+    # First +20 LP are full strength; the remaining +80 LP apply at 25% efficiency.
+    assert price == pytest.approx(24.8)
 
 
 def test_new_price_negative_delta():
@@ -80,8 +80,8 @@ def test_new_price_negative_delta():
         price = calculate_new_price(
             old_price=20.0, delta_lp=-50, streak=-1, gamma_base=1.0
         )
-    # 20 + (-50 * 0.15 * (1 + 0.1*1) * 1.0) = 20 - 8.25 = 11.75
-    assert price == 11.75
+    # First -24 LP are full strength; the remaining -26 LP apply at 50% efficiency.
+    assert price == pytest.approx(14.6276)
 
 
 def test_price_floor():
@@ -105,7 +105,7 @@ def test_new_price_with_status_and_win_rate_modifiers():
             fresh_blood=True,
         )
 
-    assert price == pytest.approx(39.255875)
+    assert price == pytest.approx(26.05076)
 
 
 def test_new_price_unchanged_without_lp_change():
@@ -159,7 +159,31 @@ def test_new_price_uses_capped_streak_multiplier():
             gamma_base=1.0,
         )
 
-    assert price == 41.0
+    assert price == pytest.approx(26.72)
+
+
+def test_new_price_softens_positive_lp_above_threshold_before_pricing():
+    with patch("app.pricing.generate_epsilon", return_value=0.0):
+        price = calculate_new_price(
+            old_price=20.0,
+            delta_lp=30,
+            streak=0,
+            gamma_base=1.0,
+        )
+
+    assert price == pytest.approx(22.7)
+
+
+def test_new_price_softens_negative_lp_above_threshold_before_loss_bias():
+    with patch("app.pricing.generate_epsilon", return_value=0.0):
+        price = calculate_new_price(
+            old_price=20.0,
+            delta_lp=-30,
+            streak=0,
+            gamma_base=1.0,
+        )
+
+    assert price == pytest.approx(16.436)
 
 
 def test_sell_multiplier_short_hold_penalty():

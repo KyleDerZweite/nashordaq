@@ -14,8 +14,10 @@ import PlayerProfileModal from "./components/PlayerProfileModal";
 import PlayerDetailsModal from "./components/PlayerDetailsModal";
 import TradeTerminal from "./components/TradeTerminal";
 import OnboardingModal from "./components/OnboardingModal";
+import { useStreamerMode } from "./contexts/useStreamerMode";
 import type { OrderSide } from "./types";
 import { formatAmount, formatLocalDateTime } from "./utils/format";
+import { obfuscateName } from "./utils/streamerMode";
 
 import {
   useBankSummary,
@@ -41,6 +43,7 @@ interface TradeTarget {
 type TickerSortMode = "value" | "name";
 
 export default function App() {
+  const { isStreamerMode } = useStreamerMode();
   const [trade, setTrade] = useState<TradeTarget | null>(null);
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
   const [tickerSortMode, setTickerSortMode] = useState<TickerSortMode>("value");
@@ -142,14 +145,10 @@ export default function App() {
           bankSummary?.debt_adjusted_net_worth ??
           balance
         }
-        creditOutstanding={bankSummary?.debt_outstanding ?? 0}
-        creditAvailable={bankSummary?.available_credit ?? 0}
         username={user?.username}
         playerDisplayName={linkedPlayer?.display_name}
         canEditProfile={Boolean(linkedPlayer) && !isAdmin}
-        showCreditPanel={!isAdmin}
         onOpenBalanceInsights={() => setIsBalanceInsightsOpen(true)}
-        onOpenCredit={() => setIsBankModalOpen(true)}
         onEditProfile={() => setIsProfileEditorOpen(true)}
       />
 
@@ -196,7 +195,9 @@ export default function App() {
               {sortedTickerPlayers.map((p) => (
                 <div key={p.id} className="flex items-center gap-3 px-5 py-2.5">
                   <span className="font-mono text-xs font-bold text-hex-white">
-                    {p.display_name}
+                    {isStreamerMode
+                      ? obfuscateName(p.display_name)
+                      : p.display_name}
                   </span>
                   <span
                     className={`font-mono text-xs font-bold ${
@@ -334,6 +335,13 @@ export default function App() {
         <BalanceInsightsModal
           isOpen={isBalanceInsightsOpen}
           onClose={() => setIsBalanceInsightsOpen(false)}
+          canOpenBank={canManageBank}
+          debtOutstanding={bankSummary?.debt_outstanding ?? 0}
+          rescueLoanAvailable={bankSummary?.rescue_loan_available ?? false}
+          onOpenBank={() => {
+            setIsBalanceInsightsOpen(false);
+            setIsBankModalOpen(true);
+          }}
         />
       )}
 

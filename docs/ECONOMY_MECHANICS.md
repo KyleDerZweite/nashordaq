@@ -41,7 +41,13 @@ Implementation: `app/pricing.py::calculate_ipo_price()`
 Calculates the new share price at each market update cycle.
 
 ```
-P_new = (P_old + (Delta_LP_abs * Alpha * StreakMultiplier) * Gamma * WinRateMultiplier) * StatusMultiplier
+EffectiveDeltaLP =
+	Delta_LP_abs                              if -24 <= Delta_LP_abs <= 20
+	20 + ((Delta_LP_abs - 20) * 0.25)        if Delta_LP_abs > 20
+	-24 + ((Delta_LP_abs + 24) * 0.50)       if Delta_LP_abs < -24
+
+LossAdjustedDeltaLP = EffectiveDeltaLP * 1.10 if EffectiveDeltaLP < 0 else EffectiveDeltaLP
+P_new = (P_old + (LossAdjustedDeltaLP * Alpha * StreakMultiplier) * Gamma * WinRateMultiplier) * StatusMultiplier
 ```
 
 If `Delta_LP_abs == 0`, the market state is left unchanged for that cycle.
@@ -49,7 +55,7 @@ If `Delta_LP_abs == 0`, the market state is left unchanged for that cycle.
 | Variable | Description | Value |
 |---|---|---|
 | Delta_LP_abs | Change in Absolute LP since last update | Computed per cycle |
-| Alpha | Base volatility scalar | 0.15 |
+| Alpha | Base volatility scalar | 0.12 |
 | StreakMultiplier | Internal streak momentum plus Riot `hotStreak` bonus | See below |
 | Gamma | Obfuscation factor | `gamma_base + epsilon` |
 
@@ -58,11 +64,16 @@ If `Delta_LP_abs == 0`, the market state is left unchanged for that cycle.
 - `WinRateMultiplier = 1 + ((WinRate - 0.50) * 0.25)`
 	- High win rates slightly amplify positive and negative LP moves.
 	- Low win rates slightly dampen the move size.
+- LP efficiency taper
+	- The first `+20 LP` of a positive refresh count at full strength; additional LP only count at `25%` efficiency.
+	- The first `-24 LP` of a negative refresh count at full strength; additional LP only count at `50%` efficiency.
+- Negative LP bias
+	- Negative refreshes are multiplied by `1.10` after the LP efficiency taper, so losses hit a bit harder than similarly sized gains.
 - `StatusMultiplier`
 	- `+0.01` if `veteran`
 	- `+0.02` if `freshBlood`
 - `hotStreak`
-	- Adds an extra `+0.15` momentum bonus on top of the internal streak multiplier.
+	- Adds an extra `+0.05` momentum bonus on top of the internal streak multiplier.
 - Flat LP cycle
 	- If Riot reports the same Absolute LP as the previous refresh, Nashordaq does not change price, streak, `last_updated`, or stored price history for that cycle.
 
@@ -70,7 +81,14 @@ If `Delta_LP_abs == 0`, the market state is left unchanged for that cycle.
 
 ```
 EffectiveStreak = min(|S|, 4)
-StreakMultiplier = 1 + (Beta * EffectiveStreak) + (0.15 if hotStreak else 0)
+StreakMultiplier = 1 + (Beta * EffectiveStreak) + (0.05 if hotStreak else 0)
+
+EffectiveDeltaLP =
+	Delta_LP_abs                              if -24 <= Delta_LP_abs <= 20
+	20 + ((Delta_LP_abs - 20) * 0.25)        if Delta_LP_abs > 20
+	-24 + ((Delta_LP_abs + 24) * 0.50)       if Delta_LP_abs < -24
+
+LossAdjustedDeltaLP = EffectiveDeltaLP * 1.10 if EffectiveDeltaLP < 0 else EffectiveDeltaLP
 ```
 
 **Gamma base:** Deterministic per-player value generated once from `hash(puuid) % 10000`:
@@ -120,43 +138,37 @@ Orders are validated and executed in the same request.
 - **BUY:** `current_price * quantity` must not exceed user balance.
 - **SELL:** Available shares must be sufficient.
 
-## 6. Bank Credit
+## 6. Bank Failsafe
 
-Bank debt is a separate account-level liability. Borrowing adds cash immediately, but debt-adjusted net worth drops slightly because the first interest charge is added at loan creation.
+Bank debt is now a rescue-only account-level liability. Players do not get a general credit line anymore.
 
-### Credit Limit
+### Rescue Unlock
 
-```
-credit_limit = min(1500, floor_to_50((0.15 * debt_adjusted_net_worth) + 300))
-```
-
-Where:
+The bank offers a fixed failsafe package only when debt-adjusted net worth is low enough, the player has no existing debt, and they still have a rescue use available.
 
 ```
 debt_adjusted_net_worth = cash_balance + holdings_value + active_gamba_mark_value - outstanding_debt
 ```
 
+Current defaults:
+
+- Rescue unlock threshold: `250 P` debt-adjusted net worth or below
+- Rescue amount: `750 P`
+- Rescue cannot be claimed while any debt is still outstanding
+- Rescue starts with `1` lifetime use; after that, an admin must restore access before it can be claimed again
+
 ### Interest Accrual
 
-Outstanding debt compounds every 120 hours using a tiered percentage based on debt size.
-
-- `< 500`: `2.5%`
-- `500` to `1000`: `2.75%`
-- `> 1000`: `3.0%`
+Rescue debt uses a flat `2.0%` interest rate every `120` hours.
 
 ```
-InterestRate(Debt_current) =
-	0.025   if Debt_current < 500
-	0.0275  if 500 <= Debt_current <= 1000
-	0.03    if Debt_current > 1000
-
-Debt_next = Debt_current + (Debt_current * InterestRate(Debt_current))
+Debt_next = Debt_current + (Debt_current * 0.02)
 ```
 
-- Each new borrow also receives an immediate one-time interest charge equal to `borrow_amount * InterestRate(borrow_amount)`.
+- Claiming the failsafe adds cash immediately and also adds an immediate one-time `2.0%` opening charge on the `750 P` rescue amount.
 - Interest capitalizes on the full outstanding debt, including prior accrued interest.
 - Repayments always clear accrued interest before principal.
-- If the scheduler misses one or more rollover windows, the backend catches up one 120-hour interval at a time.
+- If the scheduler misses one or more rollover windows, the backend catches up one `120`-hour interval at a time.
 
 Implementation: `app/banking.py`, `app/routers/bank.py`, `app/scheduler.py`
 
@@ -173,24 +185,33 @@ Linked player accounts receive a small direct cash reward when Nashordaq detects
 
 ### Formula
 
-The reward uses the player's current share price after the latest market refresh.
+The reward uses the player's current share price after the latest market refresh, but caps the price input so already-expensive accounts do not snowball the cash faucet.
 
 ```
-PlayingIncome = P_current * BaseRate * OutcomeMultiplier
+PlayingIncome = max(MinimumPayout, min(P_current, PriceCap) * BaseRate * OutcomeMultiplier) * DailyTierMultiplier
 ```
 
 Current defaults:
 
-- `BaseRate = 0.01`
+- `BaseRate = 0.0125`
+- `PriceCap = 35`
+- `MinimumPayout = 0.20` on a win
+- `MinimumPayout = 0.10` on a loss
 - `OutcomeMultiplier = 1.0` on a win
-- `OutcomeMultiplier = 0.5` on a loss
-- `MinimumPayout = 0.15` per eligible match
+- `OutcomeMultiplier = 0.50` on losses for games `1` to `3` that day
+- `OutcomeMultiplier = 0.45` on losses for games `4` to `6` that day
+- `OutcomeMultiplier = 0.40` on losses from game `7` onward that day
+- `DailyTierMultiplier = 1.15` for games `1` to `3` that day
+- `DailyTierMultiplier = 0.85` for games `4` to `6` that day
+- `DailyTierMultiplier = 0.70` for games `7` to `8` that day
+- `DailyTierMultiplier = 0.50` from game `9` onward that day
 
 Examples:
 
-- A player with current price `42.00` earns `0.42` on a win.
-- The same player earns `0.21` on a loss.
-- A low-priced player still earns at least `0.15` for any eligible match, even when the percentage formula would be lower.
+- A player with current price `42.00` is capped to `35.00` for this calculation and earns `0.50` on their first win of the day.
+- The same player earns `0.25` on their first loss of the day.
+- A low-priced player still earns at least `0.23` for an early win and `0.12` for an early loss because the daily boost also applies to the floor.
+- After three rewarded matches in a day, later games still pay out, but at a reduced daily multiplier.
 
 ### Processing Rules
 
@@ -209,7 +230,7 @@ Nashordaq can occasionally spawn a small clickable poro that flies across the UI
 ### Spawn Rules
 
 - Scheduling is per-user and server-authoritative.
-- Each completed interval rolls a result between `30 minutes` and `3 hours`.
+- Each completed interval rolls a result between `20 minutes` and `2 hours`.
 - Some intervals intentionally produce no poro.
 - Only one active poro can exist per user at a time.
 - Rewards can be claimed once and expire when the poro flight ends.

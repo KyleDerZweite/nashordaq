@@ -6,7 +6,7 @@ from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import CurrentAdminUser, get_user_role
-from app.banking import build_account_snapshot
+from app.banking import build_account_snapshot, restore_rescue_loan_use
 from app.database import get_session
 from app.models import Order, OrderStatus, TrackedPlayer, User
 from app.routers.orders import build_order_responses
@@ -33,6 +33,32 @@ SessionDep = Annotated[AsyncSession, Depends(get_session)]
 async def _linked_player_name_map(session: AsyncSession) -> dict[int, str]:
     result = await session.execute(select(TrackedPlayer.id, TrackedPlayer.display_name))
     return {player_id: display_name for player_id, display_name in result.all()}
+
+
+async def _build_admin_user_portfolio_response(
+    session: AsyncSession,
+    user: User,
+) -> AdminUserPortfolioResponse:
+    linked_player_name = None
+    if user.linked_player_id is not None:
+        linked_player = await session.get(TrackedPlayer, user.linked_player_id)
+        linked_player_name = linked_player.display_name if linked_player else None
+
+    snapshot = await build_account_snapshot(session, user)
+
+    return AdminUserPortfolioResponse(
+        user_id=user.id,
+        username=user.username,
+        role=get_user_role(user.username),
+        linked_player_id=user.linked_player_id,
+        linked_player_name=linked_player_name,
+        onboarding_complete=user.linked_player_id is not None,
+        created_at=user.created_at,
+        rescue_loan_uses_remaining=snapshot.rescue_loan_uses_remaining,
+        rescue_loan_available=snapshot.rescue_loan_available,
+        rescue_loan_block_reason=snapshot.rescue_loan_block_reason,
+        portfolio=await build_portfolio_response(session, user),
+    )
 
 
 @router.get("/overview", response_model=AdminOverviewResponse)
@@ -145,22 +171,28 @@ async def get_admin_user_portfolio(
     user = await session.get(User, user_id)
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
+    return await _build_admin_user_portfolio_response(session, user)
 
-    linked_player_name = None
-    if user.linked_player_id is not None:
-        linked_player = await session.get(TrackedPlayer, user.linked_player_id)
-        linked_player_name = linked_player.display_name if linked_player else None
 
-    return AdminUserPortfolioResponse(
-        user_id=user.id,
-        username=user.username,
-        role=get_user_role(user.username),
-        linked_player_id=user.linked_player_id,
-        linked_player_name=linked_player_name,
-        onboarding_complete=user.linked_player_id is not None,
-        created_at=user.created_at,
-        portfolio=await build_portfolio_response(session, user),
-    )
+@router.post(
+    "/users/{user_id}/rescue-unlock",
+    response_model=AdminUserPortfolioResponse,
+)
+async def restore_admin_user_rescue_unlock(
+    user_id: int,
+    admin_user: CurrentAdminUser,
+    session: SessionDep,
+) -> AdminUserPortfolioResponse:
+    del admin_user
+
+    user = await session.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    restore_rescue_loan_use(user)
+    await session.commit()
+    await session.refresh(user)
+    return await _build_admin_user_portfolio_response(session, user)
 
 
 @router.get("/orders", response_model=list[OrderResponse])

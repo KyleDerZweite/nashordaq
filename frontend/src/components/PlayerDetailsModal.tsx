@@ -1,7 +1,9 @@
 import { useMemo, useState } from "react";
 import TimeSeriesChart, { type TimeSeriesChartDatum } from "./TimeSeriesChart";
+import { useStreamerMode } from "../contexts/useStreamerMode";
 import { usePlayer } from "../api";
 import type { OrderSide, PriceHistoryEntry } from "../types";
+import { obfuscateName, obfuscateRiotHandle } from "../utils/streamerMode";
 import {
   formatAmount,
   formatLocalDate,
@@ -139,6 +141,7 @@ export default function PlayerDetailsModal({
   onTrade,
   onClose,
 }: Props) {
+  const { isStreamerMode } = useStreamerMode();
   const [range, setRange] = useState<ChartRange>(30);
   const [resolution, setResolution] = useState<ChartResolution>("daily");
   const { data: player, isLoading, isError, error } = usePlayer(playerId);
@@ -315,9 +318,13 @@ export default function PlayerDetailsModal({
                 )}
               </div>
               <h2 className="font-serif text-3xl font-bold text-hex-gold">
-                {player?.display_name ?? "Loading player..."}
+                {player
+                  ? isStreamerMode
+                    ? obfuscateName(player.display_name)
+                    : player.display_name
+                  : "Loading player..."}
               </h2>
-              {player && opGgUrl ? (
+              {player && opGgUrl && !isStreamerMode ? (
                 <a
                   href={opGgUrl}
                   target="_blank"
@@ -330,6 +337,10 @@ export default function PlayerDetailsModal({
                   </span>
                   <span>{`${player.game_name}#${player.tag_line}`}</span>
                 </a>
+              ) : player && isStreamerMode ? (
+                <p className="mt-1 font-mono text-sm text-hex-bronze">
+                  {obfuscateRiotHandle(player.game_name, player.tag_line)}
+                </p>
               ) : (
                 <p className="mt-1 font-mono text-sm text-hex-bronze">
                   Fetching complete market history

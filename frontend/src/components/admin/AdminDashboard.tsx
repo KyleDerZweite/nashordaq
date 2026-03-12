@@ -1,11 +1,13 @@
 import { useState } from "react";
 
+import { useStreamerMode } from "../../contexts/useStreamerMode";
 import type {
   AdminOverviewResponse,
   AdminUserSummaryResponse,
   OrderResponse,
   SystemStatusResponse,
 } from "../../types";
+import { obfuscateName } from "../../utils/streamerMode";
 import { formatAmount, formatLocalDateTime } from "../../utils/format";
 import OrderHistory from "../OrderHistory";
 import AdminPortfolioModal from "./AdminPortfolioModal";
@@ -23,6 +25,7 @@ export default function AdminDashboard({
   orders,
   systemStatus,
 }: Props) {
+  const { isStreamerMode } = useStreamerMode();
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
 
   const statCards = [
@@ -176,7 +179,13 @@ export default function AdminDashboard({
                     className="border-b border-hex-border/50 transition-colors hover:bg-hex-bg-alt"
                   >
                     <td className="px-4 py-2.5 font-mono text-sm text-hex-white">
-                      <div>{user.linked_player_name ?? user.username}</div>
+                      <div>
+                        {user.linked_player_name
+                          ? isStreamerMode
+                            ? obfuscateName(user.linked_player_name)
+                            : user.linked_player_name
+                          : user.username}
+                      </div>
                       <div className="text-[11px] text-hex-bronze">
                         {user.username}
                       </div>
@@ -193,7 +202,11 @@ export default function AdminDashboard({
                       </span>
                     </td>
                     <td className="px-4 py-2.5 font-mono text-sm text-hex-bronze">
-                      {user.linked_player_name ?? "Not onboarded"}
+                      {user.linked_player_name
+                        ? isStreamerMode
+                          ? obfuscateName(user.linked_player_name)
+                          : user.linked_player_name
+                        : "Not onboarded"}
                     </td>
                     <td className="px-4 py-2.5 text-right font-mono text-sm font-bold text-hex-gold">
                       {formatAmount(user.total_value)}

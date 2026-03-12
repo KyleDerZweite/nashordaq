@@ -49,8 +49,13 @@ export interface BankSummaryResponse {
   debt_accrued_interest: number;
   debt_outstanding: number;
   debt_adjusted_net_worth: number;
-  credit_limit: number;
-  available_credit: number;
+  rescue_loan_amount: number;
+  rescue_loan_uses_remaining: number;
+  rescue_loan_interest_rate: number;
+  rescue_loan_upfront_interest_amount: number;
+  rescue_net_worth_threshold: number;
+  rescue_loan_available: boolean;
+  rescue_loan_block_reason: string | null;
   next_interest_accrual_at: string | null;
   next_interest_amount: number;
   interest_rate_per_interval: number;
@@ -241,6 +246,9 @@ export interface AdminUserPortfolioResponse {
   linked_player_name: string | null;
   onboarding_complete: boolean;
   created_at: string;
+  rescue_loan_uses_remaining: number;
+  rescue_loan_available: boolean;
+  rescue_loan_block_reason: string | null;
   portfolio: PortfolioResponse;
 }
 

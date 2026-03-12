@@ -1,4 +1,6 @@
+import { useStreamerMode } from "../contexts/useStreamerMode";
 import type { PlayerSummary, OrderSide } from "../types";
+import { obfuscateName, obfuscateRiotHandle } from "../utils/streamerMode";
 import { formatAmount, formatLocalTime } from "../utils/format";
 
 interface Props {
@@ -16,6 +18,7 @@ export default function PlayerCard({
   canTrade = true,
   isOwnStock = false,
 }: Props) {
+  const { isStreamerMode } = useStreamerMode();
   const canBuy = canTrade && player.last_updated !== null && !isOwnStock;
   const trendIndicator =
     player.trend === "up"
@@ -34,10 +37,14 @@ export default function PlayerCard({
         {/* Top row: name + tag */}
         <div className="mb-3 flex items-baseline justify-between">
           <h3 className="font-serif text-xl font-bold text-hex-white transition-colors group-hover:text-hex-gold">
-            {player.display_name}
+            {isStreamerMode
+              ? obfuscateName(player.display_name)
+              : player.display_name}
           </h3>
           <span className="font-mono text-xs text-hex-bronze">
-            {player.game_name}#{player.tag_line}
+            {isStreamerMode
+              ? obfuscateRiotHandle(player.game_name, player.tag_line)
+              : `${player.game_name}#${player.tag_line}`}
           </span>
         </div>
 

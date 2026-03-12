@@ -1,7 +1,9 @@
 import { useMemo, useState } from "react";
+import { useStreamerMode } from "../contexts/useStreamerMode";
 import type { OrderResponse } from "../types";
 import { useCancelOrder } from "../api";
 import OrderDetailsModal from "./OrderDetailsModal";
+import { obfuscateName } from "../utils/streamerMode";
 import { formatAmount, formatQuantity } from "../utils/format";
 
 interface Props {
@@ -21,6 +23,7 @@ export default function OrderHistory({
   allowViewToggle = true,
   title = "Recent Orders",
 }: Props) {
+  const { isStreamerMode } = useStreamerMode();
   const cancelOrder = useCancelOrder();
   const [view, setView] = useState<OrderHistoryView>(defaultView);
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
@@ -130,7 +133,9 @@ export default function OrderHistory({
                   #{o.id}
                 </td>
                 <td className="px-4 py-2.5 font-mono text-sm text-hex-white">
-                  {o.player_name}
+                  {isStreamerMode
+                    ? obfuscateName(o.player_name)
+                    : o.player_name}
                   {o.source === "GAMBA" && (
                     <span className="ml-2 inline-block border border-hex-gold-dim px-1.5 py-0.5 align-middle font-mono text-[10px] font-bold uppercase tracking-wider text-hex-gold">
                       Gamba

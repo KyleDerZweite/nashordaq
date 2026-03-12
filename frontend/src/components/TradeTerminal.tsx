@@ -1,6 +1,8 @@
 import { useState } from "react";
+import { useStreamerMode } from "../contexts/useStreamerMode";
 import type { PlayerSummary, OrderSide } from "../types";
 import { usePlaceOrder } from "../api";
+import { obfuscateName, obfuscateRiotHandle } from "../utils/streamerMode";
 import { formatAmount } from "../utils/format";
 
 interface Props {
@@ -20,6 +22,7 @@ export default function TradeTerminal({
   isOwnStock = false,
   onClose,
 }: Props) {
+  const { isStreamerMode } = useStreamerMode();
   const [quantity, setQuantity] = useState(1);
   const placeOrder = usePlaceOrder();
 
@@ -84,7 +87,10 @@ export default function TradeTerminal({
         {/* Header */}
         <div className="flex items-center justify-between border-b-4 border-hex-gold px-5 py-3">
           <h2 className="font-serif text-xl font-bold text-hex-gold">
-            {side} &mdash; {player.display_name}
+            {side} &mdash;{" "}
+            {isStreamerMode
+              ? obfuscateName(player.display_name)
+              : player.display_name}
           </h2>
           <button
             type="button"
@@ -98,7 +104,9 @@ export default function TradeTerminal({
         {/* Player info */}
         <div className="flex items-baseline justify-between border-b-2 border-hex-border px-5 py-3">
           <span className="font-mono text-xs text-hex-bronze">
-            {player.game_name}#{player.tag_line}
+            {isStreamerMode
+              ? obfuscateRiotHandle(player.game_name, player.tag_line)
+              : `${player.game_name}#${player.tag_line}`}
           </span>
           <span className="font-mono text-lg font-bold text-hex-gold">
             {formatAmount(player.current_price)}

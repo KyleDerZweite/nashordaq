@@ -11,6 +11,10 @@ import {
 interface Props {
   isOpen: boolean;
   onClose: () => void;
+  canOpenBank?: boolean;
+  debtOutstanding?: number;
+  rescueLoanAvailable?: boolean;
+  onOpenBank?: () => void;
 }
 
 function snapshotSourceLabel(source: string): string {
@@ -18,7 +22,7 @@ function snapshotSourceLabel(source: string): string {
     return "Market update";
   }
   if (source === "CREDIT_ACTION") {
-    return "Credit action";
+    return "Debt action";
   }
   if (source === "ONBOARDING") {
     return "Onboarding";
@@ -26,7 +30,14 @@ function snapshotSourceLabel(source: string): string {
   return source;
 }
 
-export default function BalanceInsightsModal({ isOpen, onClose }: Props) {
+export default function BalanceInsightsModal({
+  isOpen,
+  onClose,
+  canOpenBank = false,
+  debtOutstanding = 0,
+  rescueLoanAvailable = false,
+  onOpenBank,
+}: Props) {
   const [range, setRange] = useState<ChartRange>(30);
   const { data, isLoading, isError, error } = useBalanceInsights(isOpen);
   const history = useMemo(() => data?.history ?? [], [data?.history]);
@@ -74,12 +85,24 @@ export default function BalanceInsightsModal({ isOpen, onClose }: Props) {
               Balance, income and net worth through market updates
             </p>
           </div>
-          <button
-            onClick={onClose}
-            className="border-2 border-hex-border px-4 py-3 font-mono text-xs font-bold uppercase tracking-[0.18em] text-hex-bronze transition-colors hover:border-hex-white hover:text-hex-white"
-          >
-            Close
-          </button>
+          <div className="flex items-center gap-2">
+            {canOpenBank && (
+              <button
+                type="button"
+                onClick={onOpenBank}
+                className="border border-hex-border px-3 py-2 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-hex-bronze transition-colors hover:border-hex-gold hover:text-hex-gold"
+              >
+                Bank · {formatAmount(debtOutstanding)} P ·{" "}
+                {rescueLoanAvailable ? "Ready" : "Locked"}
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="border-2 border-hex-border px-4 py-3 font-mono text-xs font-bold uppercase tracking-[0.18em] text-hex-bronze transition-colors hover:border-hex-white hover:text-hex-white"
+            >
+              Close
+            </button>
+          </div>
         </div>
 
         <div className="px-5 py-4">
@@ -114,7 +137,7 @@ export default function BalanceInsightsModal({ isOpen, onClose }: Props) {
                     value: `${formatAmount(data.active_gamba_value)} P`,
                   },
                   {
-                    label: "Credit",
+                    label: "Debt",
                     value: `${formatAmount(data.debt_outstanding)} P`,
                   },
                   {
@@ -189,7 +212,7 @@ export default function BalanceInsightsModal({ isOpen, onClose }: Props) {
                           },
                         ]}
                         className="p-3"
-                        emptyMessage="History will appear after market updates and credit actions create more snapshots."
+                        emptyMessage="History will appear after market updates and debt actions create more snapshots."
                         formatAxisValue={formatAmount}
                         renderTooltipDetails={(datum) => (
                           <div className="space-y-1">
@@ -200,8 +223,8 @@ export default function BalanceInsightsModal({ isOpen, onClose }: Props) {
                               P
                             </div>
                             <div>
-                              Credit{" "}
-                              {formatAmount(Number(datum.meta?.debt ?? 0))} P
+                              Debt {formatAmount(Number(datum.meta?.debt ?? 0))}{" "}
+                              P
                             </div>
                           </div>
                         )}
@@ -215,8 +238,8 @@ export default function BalanceInsightsModal({ isOpen, onClose }: Props) {
                     </div>
                   ) : (
                     <p className="mt-4 font-mono text-xs text-hex-bronze">
-                      History will appear after market updates and credit
-                      actions create more snapshots.
+                      History will appear after market updates and debt actions
+                      create more snapshots.
                     </p>
                   )}
                 </div>

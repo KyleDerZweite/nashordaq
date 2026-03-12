@@ -1,4 +1,6 @@
+import { useStreamerMode } from "../contexts/useStreamerMode";
 import { useOrderDetail } from "../api";
+import { obfuscateName } from "../utils/streamerMode";
 import {
   formatAmount,
   formatLocalDateTime,
@@ -21,6 +23,7 @@ function adjustmentLabel(reason: string | null): string {
 }
 
 export default function OrderDetailsModal({ orderId, onClose }: Props) {
+  const { isStreamerMode } = useStreamerMode();
   const { data: order, isLoading, isError, error } = useOrderDetail(orderId);
 
   return (
@@ -64,7 +67,12 @@ export default function OrderDetailsModal({ orderId, onClose }: Props) {
             <div className="space-y-5">
               <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                 {[
-                  { label: "Stock", value: order.player_name },
+                  {
+                    label: "Stock",
+                    value: isStreamerMode
+                      ? obfuscateName(order.player_name)
+                      : order.player_name,
+                  },
                   { label: "Side", value: order.side },
                   { label: "Qty", value: formatQuantity(order.quantity) },
                   { label: "Source", value: order.source },

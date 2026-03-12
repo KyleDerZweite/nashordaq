@@ -190,12 +190,12 @@ async def test_market_update_job_accrues_due_bank_interest(db_engine, monkeypatc
     assert user is not None
     assert entry is not None
     assert user.debt_principal == pytest.approx(250.0)
-    assert user.debt_accrued_interest == pytest.approx(6.25)
-    assert entry.amount == pytest.approx(6.25)
+    assert user.debt_accrued_interest == pytest.approx(5.0)
+    assert entry.amount == pytest.approx(5.0)
 
 
 @pytest.mark.asyncio
-async def test_market_update_job_uses_mid_interest_tier_at_five_hundred_debt(
+async def test_market_update_job_uses_rescue_interest_rate_at_five_hundred_debt(
     db_engine, monkeypatch
 ):
     session_factory = async_sessionmaker(
@@ -277,8 +277,8 @@ async def test_market_update_job_uses_mid_interest_tier_at_five_hundred_debt(
     assert user is not None
     assert entry is not None
     assert user.debt_principal == pytest.approx(500.0)
-    assert user.debt_accrued_interest == pytest.approx(13.75)
-    assert entry.amount == pytest.approx(13.75)
+    assert user.debt_accrued_interest == pytest.approx(10.0)
+    assert entry.amount == pytest.approx(10.0)
 
 
 @pytest.mark.asyncio
@@ -422,8 +422,10 @@ async def test_market_update_job_applies_playing_income_once_per_new_match(
     assert [entry.match_id for entry in entries] == ["EUW1_100", "EUW1_101", "EUW1_102"]
     assert entries[1].match_result == PlayingIncomeMatchResult.LOSS
     assert entries[1].amount == pytest.approx(0.25)
+    assert entries[1].base_rate == pytest.approx(0.0125)
     assert entries[2].match_result == PlayingIncomeMatchResult.WIN
     assert entries[2].amount == pytest.approx(0.5)
+    assert entries[2].share_price == pytest.approx(50.0)
     assert player.last_playing_income_match_id == "EUW1_102"
 
 
@@ -679,8 +681,175 @@ async def test_market_update_job_applies_minimum_playing_income_amount(
 
     assert user is not None
     assert entry is not None
-    assert user.balance == pytest.approx(1000.15)
-    assert entry.amount == pytest.approx(0.15)
+    assert user.balance == pytest.approx(1000.12)
+    assert entry.amount == pytest.approx(0.12)
+
+
+@pytest.mark.asyncio
+async def test_market_update_job_reduces_playing_income_after_three_games_in_day(
+    db_engine, monkeypatch
+):
+    session_factory = async_sessionmaker(
+        db_engine, class_=AsyncSession, expire_on_commit=False
+    )
+
+    match_day = datetime(2026, 3, 9, 0, 0, tzinfo=UTC)
+
+    async with session_factory() as session:
+        player = TrackedPlayer(
+            game_name="DailyIncomePlayer",
+            tag_line="EUW",
+            display_name="Daily Income Player",
+            puuid="daily-income-puuid",
+            summoner_id="daily-income-summoner",
+            current_price=50.0,
+            lp_abs=1500,
+            previous_lp_abs=1500,
+            streak=0,
+            gamma_factor=1.0,
+            last_updated=datetime(2026, 3, 10, 12, 0, tzinfo=UTC),
+            last_playing_income_match_id="EUW1_703",
+        )
+        session.add(player)
+        await session.flush()
+        user = User(
+            username="daily-income-user",
+            balance=1000.0,
+            linked_player_id=player.id,
+        )
+        session.add(user)
+        await session.flush()
+        session.add_all(
+            [
+                PlayingIncomeEntry(
+                    user_id=user.id,
+                    player_id=player.id,
+                    match_id="EUW1_701",
+                    match_result=PlayingIncomeMatchResult.WIN,
+                    match_duration_seconds=1800,
+                    match_completed_at=match_day + timedelta(hours=1),
+                    share_price=50.0,
+                    base_rate=0.0125,
+                    outcome_multiplier=1.0,
+                    amount=0.5,
+                ),
+                PlayingIncomeEntry(
+                    user_id=user.id,
+                    player_id=player.id,
+                    match_id="EUW1_702",
+                    match_result=PlayingIncomeMatchResult.WIN,
+                    match_duration_seconds=1800,
+                    match_completed_at=match_day + timedelta(hours=2),
+                    share_price=50.0,
+                    base_rate=0.0125,
+                    outcome_multiplier=1.0,
+                    amount=0.5,
+                ),
+                PlayingIncomeEntry(
+                    user_id=user.id,
+                    player_id=player.id,
+                    match_id="EUW1_703",
+                    match_result=PlayingIncomeMatchResult.WIN,
+                    match_duration_seconds=1800,
+                    match_completed_at=match_day + timedelta(hours=3),
+                    share_price=50.0,
+                    base_rate=0.0125,
+                    outcome_multiplier=1.0,
+                    amount=0.5,
+                ),
+            ]
+        )
+        await session.commit()
+
+    async def fake_get_rank(**_: object) -> RankData:
+        return RankData(
+            puuid="daily-income-puuid",
+            summoner_id="daily-income-summoner",
+            tier="GOLD",
+            rank="I",
+            league_points=0,
+            wins=10,
+            losses=10,
+            hot_streak=False,
+            veteran=False,
+            inactive=False,
+            fresh_blood=False,
+        )
+
+    async def fake_get_recent_match_ids(**_: object) -> list[str]:
+        return ["EUW1_705", "EUW1_704", "EUW1_703"]
+
+    async def fake_get_match_summary(**kwargs: object) -> MatchSummary:
+        match_id = str(kwargs["match_id"])
+        summaries = {
+            "EUW1_704": MatchSummary(
+                match_id="EUW1_704",
+                queue_id=420,
+                win=True,
+                game_duration_seconds=1800,
+                game_end_timestamp=1_773_082_800_000,
+            ),
+            "EUW1_705": MatchSummary(
+                match_id="EUW1_705",
+                queue_id=420,
+                win=False,
+                game_duration_seconds=1800,
+                game_end_timestamp=1_773_086_400_000,
+            ),
+        }
+        return summaries[match_id]
+
+    http_client = httpx.AsyncClient()
+    monkeypatch.setattr(scheduler_module, "SessionLocal", session_factory)
+    monkeypatch.setattr(scheduler_module, "get_rank", fake_get_rank)
+    monkeypatch.setattr(
+        scheduler_module.settings,
+        "playing_income_start_date",
+        datetime(2026, 3, 1, tzinfo=UTC),
+    )
+    monkeypatch.setattr(
+        scheduler_module,
+        "get_recent_match_ids",
+        fake_get_recent_match_ids,
+    )
+    monkeypatch.setattr(
+        scheduler_module,
+        "get_match_summary",
+        fake_get_match_summary,
+    )
+    monkeypatch.setattr(
+        scheduler_module,
+        "_app",
+        SimpleNamespace(state=SimpleNamespace(http_client=http_client)),
+    )
+    monkeypatch.setattr(scheduler_module, "_last_market_update_at", None)
+
+    try:
+        await scheduler_module.market_update_job()
+    finally:
+        await http_client.aclose()
+
+    async with session_factory() as session:
+        user = await session.scalar(
+            select(User).where(User.username == "daily-income-user")
+        )
+        assert user is not None
+        entries = (
+            (
+                await session.execute(
+                    select(PlayingIncomeEntry)
+                    .where(PlayingIncomeEntry.user_id == user.id)
+                    .order_by(PlayingIncomeEntry.match_completed_at.asc())
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+    assert user.balance == pytest.approx(1000.54)
+    assert [entry.match_id for entry in entries[-2:]] == ["EUW1_704", "EUW1_705"]
+    assert entries[-2].amount == pytest.approx(0.37)
+    assert entries[-1].amount == pytest.approx(0.17)
 
 
 @pytest.mark.asyncio
@@ -814,8 +983,9 @@ async def test_market_update_job_falls_back_when_start_time_query_is_rejected(
         )
 
     assert user is not None
-    assert user.balance == pytest.approx(1000.35)
+    assert user.balance == pytest.approx(1000.43)
     assert [entry.match_id for entry in entries] == ["EUW1_949", "EUW1_950"]
+    assert [entry.amount for entry in entries] == pytest.approx([0.14, 0.29])
     assert request_calls[0]["start_time"] is not None
     assert request_calls[1]["start_time"] is None
 
@@ -1025,8 +1195,9 @@ async def test_market_update_job_skips_malformed_match_summary_and_continues(
         )
 
     assert user is not None
-    assert user.balance == pytest.approx(1000.35)
+    assert user.balance == pytest.approx(1000.43)
     assert [entry.match_id for entry in entries] == ["EUW1_1000", "EUW1_1002"]
+    assert [entry.amount for entry in entries] == pytest.approx([0.14, 0.29])
 
 
 @pytest.mark.asyncio

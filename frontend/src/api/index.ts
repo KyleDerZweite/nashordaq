@@ -30,6 +30,7 @@ export {
   useCreateGambaPosition,
   useBorrowFromBank,
   useRepayBankDebt,
+  useRestoreAdminRescue,
   useClaimPoro,
   usePlaceOrder,
   useCancelOrder,

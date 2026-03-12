@@ -1,4 +1,6 @@
-import { useAdminUserPortfolio } from "../../api";
+import { useStreamerMode } from "../../contexts/useStreamerMode";
+import { useAdminUserPortfolio, useRestoreAdminRescue } from "../../api";
+import { obfuscateName } from "../../utils/streamerMode";
 import { formatAmount, formatLocalDateTime } from "../../utils/format";
 
 interface Props {
@@ -7,7 +9,9 @@ interface Props {
 }
 
 export default function AdminPortfolioModal({ userId, onClose }: Props) {
+  const { isStreamerMode } = useStreamerMode();
   const { data, isLoading, isError, error } = useAdminUserPortfolio(userId);
+  const restoreAdminRescue = useRestoreAdminRescue(userId);
 
   return (
     <div
@@ -26,7 +30,11 @@ export default function AdminPortfolioModal({ userId, onClose }: Props) {
             {data && (
               <p className="mt-1 font-mono text-xs uppercase tracking-[0.18em] text-hex-bronze">
                 {data.username} ·{" "}
-                {data.linked_player_name ?? "No linked player"}
+                {data.linked_player_name
+                  ? isStreamerMode
+                    ? obfuscateName(data.linked_player_name)
+                    : data.linked_player_name
+                  : "No linked player"}
               </p>
             )}
           </div>
@@ -65,7 +73,11 @@ export default function AdminPortfolioModal({ userId, onClose }: Props) {
                   },
                   {
                     label: "Linked Player",
-                    value: data.linked_player_name ?? "None",
+                    value: data.linked_player_name
+                      ? isStreamerMode
+                        ? obfuscateName(data.linked_player_name)
+                        : data.linked_player_name
+                      : "None",
                   },
                 ].map((item) => (
                   <div
@@ -103,6 +115,53 @@ export default function AdminPortfolioModal({ userId, onClose }: Props) {
                 ))}
               </div>
 
+              <div className="border border-hex-border px-4 py-4">
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div className="space-y-2">
+                    <h3 className="font-serif text-lg font-bold text-hex-gold">
+                      Failsafe Access
+                    </h3>
+                    <p className="font-mono text-xs text-hex-bronze">
+                      Uses remaining: {data.rescue_loan_uses_remaining}
+                    </p>
+                    <p className="font-mono text-xs text-hex-bronze">
+                      Status:{" "}
+                      {data.rescue_loan_available
+                        ? "Ready if the user is under the net-worth gate"
+                        : (data.rescue_loan_block_reason ?? "Locked")}
+                    </p>
+                  </div>
+
+                  <div className="w-full max-w-xs space-y-2">
+                    {restoreAdminRescue.isError && (
+                      <p className="font-mono text-xs text-hex-zaun">
+                        {restoreAdminRescue.error.message}
+                      </p>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => restoreAdminRescue.mutate()}
+                      disabled={
+                        restoreAdminRescue.isPending ||
+                        data.rescue_loan_uses_remaining > 0
+                      }
+                      className={`w-full border-2 px-4 py-2 font-mono text-xs font-bold uppercase tracking-[0.18em] transition-colors ${
+                        !restoreAdminRescue.isPending &&
+                        data.rescue_loan_uses_remaining === 0
+                          ? "border-hex-gold text-hex-gold hover:bg-hex-gold hover:text-hex-bg"
+                          : "cursor-not-allowed border-hex-border text-hex-border"
+                      }`}
+                    >
+                      {restoreAdminRescue.isPending
+                        ? "Restoring..."
+                        : data.rescue_loan_uses_remaining > 0
+                          ? "Failsafe Already Available"
+                          : "Restore One Failsafe Use"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               <div className="overflow-x-auto border border-hex-border">
                 <table className="w-full">
                   <thead>
@@ -131,7 +190,9 @@ export default function AdminPortfolioModal({ userId, onClose }: Props) {
                         className="border-b border-hex-border/50"
                       >
                         <td className="px-4 py-2.5 font-mono text-sm text-hex-white">
-                          {holding.player_name}
+                          {isStreamerMode
+                            ? obfuscateName(holding.player_name)
+                            : holding.player_name}
                         </td>
                         <td className="px-4 py-2.5 text-right font-mono text-sm text-hex-bronze">
                           {holding.quantity}

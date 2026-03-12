@@ -64,8 +64,13 @@ class BankSummaryResponse(BaseModel):
     debt_accrued_interest: float
     debt_outstanding: float
     debt_adjusted_net_worth: float
-    credit_limit: float
-    available_credit: float
+    rescue_loan_amount: float
+    rescue_loan_uses_remaining: int
+    rescue_loan_interest_rate: float
+    rescue_loan_upfront_interest_amount: float
+    rescue_net_worth_threshold: float
+    rescue_loan_available: bool
+    rescue_loan_block_reason: str | None
     next_interest_accrual_at: datetime | None
     next_interest_amount: float
     interest_rate_per_interval: float
@@ -243,6 +248,9 @@ class AdminUserPortfolioResponse(BaseModel):
     linked_player_name: str | None
     onboarding_complete: bool
     created_at: datetime
+    rescue_loan_uses_remaining: int
+    rescue_loan_available: bool
+    rescue_loan_block_reason: str | None
     portfolio: PortfolioResponse
 
 

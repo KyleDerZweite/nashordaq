@@ -27,25 +27,31 @@ async def test_bank_borrow_applies_immediate_interest_and_reduces_net_worth(
     user_id = me_resp.json()["id"]
     user = await db_session.get(User, user_id)
     assert user is not None
-    user.balance = 1000.0
+    user.balance = 200.0
     await db_session.commit()
 
     summary_resp = await auth_client.get("/api/bank")
     assert summary_resp.status_code == 200
     summary = summary_resp.json()
-    assert summary["credit_limit"] == pytest.approx(450.0)
-    assert summary["available_credit"] == pytest.approx(450.0)
+    assert summary["rescue_loan_available"] is True
+    assert summary["rescue_loan_amount"] == pytest.approx(750.0)
+    assert summary["rescue_loan_uses_remaining"] == 1
+    assert summary["rescue_loan_upfront_interest_amount"] == pytest.approx(15.0)
 
-    borrow_resp = await auth_client.post("/api/bank/borrow", json={"amount": 400})
+    borrow_resp = await auth_client.post("/api/bank/borrow", json={"amount": 750})
     assert borrow_resp.status_code == 200
     borrowed = borrow_resp.json()
-    assert borrowed["cash_balance"] == pytest.approx(1400.0)
-    assert borrowed["debt_principal"] == pytest.approx(400.0)
-    assert borrowed["debt_accrued_interest"] == pytest.approx(10.0)
-    assert borrowed["debt_outstanding"] == pytest.approx(410.0)
-    assert borrowed["debt_adjusted_net_worth"] == pytest.approx(990.0)
-    assert borrowed["available_credit"] == pytest.approx(0.0)
-    assert borrowed["interest_rate_per_interval"] == pytest.approx(0.025)
+    assert borrowed["cash_balance"] == pytest.approx(950.0)
+    assert borrowed["debt_principal"] == pytest.approx(750.0)
+    assert borrowed["debt_accrued_interest"] == pytest.approx(15.0)
+    assert borrowed["debt_outstanding"] == pytest.approx(765.0)
+    assert borrowed["debt_adjusted_net_worth"] == pytest.approx(185.0)
+    assert borrowed["rescue_loan_available"] is False
+    assert borrowed["rescue_loan_uses_remaining"] == 0
+    assert borrowed["rescue_loan_block_reason"] == (
+        "Rescue loan unavailable while debt is outstanding"
+    )
+    assert borrowed["interest_rate_per_interval"] == pytest.approx(0.02)
     assert [entry["entry_type"] for entry in borrowed["recent_entries"][:2]] == [
         "INTEREST",
         "BORROW",
@@ -53,14 +59,14 @@ async def test_bank_borrow_applies_immediate_interest_and_reduces_net_worth(
 
     portfolio_resp = await auth_client.get("/api/portfolio")
     assert portfolio_resp.status_code == 200
-    assert portfolio_resp.json()["total_value"] == pytest.approx(990.0)
+    assert portfolio_resp.json()["total_value"] == pytest.approx(185.0)
 
     leaderboard_resp = await auth_client.get("/api/leaderboard")
     assert leaderboard_resp.status_code == 200
-    assert leaderboard_resp.json()[0]["total_value"] == pytest.approx(990.0)
+    assert leaderboard_resp.json()[0]["total_value"] == pytest.approx(185.0)
 
 
-async def test_bank_credit_limit_adds_flat_credit_at_four_thousand_net_worth(
+async def test_bank_summary_locks_rescue_when_net_worth_is_above_threshold(
     auth_client,
     db_session,
 ):
@@ -77,11 +83,13 @@ async def test_bank_credit_limit_adds_flat_credit_at_four_thousand_net_worth(
     assert summary_resp.status_code == 200
     summary = summary_resp.json()
     assert summary["debt_adjusted_net_worth"] == pytest.approx(4000.0)
-    assert summary["credit_limit"] == pytest.approx(900.0)
-    assert summary["available_credit"] == pytest.approx(900.0)
+    assert summary["rescue_loan_available"] is False
+    assert summary["rescue_loan_block_reason"] == (
+        "Rescue loan unlocks once net worth falls to 250 P or below"
+    )
 
 
-async def test_bank_credit_limit_includes_flat_component_at_zero_net_worth(
+async def test_bank_summary_unlocks_rescue_at_zero_net_worth(
     auth_client,
     db_session,
 ):
@@ -98,29 +106,12 @@ async def test_bank_credit_limit_includes_flat_component_at_zero_net_worth(
     assert summary_resp.status_code == 200
     summary = summary_resp.json()
     assert summary["debt_adjusted_net_worth"] == pytest.approx(0.0)
-    assert summary["credit_limit"] == pytest.approx(300.0)
-    assert summary["available_credit"] == pytest.approx(300.0)
+    assert summary["rescue_loan_available"] is True
+    assert summary["rescue_loan_amount"] == pytest.approx(750.0)
+    assert summary["rescue_net_worth_threshold"] == pytest.approx(250.0)
 
 
-async def test_bank_credit_limit_respects_absolute_cap(auth_client, db_session):
-    await _onboard_bank_user(auth_client)
-
-    me_resp = await auth_client.get("/api/user/me")
-    user_id = me_resp.json()["id"]
-    user = await db_session.get(User, user_id)
-    assert user is not None
-    user.balance = 12000.0
-    await db_session.commit()
-
-    summary_resp = await auth_client.get("/api/bank")
-    assert summary_resp.status_code == 200
-    summary = summary_resp.json()
-    assert summary["debt_adjusted_net_worth"] == pytest.approx(12000.0)
-    assert summary["credit_limit"] == pytest.approx(1500.0)
-    assert summary["available_credit"] == pytest.approx(1500.0)
-
-
-async def test_bank_borrow_rejects_amount_above_available_credit(
+async def test_bank_borrow_rejects_wrong_rescue_amount(
     auth_client,
     db_session,
 ):
@@ -130,12 +121,32 @@ async def test_bank_borrow_rejects_amount_above_available_credit(
     user_id = me_resp.json()["id"]
     user = await db_session.get(User, user_id)
     assert user is not None
-    user.balance = 1000.0
+    user.balance = 200.0
     await db_session.commit()
 
     borrow_resp = await auth_client.post("/api/bank/borrow", json={"amount": 550})
     assert borrow_resp.status_code == 400
-    assert borrow_resp.json()["detail"] == "Borrow amount exceeds available credit"
+    assert borrow_resp.json()["detail"] == "Rescue loan amount is fixed at 750.00 P"
+
+
+async def test_bank_borrow_rejects_rescue_when_net_worth_is_too_high(
+    auth_client,
+    db_session,
+):
+    await _onboard_bank_user(auth_client)
+
+    me_resp = await auth_client.get("/api/user/me")
+    user_id = me_resp.json()["id"]
+    user = await db_session.get(User, user_id)
+    assert user is not None
+    user.balance = 400.0
+    await db_session.commit()
+
+    borrow_resp = await auth_client.post("/api/bank/borrow", json={"amount": 750})
+    assert borrow_resp.status_code == 400
+    assert borrow_resp.json()["detail"] == (
+        "Rescue loan unlocks once net worth falls to 250 P or below"
+    )
 
 
 async def test_bank_repayment_clears_interest_first(auth_client, db_session):
@@ -145,10 +156,10 @@ async def test_bank_repayment_clears_interest_first(auth_client, db_session):
     user_id = me_resp.json()["id"]
     user = await db_session.get(User, user_id)
     assert user is not None
-    user.balance = 1000.0
+    user.balance = 200.0
     await db_session.commit()
 
-    borrow_resp = await auth_client.post("/api/bank/borrow", json={"amount": 400})
+    borrow_resp = await auth_client.post("/api/bank/borrow", json={"amount": 750})
     assert borrow_resp.status_code == 200
 
     user = await db_session.get(User, user_id)
@@ -160,13 +171,13 @@ async def test_bank_repayment_clears_interest_first(auth_client, db_session):
     repay_resp = await auth_client.post("/api/bank/repay", json={"amount": 60})
     assert repay_resp.status_code == 200
     repaid = repay_resp.json()
-    assert repaid["cash_balance"] == pytest.approx(1340.0)
-    assert repaid["debt_principal"] == pytest.approx(350.0)
+    assert repaid["cash_balance"] == pytest.approx(890.0)
+    assert repaid["debt_principal"] == pytest.approx(700.0)
     assert repaid["debt_accrued_interest"] == pytest.approx(0.0)
-    assert repaid["debt_outstanding"] == pytest.approx(350.0)
+    assert repaid["debt_outstanding"] == pytest.approx(700.0)
 
 
-async def test_bank_second_borrow_charges_interest_only_on_new_amount(
+async def test_bank_rescue_cannot_be_taken_twice_while_debt_is_outstanding(
     auth_client,
     db_session,
 ):
@@ -176,27 +187,52 @@ async def test_bank_second_borrow_charges_interest_only_on_new_amount(
     user_id = me_resp.json()["id"]
     user = await db_session.get(User, user_id)
     assert user is not None
-    user.balance = 3000.0
+    user.balance = 100.0
     await db_session.commit()
 
-    first_borrow_resp = await auth_client.post("/api/bank/borrow", json={"amount": 500})
+    first_borrow_resp = await auth_client.post("/api/bank/borrow", json={"amount": 750})
     assert first_borrow_resp.status_code == 200
 
     second_borrow_resp = await auth_client.post(
-        "/api/bank/borrow", json={"amount": 100}
+        "/api/bank/borrow", json={"amount": 750}
     )
-    assert second_borrow_resp.status_code == 200
-    borrowed = second_borrow_resp.json()
-    assert borrowed["debt_principal"] == pytest.approx(600.0)
-    assert borrowed["debt_accrued_interest"] == pytest.approx(16.25)
-    assert borrowed["debt_outstanding"] == pytest.approx(616.25)
-    assert borrowed["interest_rate_per_interval"] == pytest.approx(0.0275)
-    assert [entry["entry_type"] for entry in borrowed["recent_entries"][:4]] == [
-        "INTEREST",
-        "BORROW",
-        "INTEREST",
-        "BORROW",
-    ]
+    assert second_borrow_resp.status_code == 400
+    assert second_borrow_resp.json()["detail"] == (
+        "Rescue loan unavailable while debt is outstanding"
+    )
+
+
+async def test_bank_rescue_stays_spent_after_full_repayment(
+    auth_client,
+    db_session,
+):
+    await _onboard_bank_user(auth_client)
+
+    me_resp = await auth_client.get("/api/user/me")
+    user_id = me_resp.json()["id"]
+    user = await db_session.get(User, user_id)
+    assert user is not None
+    user.balance = 0.0
+    await db_session.commit()
+
+    borrow_resp = await auth_client.post("/api/bank/borrow", json={"amount": 750})
+    assert borrow_resp.status_code == 200
+
+    user = await db_session.get(User, user_id)
+    assert user is not None
+    user.balance = 900.0
+    await db_session.commit()
+
+    repay_resp = await auth_client.post("/api/bank/repay", json={"amount": 765})
+    assert repay_resp.status_code == 200
+    repaid = repay_resp.json()
+
+    assert repaid["debt_outstanding"] == pytest.approx(0.0)
+    assert repaid["rescue_loan_uses_remaining"] == 0
+    assert repaid["rescue_loan_available"] is False
+    assert repaid["rescue_loan_block_reason"] == (
+        "Rescue loan already used. Ask an admin to restore it"
+    )
 
 
 async def test_bank_summary_previews_due_interest(auth_client, db_session):
@@ -217,13 +253,13 @@ async def test_bank_summary_previews_due_interest(auth_client, db_session):
     assert summary_resp.status_code == 200
     summary = summary_resp.json()
     assert summary["debt_principal"] == pytest.approx(500.0)
-    assert summary["debt_accrued_interest"] == pytest.approx(13.75)
-    assert summary["debt_outstanding"] == pytest.approx(513.75)
-    assert summary["interest_rate_per_interval"] == pytest.approx(0.0275)
-    assert summary["next_interest_amount"] == pytest.approx(14.13)
+    assert summary["debt_accrued_interest"] == pytest.approx(10.0)
+    assert summary["debt_outstanding"] == pytest.approx(510.0)
+    assert summary["interest_rate_per_interval"] == pytest.approx(0.02)
+    assert summary["next_interest_amount"] == pytest.approx(10.2)
 
 
-async def test_bank_summary_uses_high_interest_tier_for_large_outstanding_debt(
+async def test_bank_summary_uses_rescue_interest_rate_for_outstanding_debt(
     auth_client,
     db_session,
 ):
@@ -243,8 +279,8 @@ async def test_bank_summary_uses_high_interest_tier_for_large_outstanding_debt(
     summary_resp = await auth_client.get("/api/bank")
     assert summary_resp.status_code == 200
     summary = summary_resp.json()
-    assert summary["interest_rate_per_interval"] == pytest.approx(0.03)
-    assert summary["next_interest_amount"] == pytest.approx(36.0)
+    assert summary["interest_rate_per_interval"] == pytest.approx(0.02)
+    assert summary["next_interest_amount"] == pytest.approx(24.0)
 
 
 async def test_bank_summary_includes_playing_income_metrics(auth_client, db_session):
@@ -292,8 +328,8 @@ async def test_bank_summary_includes_playing_income_metrics(auth_client, db_sess
     summary_resp = await auth_client.get("/api/bank")
     assert summary_resp.status_code == 200
     summary = summary_resp.json()
-    assert summary["projected_next_win_income"] == pytest.approx(0.42)
-    assert summary["projected_next_loss_income"] == pytest.approx(0.21)
+    assert summary["projected_next_win_income"] == pytest.approx(0.5)
+    assert summary["projected_next_loss_income"] == pytest.approx(0.25)
     assert summary["playing_income_last_24h"] == pytest.approx(0.4)
     assert summary["playing_income_lifetime_total"] == pytest.approx(0.6)
     assert [
@@ -321,5 +357,5 @@ async def test_bank_summary_applies_minimum_playing_income_projection(
     summary_resp = await auth_client.get("/api/bank")
     assert summary_resp.status_code == 200
     summary = summary_resp.json()
-    assert summary["projected_next_win_income"] == pytest.approx(0.15)
-    assert summary["projected_next_loss_income"] == pytest.approx(0.15)
+    assert summary["projected_next_win_income"] == pytest.approx(0.23)
+    assert summary["projected_next_loss_income"] == pytest.approx(0.12)

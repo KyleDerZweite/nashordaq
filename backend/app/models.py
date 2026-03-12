@@ -76,6 +76,7 @@ class User(Base):
         default=None,
         index=True,
     )
+    rescue_loan_uses_remaining: Mapped[int] = mapped_column(Integer, default=1)
     linked_player_id: Mapped[int | None] = mapped_column(
         ForeignKey("tracked_players.id"), unique=True, default=None
     )

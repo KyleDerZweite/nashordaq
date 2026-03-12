@@ -1,4 +1,3 @@
-import math
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
@@ -40,8 +39,13 @@ class AccountSnapshot:
     debt_accrued_interest: float
     debt_outstanding: float
     debt_adjusted_net_worth: float
-    credit_limit: float
-    available_credit: float
+    rescue_loan_amount: float
+    rescue_loan_uses_remaining: int
+    rescue_loan_interest_rate: float
+    rescue_loan_upfront_interest_amount: float
+    rescue_net_worth_threshold: float
+    rescue_loan_available: bool
+    rescue_loan_block_reason: str | None
     next_interest_accrual_at: datetime | None
     next_interest_amount: float
     interest_rate_per_interval: float
@@ -67,14 +71,67 @@ def round_currency(value: float) -> float:
     return round(value + 1e-9, 2)
 
 
-def calculate_playing_income_amount(
-    share_price: float, outcome_multiplier: float
+def start_of_utc_day(value: datetime) -> datetime:
+    normalized_value = normalize_datetime(value) or datetime.now(UTC)
+    return normalized_value.replace(hour=0, minute=0, second=0, microsecond=0)
+
+
+def get_playing_income_daily_multiplier(match_number_for_day: int) -> float:
+    match_number = max(1, match_number_for_day)
+
+    if match_number <= settings.playing_income_boosted_games_per_day:
+        return settings.playing_income_boosted_daily_multiplier
+    if match_number <= settings.playing_income_standard_games_per_day:
+        return settings.playing_income_standard_daily_multiplier
+    if match_number <= settings.playing_income_late_games_per_day:
+        return settings.playing_income_late_daily_multiplier
+    return settings.playing_income_grind_daily_multiplier
+
+
+def get_playing_income_outcome_multiplier(
+    won_match: bool, match_number_for_day: int
 ) -> float:
+    if won_match:
+        return 1.0
+
+    match_number = max(1, match_number_for_day)
+    if match_number <= settings.playing_income_boosted_games_per_day:
+        return settings.playing_income_boosted_loss_multiplier
+    if match_number <= settings.playing_income_standard_games_per_day:
+        return settings.playing_income_standard_loss_multiplier
+    if match_number <= settings.playing_income_late_games_per_day:
+        return settings.playing_income_late_loss_multiplier
+    return settings.playing_income_grind_loss_multiplier
+
+
+def get_playing_income_minimum_amount(won_match: bool) -> float:
+    return (
+        settings.playing_income_win_min_amount
+        if won_match
+        else settings.playing_income_loss_min_amount
+    )
+
+
+def get_playing_income_effective_share_price(share_price: float) -> float:
+    return max(0.0, min(share_price, settings.playing_income_price_cap))
+
+
+def calculate_playing_income_amount(
+    share_price: float,
+    outcome_multiplier: float,
+    *,
+    minimum_amount: float,
+    daily_multiplier: float,
+) -> float:
+    effective_share_price = get_playing_income_effective_share_price(share_price)
     return round_currency(
         max(
-            settings.playing_income_min_amount,
-            share_price * settings.playing_income_base_rate * outcome_multiplier,
+            minimum_amount,
+            effective_share_price
+            * settings.playing_income_base_rate
+            * outcome_multiplier,
         )
+        * daily_multiplier
     )
 
 
@@ -95,34 +152,39 @@ def current_outstanding_debt(user: User) -> float:
 
 
 def get_bank_interest_rate(base_amount: float) -> float:
-    normalized_amount = max(0.0, round_currency(base_amount))
-    if normalized_amount < settings.bank_interest_rate_low_balance_max:
-        return settings.bank_interest_rate_per_interval
-    if normalized_amount <= settings.bank_interest_rate_mid_balance_max:
-        return settings.bank_interest_rate_mid_per_interval
-    return settings.bank_interest_rate_high_per_interval
+    return settings.bank_rescue_interest_rate_per_interval
 
 
 def calculate_bank_interest(base_amount: float) -> float:
     return round_currency(base_amount * get_bank_interest_rate(base_amount))
 
 
-def floor_to_increment(value: float, increment: float) -> float:
-    if value <= 0 or increment <= 0:
-        return 0.0
-    return round_currency(math.floor(value / increment) * increment)
+def calculate_borrow_interest(
+    borrow_amount: float,
+    projected_outstanding_debt: float,
+) -> float:
+    normalized_borrow_amount = max(0.0, round_currency(borrow_amount))
+    return round_currency(
+        normalized_borrow_amount * get_bank_interest_rate(projected_outstanding_debt)
+    )
 
 
-def calculate_credit_limit(debt_adjusted_net_worth: float) -> float:
-    raw_limit = (
-        debt_adjusted_net_worth * settings.bank_max_borrow_net_worth_ratio
-        + settings.bank_base_credit_limit
-    )
-    credit_limit = floor_to_increment(
-        max(0.0, raw_limit),
-        settings.bank_credit_limit_rounding_increment,
-    )
-    return round_currency(min(settings.bank_max_borrow_absolute, credit_limit))
+def get_rescue_loan_block_reason(
+    *,
+    debt_adjusted_net_worth: float,
+    outstanding_debt: float,
+    rescue_loan_uses_remaining: int,
+) -> str | None:
+    if outstanding_debt > 0:
+        return "Rescue loan unavailable while debt is outstanding"
+    if rescue_loan_uses_remaining <= 0:
+        return "Rescue loan already used. Ask an admin to restore it"
+    if debt_adjusted_net_worth > settings.bank_rescue_net_worth_threshold:
+        return (
+            "Rescue loan unlocks once net worth falls to "
+            f"{settings.bank_rescue_net_worth_threshold:.0f} P or below"
+        )
+    return None
 
 
 def _pending_interest_intervals(
@@ -237,9 +299,18 @@ async def build_account_snapshot(
         + active_gamba_value
         - debt_preview.outstanding_debt
     )
-    credit_limit = calculate_credit_limit(debt_adjusted_net_worth)
-    available_credit = round_currency(
-        max(0.0, credit_limit - debt_preview.outstanding_debt)
+    rescue_loan_uses_remaining = max(0, int(user.rescue_loan_uses_remaining or 0))
+    rescue_loan_block_reason = get_rescue_loan_block_reason(
+        debt_adjusted_net_worth=debt_adjusted_net_worth,
+        outstanding_debt=debt_preview.outstanding_debt,
+        rescue_loan_uses_remaining=rescue_loan_uses_remaining,
+    )
+    rescue_loan_available = rescue_loan_block_reason is None
+    rescue_loan_amount = round_currency(settings.bank_rescue_loan_amount)
+    rescue_loan_interest_rate = settings.bank_rescue_interest_rate_per_interval
+    rescue_loan_upfront_interest_amount = calculate_borrow_interest(
+        rescue_loan_amount,
+        rescue_loan_amount,
     )
     interest_rate_per_interval = get_bank_interest_rate(debt_preview.outstanding_debt)
     next_interest_amount = (
@@ -256,8 +327,15 @@ async def build_account_snapshot(
         debt_accrued_interest=debt_preview.accrued_interest,
         debt_outstanding=debt_preview.outstanding_debt,
         debt_adjusted_net_worth=debt_adjusted_net_worth,
-        credit_limit=credit_limit,
-        available_credit=available_credit,
+        rescue_loan_amount=rescue_loan_amount,
+        rescue_loan_uses_remaining=rescue_loan_uses_remaining,
+        rescue_loan_interest_rate=rescue_loan_interest_rate,
+        rescue_loan_upfront_interest_amount=rescue_loan_upfront_interest_amount,
+        rescue_net_worth_threshold=round_currency(
+            settings.bank_rescue_net_worth_threshold
+        ),
+        rescue_loan_available=rescue_loan_available,
+        rescue_loan_block_reason=rescue_loan_block_reason,
         next_interest_accrual_at=debt_preview.next_accrual_at,
         next_interest_amount=next_interest_amount,
         interest_rate_per_interval=interest_rate_per_interval,
@@ -300,12 +378,31 @@ async def build_playing_income_summary(
         linked_player = await session.get(TrackedPlayer, user.linked_player_id)
 
     share_price = linked_player.current_price if linked_player is not None else 0.0
+    today_start = start_of_utc_day(now)
+    tomorrow_start = today_start + timedelta(days=1)
+    rewarded_matches_today_result = await session.scalar(
+        select(func.count(PlayingIncomeEntry.id)).where(
+            PlayingIncomeEntry.user_id == user.id,
+            PlayingIncomeEntry.match_completed_at >= today_start,
+            PlayingIncomeEntry.match_completed_at < tomorrow_start,
+        )
+    )
+    next_match_number = int(rewarded_matches_today_result or 0) + 1
+    next_win_daily_multiplier = get_playing_income_daily_multiplier(next_match_number)
+    next_loss_daily_multiplier = get_playing_income_daily_multiplier(next_match_number)
 
     return PlayingIncomeSummary(
-        projected_next_win_income=calculate_playing_income_amount(share_price, 1.0),
+        projected_next_win_income=calculate_playing_income_amount(
+            share_price,
+            get_playing_income_outcome_multiplier(True, next_match_number),
+            minimum_amount=get_playing_income_minimum_amount(True),
+            daily_multiplier=next_win_daily_multiplier,
+        ),
         projected_next_loss_income=calculate_playing_income_amount(
             share_price,
-            settings.playing_income_loss_multiplier,
+            get_playing_income_outcome_multiplier(False, next_match_number),
+            minimum_amount=get_playing_income_minimum_amount(False),
+            daily_multiplier=next_loss_daily_multiplier,
         ),
         playing_income_last_24h=round_currency(float(recent_total_result or 0.0)),
         playing_income_lifetime_total=round_currency(
@@ -461,6 +558,7 @@ def apply_borrow(user: User, amount: float, *, at: datetime) -> BankLedgerEntry:
     normalized_amount = round_currency(amount)
     user.balance = round_currency(user.balance + normalized_amount)
     user.debt_principal = round_currency(user.debt_principal + normalized_amount)
+    user.rescue_loan_uses_remaining = max(0, user.rescue_loan_uses_remaining - 1)
     if current_outstanding_debt(user) > 0 and user.debt_next_accrual_at is None:
         initialize_debt_schedule(user, at=at)
 
@@ -478,7 +576,10 @@ def apply_borrow(user: User, amount: float, *, at: datetime) -> BankLedgerEntry:
 def apply_borrow_interest(
     user: User, amount: float, *, at: datetime
 ) -> BankLedgerEntry:
-    interest_amount = calculate_bank_interest(amount)
+    interest_amount = calculate_borrow_interest(
+        amount,
+        current_outstanding_debt(user),
+    )
     user.debt_accrued_interest = round_currency(
         user.debt_accrued_interest + interest_amount
     )
@@ -520,3 +621,7 @@ def apply_repayment(user: User, amount: float, *, at: datetime) -> BankLedgerEnt
         outstanding_debt=current_outstanding_debt(user),
         created_at=normalize_datetime(at),
     )
+
+
+def restore_rescue_loan_use(user: User) -> None:
+    user.rescue_loan_uses_remaining = 1

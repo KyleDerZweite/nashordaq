@@ -421,6 +421,26 @@ export function useRepayBankDebt() {
   });
 }
 
+export function useRestoreAdminRescue(userId: number | null) {
+  const qc = useQueryClient();
+  return useMutation<AdminUserPortfolioResponse, Error, void>({
+    mutationFn: () =>
+      post<AdminUserPortfolioResponse>(
+        `/admin/users/${userId}/rescue-unlock`,
+        {},
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.adminUsers });
+      void qc.invalidateQueries({ queryKey: queryKeys.adminOverview });
+      if (userId !== null) {
+        void qc.invalidateQueries({
+          queryKey: queryKeys.adminUserPortfolio(userId),
+        });
+      }
+    },
+  });
+}
+
 export function useClaimPoro() {
   const qc = useQueryClient();
   return useMutation<PoroClaimResponse, Error, PoroClaimRequest>({

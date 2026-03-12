@@ -54,6 +54,23 @@ async def init_db() -> None:
             await conn.execute(
                 text("ALTER TABLE users ADD COLUMN debt_next_accrual_at DATETIME")
             )
+        if "rescue_loan_uses_remaining" not in user_columns:
+            await conn.execute(
+                text(
+                    "ALTER TABLE users ADD COLUMN rescue_loan_uses_remaining "
+                    "INTEGER DEFAULT 1"
+                )
+            )
+            await conn.execute(
+                text(
+                    "UPDATE users SET rescue_loan_uses_remaining = CASE "
+                    "WHEN EXISTS ("
+                    "SELECT 1 FROM bank_ledger_entries "
+                    "WHERE bank_ledger_entries.user_id = users.id "
+                    "AND bank_ledger_entries.entry_type = 'BORROW'"
+                    ") THEN 0 ELSE 1 END"
+                )
+            )
 
         tracked_player_cols_result = await conn.execute(
             text("PRAGMA table_info(tracked_players)")
