@@ -44,6 +44,7 @@ class AccountSnapshot:
     available_credit: float
     next_interest_accrual_at: datetime | None
     next_interest_amount: float
+    interest_rate_per_interval: float
 
 
 @dataclass(slots=True)
@@ -93,8 +94,17 @@ def current_outstanding_debt(user: User) -> float:
     return round_currency(user.debt_principal + user.debt_accrued_interest)
 
 
+def get_bank_interest_rate(base_amount: float) -> float:
+    normalized_amount = max(0.0, round_currency(base_amount))
+    if normalized_amount < settings.bank_interest_rate_low_balance_max:
+        return settings.bank_interest_rate_per_interval
+    if normalized_amount <= settings.bank_interest_rate_mid_balance_max:
+        return settings.bank_interest_rate_mid_per_interval
+    return settings.bank_interest_rate_high_per_interval
+
+
 def calculate_bank_interest(base_amount: float) -> float:
-    return round_currency(base_amount * settings.bank_interest_rate_per_interval)
+    return round_currency(base_amount * get_bank_interest_rate(base_amount))
 
 
 def floor_to_increment(value: float, increment: float) -> float:
@@ -158,10 +168,7 @@ def preview_debt(user: User, as_of: datetime) -> DebtPreview:
     for _ in range(pending_intervals):
         preview_outstanding = round_currency(principal + preview_interest)
         preview_interest = round_currency(
-            preview_interest
-            + round_currency(
-                preview_outstanding * settings.bank_interest_rate_per_interval
-            )
+            preview_interest + calculate_bank_interest(preview_outstanding)
         )
         preview_next = preview_next + interest_interval()
 
@@ -234,6 +241,7 @@ async def build_account_snapshot(
     available_credit = round_currency(
         max(0.0, credit_limit - debt_preview.outstanding_debt)
     )
+    interest_rate_per_interval = get_bank_interest_rate(debt_preview.outstanding_debt)
     next_interest_amount = (
         calculate_bank_interest(debt_preview.outstanding_debt)
         if debt_preview.outstanding_debt > 0
@@ -252,6 +260,7 @@ async def build_account_snapshot(
         available_credit=available_credit,
         next_interest_accrual_at=debt_preview.next_accrual_at,
         next_interest_amount=next_interest_amount,
+        interest_rate_per_interval=interest_rate_per_interval,
     )
 
 

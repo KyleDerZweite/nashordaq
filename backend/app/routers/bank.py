@@ -60,7 +60,7 @@ async def _build_bank_summary(
         available_credit=snapshot.available_credit,
         next_interest_accrual_at=snapshot.next_interest_accrual_at,
         next_interest_amount=snapshot.next_interest_amount,
-        interest_rate_per_interval=settings.bank_interest_rate_per_interval,
+        interest_rate_per_interval=snapshot.interest_rate_per_interval,
         interest_interval_hours=settings.bank_interest_interval_hours,
         projected_next_win_income=playing_income.projected_next_win_income,
         projected_next_loss_income=playing_income.projected_next_loss_income,

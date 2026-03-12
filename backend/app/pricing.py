@@ -1,5 +1,7 @@
 import random
 
+from app.config import settings
+
 TIER_MAP: dict[str, int] = {
     "IRON": 0,
     "BRONZE": 1,
@@ -29,6 +31,10 @@ WIN_RATE_PRICE_WEIGHT = 0.25
 HOT_STREAK_BONUS = 0.15
 VETERAN_BONUS = 0.01
 FRESH_BLOOD_BONUS = 0.02
+
+
+def _max_effective_streak() -> int:
+    return max(1, settings.pricing_max_effective_streak)
 
 
 def calculate_lp_abs(tier: str, rank: str, league_points: int) -> int:
@@ -87,7 +93,8 @@ def calculate_new_price(
 
     epsilon = generate_epsilon()
     gamma = gamma_base + epsilon
-    streak_multiplier = 1 + BETA * abs(streak)
+    effective_streak = min(abs(streak), _max_effective_streak())
+    streak_multiplier = 1 + BETA * effective_streak
     if hot_streak:
         streak_multiplier += HOT_STREAK_BONUS
 
@@ -106,10 +113,15 @@ def calculate_new_price(
 
 
 def update_streak(old_streak: int, delta_lp: int) -> int:
+    max_effective_streak = _max_effective_streak()
+
     if delta_lp > 0:
-        return (old_streak + 1) if old_streak >= 0 else 1
+        return min((old_streak + 1) if old_streak >= 0 else 1, max_effective_streak)
     elif delta_lp < 0:
-        return (old_streak - 1) if old_streak <= 0 else -1
+        return max(
+            (old_streak - 1) if old_streak <= 0 else -1,
+            -max_effective_streak,
+        )
     return 0
 
 

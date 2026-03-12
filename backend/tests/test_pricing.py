@@ -135,6 +135,11 @@ def test_streak_negative():
     assert update_streak(-3, -10) == -4
 
 
+def test_streak_is_capped_in_both_directions():
+    assert update_streak(4, 10) == 4
+    assert update_streak(-4, -10) == -4
+
+
 def test_streak_direction_change():
     assert update_streak(3, -10) == -1
     assert update_streak(-3, 10) == 1
@@ -143,6 +148,18 @@ def test_streak_direction_change():
 def test_streak_no_change():
     assert update_streak(5, 0) == 0
     assert update_streak(-3, 0) == 0
+
+
+def test_new_price_uses_capped_streak_multiplier():
+    with patch("app.pricing.generate_epsilon", return_value=0.0):
+        price = calculate_new_price(
+            old_price=20.0,
+            delta_lp=100,
+            streak=10,
+            gamma_base=1.0,
+        )
+
+    assert price == 41.0
 
 
 def test_sell_multiplier_short_hold_penalty():

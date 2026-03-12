@@ -66,10 +66,11 @@ If `Delta_LP_abs == 0`, the market state is left unchanged for that cycle.
 - Flat LP cycle
 	- If Riot reports the same Absolute LP as the previous refresh, Nashordaq does not change price, streak, `last_updated`, or stored price history for that cycle.
 
-**Internal streak:** A signed integer tracking consecutive same-direction updates. Positive for consecutive LP gains and negative for consecutive losses. Resets to +1 or -1 on direction change. It is only recalculated on cycles where LP changes.
+**Internal streak:** A signed integer tracking consecutive same-direction updates. Positive for consecutive LP gains and negative for consecutive losses. Resets to +1 or -1 on direction change, and is capped at `+4` / `-4` so momentum stops compounding after four same-direction refreshes. It is only recalculated on cycles where LP changes.
 
 ```
-StreakMultiplier = 1 + (Beta * |S|) + (0.15 if hotStreak else 0)
+EffectiveStreak = min(|S|, 4)
+StreakMultiplier = 1 + (Beta * EffectiveStreak) + (0.15 if hotStreak else 0)
 ```
 
 **Gamma base:** Deterministic per-player value generated once from `hash(puuid) % 10000`:
@@ -126,7 +127,7 @@ Bank debt is a separate account-level liability. Borrowing adds cash immediately
 ### Credit Limit
 
 ```
-credit_limit = min(2500, floor_to_50((0.25 * debt_adjusted_net_worth) + 250))
+credit_limit = min(1500, floor_to_50((0.15 * debt_adjusted_net_worth) + 300))
 ```
 
 Where:
@@ -137,13 +138,22 @@ debt_adjusted_net_worth = cash_balance + holdings_value + active_gamba_mark_valu
 
 ### Interest Accrual
 
-Outstanding debt compounds every 120 hours at 2.5%.
+Outstanding debt compounds every 120 hours using a tiered percentage based on debt size.
+
+- `< 500`: `2.5%`
+- `500` to `1000`: `2.75%`
+- `> 1000`: `3.0%`
 
 ```
-Debt_next = Debt_current + (Debt_current * 0.025)
+InterestRate(Debt_current) =
+	0.025   if Debt_current < 500
+	0.0275  if 500 <= Debt_current <= 1000
+	0.03    if Debt_current > 1000
+
+Debt_next = Debt_current + (Debt_current * InterestRate(Debt_current))
 ```
 
-- Each new borrow also receives an immediate one-time interest charge equal to `borrow_amount * 0.025`.
+- Each new borrow also receives an immediate one-time interest charge equal to `borrow_amount * InterestRate(borrow_amount)`.
 - Interest capitalizes on the full outstanding debt, including prior accrued interest.
 - Repayments always clear accrued interest before principal.
 - If the scheduler misses one or more rollover windows, the backend catches up one 120-hour interval at a time.
