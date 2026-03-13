@@ -44,7 +44,7 @@ class Settings(BaseSettings):
     buy_revert_grace_seconds: int = 60
     gamba_min_hold_hours: float = 24.0
     gamba_max_hold_hours: float = 168.0
-    gamba_settlement_multiplier: float = 2.0
+    gamba_settlement_multiplier: float = 2.5
     gamba_max_active_positions_per_user: int = 1
     bank_rescue_interest_rate_per_interval: float = 0.02
     bank_interest_interval_hours: float = 120.0

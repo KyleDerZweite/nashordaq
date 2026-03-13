@@ -40,7 +40,7 @@ export default function GambaWidget({ balance, canTrade }: Props) {
       ),
     [activePositions],
   );
-  const displayMultiplier = activePositions[0]?.settlement_multiplier ?? 2;
+  const displayMultiplier = activePositions[0]?.settlement_multiplier ?? 2.5;
 
   const parsedCashAmount = Number(cashAmount);
   const hasValidAmount =

@@ -146,6 +146,8 @@ The bank offers a fixed failsafe package only when debt-adjusted net worth is lo
 debt_adjusted_net_worth = cash_balance + holdings_value + active_gamba_mark_value - outstanding_debt
 ```
 
+- `active_gamba_mark_value` is the sum of `cash_amount` of all active Gamba positions. It represents the value "locked" in those positions.
+
 Current defaults:
 
 - Rescue unlock threshold: `250 P` debt-adjusted net worth or below
@@ -168,7 +170,30 @@ Debt_next = Debt_current + (Debt_current * 0.02)
 
 Implementation: `app/banking.py`, `app/routers/bank.py`, `app/scheduler.py`
 
-## 7. Playing Income
+## 7. Gamba (Long-Term Leveraged Positions)
+
+Users can choose to enter a "Gamba" position, which is a leveraged long-term investment in a randomly selected tracked player (excluding their own linked player).
+
+### Placement
+
+- User invests a fixed `cash_amount`.
+- A random eligible player is chosen.
+- A hold duration is randomly selected between `24` and `168` hours.
+- A virtual `quantity` of shares is bought at the player's current price.
+- Cash is deducted immediately.
+
+### Settlement
+
+- After the hold duration expires, the position is automatically settled by the scheduler.
+- The "Raw P&L" is calculated as `(current_price * quantity) - initial_cash_amount`.
+- The settled payout is `initial_cash_amount + (raw_pnl * multiplier)`.
+- The multiplier is `2.5x` (default).
+- The payout is credited to the user's cash balance.
+- Payout cannot drop below `0.0`.
+
+Implementation: `app/routers/gamba.py`, `app/scheduler.py`
+
+## 8. Playing Income
 
 Linked player accounts receive a small direct cash reward when Nashordaq detects a newly completed Ranked Solo 5v5 match for that player.
 

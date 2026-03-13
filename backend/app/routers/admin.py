@@ -434,7 +434,7 @@ async def list_admin_player_insights(
                         share_price=entry.share_price,
                         outcome_multiplier=entry.outcome_multiplier,
                     )
-                    for entry in playing_income_entries[:5]
+                    for entry in playing_income_entries[:50]
                 ],
                 recent_poro_rewards=[
                     AdminPlayerPoroRewardResponse(
@@ -444,7 +444,7 @@ async def list_admin_player_insights(
                         claimed_at=spawn.claimed_at,
                         status=spawn.status,
                     )
-                    for spawn in poro_rewards[:5]
+                    for spawn in poro_rewards[:50]
                 ],
             )
         )

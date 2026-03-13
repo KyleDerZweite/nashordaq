@@ -400,9 +400,9 @@ export default function AdminPlayerInsightsPanel({ insights }: Props) {
                 <h3 className="font-serif text-lg font-bold text-hex-gold">
                   Recent Playing Income Entries
                 </h3>
-                <div className="mt-4 overflow-x-auto">
+                <div className="mt-4 max-h-80 overflow-y-auto overflow-x-auto">
                   <table className="w-full">
-                    <thead>
+                    <thead className="sticky top-0 z-10 bg-hex-panel">
                       <tr className="border-b border-hex-border text-left">
                         <th className="px-2 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-hex-bronze">
                           Match
@@ -457,9 +457,9 @@ export default function AdminPlayerInsightsPanel({ insights }: Props) {
                 <h3 className="font-serif text-lg font-bold text-hex-gold">
                   Recent Poro Rewards
                 </h3>
-                <div className="mt-4 overflow-x-auto">
+                <div className="mt-4 max-h-80 overflow-y-auto overflow-x-auto">
                   <table className="w-full">
-                    <thead>
+                    <thead className="sticky top-0 z-10 bg-hex-panel">
                       <tr className="border-b border-hex-border text-left">
                         <th className="px-2 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-hex-bronze">
                           Spawn
