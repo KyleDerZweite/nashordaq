@@ -328,8 +328,8 @@ async def test_bank_summary_includes_playing_income_metrics(auth_client, db_sess
     summary_resp = await auth_client.get("/api/bank")
     assert summary_resp.status_code == 200
     summary = summary_resp.json()
-    assert summary["projected_next_win_income"] == pytest.approx(0.5)
-    assert summary["projected_next_loss_income"] == pytest.approx(0.25)
+    assert summary["projected_next_win_income"] == pytest.approx(0.44)
+    assert summary["projected_next_loss_income"] == pytest.approx(0.22)
     assert summary["playing_income_last_24h"] == pytest.approx(0.4)
     assert summary["playing_income_lifetime_total"] == pytest.approx(0.6)
     assert [
@@ -357,5 +357,5 @@ async def test_bank_summary_applies_minimum_playing_income_projection(
     summary_resp = await auth_client.get("/api/bank")
     assert summary_resp.status_code == 200
     summary = summary_resp.json()
-    assert summary["projected_next_win_income"] == pytest.approx(0.23)
-    assert summary["projected_next_loss_income"] == pytest.approx(0.12)
+    assert summary["projected_next_win_income"] == pytest.approx(0.2)
+    assert summary["projected_next_loss_income"] == pytest.approx(0.1)

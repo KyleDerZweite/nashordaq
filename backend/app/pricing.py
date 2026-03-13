@@ -1,5 +1,3 @@
-import random
-
 from app.config import settings
 
 TIER_MAP: dict[str, int] = {
@@ -100,7 +98,7 @@ def generate_gamma_base(account_identifier: int) -> float:
 
 
 def generate_epsilon() -> float:
-    return random.uniform(-0.03, 0.03)
+    return 0.0
 
 
 def calculate_new_price(
@@ -118,25 +116,18 @@ def calculate_new_price(
         return max(old_price, PRICE_FLOOR)
 
     effective_delta_lp = _apply_lp_efficiency(delta_lp)
-    epsilon = generate_epsilon()
-    gamma = gamma_base + epsilon
     effective_streak = min(max(0, streak), _max_effective_streak())
-    win_streak_ratio = _win_streak_lp_ratio_multiplier(
+    outcome_balance_factor = _win_streak_lp_ratio_multiplier(
         avg_lp_loss_on_loss,
         avg_lp_gain_on_win,
     )
-    streak_multiplier = 1 + (BETA * effective_streak * win_streak_ratio)
-
-    win_rate_multiplier = 1 + (
-        (win_rate - WIN_RATE_NEUTRAL) * settings.pricing_win_rate_price_weight
-    )
+    streak_multiplier = 1 + (BETA * effective_streak)
 
     lp_move = (
         effective_delta_lp
         * settings.pricing_alpha
         * streak_multiplier
-        * gamma
-        * win_rate_multiplier
+        * outcome_balance_factor
     )
     if effective_delta_lp < 0:
         lp_move *= settings.pricing_loss_move_multiplier

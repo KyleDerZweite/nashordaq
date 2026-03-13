@@ -78,30 +78,18 @@ def start_of_utc_day(value: datetime) -> datetime:
 
 def get_playing_income_daily_multiplier(match_number_for_day: int) -> float:
     match_number = max(1, match_number_for_day)
-
     if match_number <= settings.playing_income_boosted_games_per_day:
-        return settings.playing_income_boosted_daily_multiplier
-    if match_number <= settings.playing_income_standard_games_per_day:
-        return settings.playing_income_standard_daily_multiplier
-    if match_number <= settings.playing_income_late_games_per_day:
-        return settings.playing_income_late_daily_multiplier
+        return 1.0
     return settings.playing_income_grind_daily_multiplier
 
 
 def get_playing_income_outcome_multiplier(
     won_match: bool, match_number_for_day: int
 ) -> float:
+    del match_number_for_day
     if won_match:
         return 1.0
-
-    match_number = max(1, match_number_for_day)
-    if match_number <= settings.playing_income_boosted_games_per_day:
-        return settings.playing_income_boosted_loss_multiplier
-    if match_number <= settings.playing_income_standard_games_per_day:
-        return settings.playing_income_standard_loss_multiplier
-    if match_number <= settings.playing_income_late_games_per_day:
-        return settings.playing_income_late_loss_multiplier
-    return settings.playing_income_grind_loss_multiplier
+    return settings.playing_income_loss_multiplier
 
 
 def get_playing_income_minimum_amount(won_match: bool) -> float:

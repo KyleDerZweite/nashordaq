@@ -67,16 +67,8 @@ class Settings(BaseSettings):
     playing_income_win_min_amount: float = 0.20
     playing_income_loss_min_amount: float = 0.10
     playing_income_boosted_games_per_day: int = 3
-    playing_income_standard_games_per_day: int = 6
-    playing_income_late_games_per_day: int = 8
-    playing_income_boosted_daily_multiplier: float = 1.15
-    playing_income_standard_daily_multiplier: float = 0.85
-    playing_income_late_daily_multiplier: float = 0.70
-    playing_income_grind_daily_multiplier: float = 0.50
-    playing_income_boosted_loss_multiplier: float = 0.50
-    playing_income_standard_loss_multiplier: float = 0.45
-    playing_income_late_loss_multiplier: float = 0.40
-    playing_income_grind_loss_multiplier: float = 0.40
+    playing_income_grind_daily_multiplier: float = 0.65
+    playing_income_loss_multiplier: float = 0.50
     playing_income_min_match_duration_seconds: int = 900
     playing_income_start_date: datetime = datetime(2026, 1, 1, tzinfo=UTC)
     playing_income_recent_match_count: int = 10

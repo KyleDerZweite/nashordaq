@@ -43,13 +43,13 @@ EffectiveDeltaLP =
 	20 + ((Delta_LP_abs - 20) * 0.25)        if Delta_LP_abs > 20
 	-24 + ((Delta_LP_abs + 24) * 0.50)       if Delta_LP_abs < -24
 
-WinStreakLpRatio = clamp(AvgLpLossOnLoss / AvgLpGainOnWin, 0.25, 1.0)
-WinStreakLpRatio = 1.0 when averages are unavailable
-
 EffectiveStreak = min(max(S, 0), 10)
-StreakMultiplier = 1 + (Beta * EffectiveStreak * WinStreakLpRatio)
+StreakMultiplier = 1 + (Beta * EffectiveStreak)
 
-PriceDelta = (EffectiveDeltaLP * Alpha * StreakMultiplier) * Gamma * WinRateMultiplier
+OutcomeBalanceFactor = clamp(AvgLpLossOnLoss / AvgLpGainOnWin, 0.25, 1.0)
+OutcomeBalanceFactor = 1.0 when averages are unavailable
+
+PriceDelta = EffectiveDeltaLP * Alpha * StreakMultiplier * OutcomeBalanceFactor
 PriceDelta = PriceDelta * 1.10 if EffectiveDeltaLP < 0 else PriceDelta
 P_new = P_old + PriceDelta
 ```
@@ -61,20 +61,17 @@ If `Delta_LP_abs == 0`, the market state is left unchanged for that cycle.
 | Delta_LP_abs | Change in Absolute LP since last update | Computed per cycle |
 | Alpha | Base volatility scalar | 0.12 |
 | StreakMultiplier | Internal streak momentum scaled by LP loss/win ratio factor | See below |
-| Gamma | Obfuscation factor | `gamma_base + epsilon` |
+| OutcomeBalanceFactor | LP-per-loss vs LP-per-win balancing factor | `clamp(loss/win, 0.25, 1.0)` |
 
 ### League-V4 Risk Adjustments
 
-- `WinRateMultiplier = 1 + ((WinRate - 0.50) * 0.25)`
-	- High win rates slightly amplify positive and negative LP moves.
-	- Low win rates slightly dampen the move size.
 - LP efficiency taper
 	- The first `+20 LP` of a positive refresh count at full strength; additional LP only count at `25%` efficiency.
 	- The first `-24 LP` of a negative refresh count at full strength; additional LP only count at `50%` efficiency.
 - Negative LP bias
 	- Negative refreshes are multiplied by `1.10` after the LP efficiency taper, so losses hit a bit harder than similarly sized gains.
-- Win streak LP ratio factor
-	- The streak bonus is multiplied by `AvgLpLossOnLoss / AvgLpGainOnWin`, clamped to `[0.25, 1.0]`.
+- LP outcome balance factor
+	- `AvgLpLossOnLoss / AvgLpGainOnWin` is clamped to `[0.25, 1.0]` and applied to the full LP move.
 	- If these average values are unavailable, the factor defaults to `1.0`.
 	- The scheduler persists rolling LP averages per tracked player using an EMA (`alpha = 0.35` default).
 	- Samples are learned from pure refresh directions only:
@@ -87,29 +84,18 @@ If `Delta_LP_abs == 0`, the market state is left unchanged for that cycle.
 **Internal streak:** A signed integer tracking consecutive same-direction updates. Positive for consecutive LP gains and negative for consecutive losses. Resets to +1 or -1 on direction change, and is capped at `+10` / `-10`. It is only recalculated on cycles where LP changes. Only positive streak contributes to price momentum.
 
 ```
-WinStreakLpRatio = clamp(AvgLpLossOnLoss / AvgLpGainOnWin, 0.25, 1.0)
-WinStreakLpRatio = 1.0 when averages are unavailable
+OutcomeBalanceFactor = clamp(AvgLpLossOnLoss / AvgLpGainOnWin, 0.25, 1.0)
+OutcomeBalanceFactor = 1.0 when averages are unavailable
 EffectiveStreak = min(max(S, 0), 10)
-StreakMultiplier = 1 + (Beta * EffectiveStreak * WinStreakLpRatio)
+StreakMultiplier = 1 + (Beta * EffectiveStreak)
 
 EffectiveDeltaLP =
 	Delta_LP_abs                              if -24 <= Delta_LP_abs <= 20
 	20 + ((Delta_LP_abs - 20) * 0.25)        if Delta_LP_abs > 20
 	-24 + ((Delta_LP_abs + 24) * 0.50)       if Delta_LP_abs < -24
 
-PriceDelta = (EffectiveDeltaLP * Alpha * StreakMultiplier) * Gamma * WinRateMultiplier
+PriceDelta = EffectiveDeltaLP * Alpha * StreakMultiplier * OutcomeBalanceFactor
 PriceDelta = PriceDelta * 1.10 if EffectiveDeltaLP < 0 else PriceDelta
-```
-
-**Gamma base:** Deterministic per-player value generated once from `hash(puuid) % 10000`:
-```
-gamma_base = 1 + ((identifier % 100) / 1000)
-```
-Range: [1.000, 1.099].
-
-**Epsilon:** Random noise regenerated each update cycle:
-```
-epsilon = random.uniform(-0.03, 0.03)
 ```
 
 **Floor:** `P_new` cannot drop below 1.00.
@@ -208,20 +194,16 @@ Current defaults:
 - `MinimumPayout = 0.20` on a win
 - `MinimumPayout = 0.10` on a loss
 - `OutcomeMultiplier = 1.0` on a win
-- `OutcomeMultiplier = 0.50` on losses for games `1` to `3` that day
-- `OutcomeMultiplier = 0.45` on losses for games `4` to `6` that day
-- `OutcomeMultiplier = 0.40` on losses from game `7` onward that day
-- `DailyTierMultiplier = 1.15` for games `1` to `3` that day
-- `DailyTierMultiplier = 0.85` for games `4` to `6` that day
-- `DailyTierMultiplier = 0.70` for games `7` to `8` that day
-- `DailyTierMultiplier = 0.50` from game `9` onward that day
+- `OutcomeMultiplier = 0.50` on all losses
+- `DailyTierMultiplier = 1.00` for games `1` to `3` that day
+- `DailyTierMultiplier = 0.65` from game `4` onward that day
 
 Examples:
 
-- A player with current price `42.00` is capped to `35.00` for this calculation and earns `0.50` on their first win of the day.
-- The same player earns `0.25` on their first loss of the day.
-- A low-priced player still earns at least `0.23` for an early win and `0.12` for an early loss because the daily boost also applies to the floor.
-- After three rewarded matches in a day, later games still pay out, but at a reduced daily multiplier.
+- A player with current price `42.00` is capped to `35.00` for this calculation and earns `0.44` on their first win of the day.
+- The same player earns `0.22` on their first loss of the day.
+- A low-priced player still earns at least `0.20` for an early win and `0.10` for an early loss.
+- After three rewarded matches in a day, later games still pay out, but at `65%` of the early-game payout.
 
 ### Processing Rules
 

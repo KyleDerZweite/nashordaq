@@ -42,7 +42,6 @@ from app.pricing import (
     calculate_lp_abs,
     calculate_new_price,
     calculate_win_rate,
-    generate_gamma_base,
     update_streak,
 )
 from app.riot import (
@@ -526,7 +525,7 @@ async def market_update_job() -> None:
                 )
                 player.lp_abs = new_lp_abs
                 player.previous_lp_abs = new_lp_abs
-                player.gamma_factor = generate_gamma_base(hash(player.puuid) % 10000)
+                player.gamma_factor = 1.0
                 player.ranked_wins_snapshot = rank_data.wins
                 player.ranked_losses_snapshot = rank_data.losses
                 should_record_market_update = True

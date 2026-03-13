@@ -97,7 +97,7 @@ def test_new_price_with_win_rate_modifier():
             win_rate=0.7,
         )
 
-    assert price == pytest.approx(25.04)
+    assert price == pytest.approx(24.8)
 
 
 def test_new_price_unchanged_without_lp_change():
@@ -163,7 +163,7 @@ def test_new_price_ratio_scales_win_streak_bonus():
             avg_lp_gain_on_win=30.0,
         )
 
-    assert price == pytest.approx(26.4)
+    assert price == pytest.approx(23.2)
 
 
 def test_new_price_ratio_is_clamped_to_configured_minimum():
@@ -177,7 +177,7 @@ def test_new_price_ratio_is_clamped_to_configured_minimum():
             avg_lp_gain_on_win=100.0,
         )
 
-    assert price == pytest.approx(26.0)
+    assert price == pytest.approx(22.4)
 
 
 def test_new_price_softens_positive_lp_above_threshold_before_pricing():
