@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import math
 from datetime import UTC, datetime, timedelta
 
 import httpx
@@ -73,7 +74,7 @@ def is_scheduler_running() -> bool:
 
 
 def get_required_market_update_interval(player_count: int) -> timedelta:
-    return timedelta(minutes=max(1, player_count))
+    return timedelta(minutes=math.ceil(max(1, player_count) * 1.25))
 
 
 def classify_market_status(

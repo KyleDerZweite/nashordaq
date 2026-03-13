@@ -40,8 +40,8 @@ NEWT_SECRET=your-newt-secret
 
 Market updates are dynamic:
 
-- Effective interval in minutes = `number of tracked players`
-- Example: 10 tracked players => market update runs every ~10 minutes
+- Effective interval in minutes = `ceil(number of tracked players * 1.25)`
+- Example: 10 tracked players => market update runs every ~13 minutes (10 * 1.25 = 12.5, rounded up to 13)
 
 The scheduler wakes every 30 seconds internally and runs immediately on startup, but only performs a full Riot fetch/order execution cycle when the dynamic interval is due.
 
