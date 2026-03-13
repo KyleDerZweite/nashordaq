@@ -181,18 +181,17 @@ Linked player accounts receive a small direct cash reward when Nashordaq detects
 
 ### Formula
 
-The reward uses the player's current share price after the latest market refresh, but caps the price input so already-expensive accounts do not snowball the cash faucet.
+The reward uses the player's current share price after the latest market refresh, with no cap. Instead of a minimum payout, a flat BasePayout is always paid, plus a variable component based on share price.
 
 ```
-PlayingIncome = max(MinimumPayout, min(P_current, PriceCap) * BaseRate * OutcomeMultiplier) * DailyTierMultiplier
+PlayingIncome = BasePayout + (P_current * BaseRate * OutcomeMultiplier * DailyTierMultiplier)
 ```
 
 Current defaults:
 
-- `BaseRate = 0.0125`
-- `PriceCap = 35`
-- `MinimumPayout = 0.20` on a win
-- `MinimumPayout = 0.10` on a loss
+- `BasePayout = 0.50` on a win
+- `BasePayout = 0.25` on a loss
+- `BaseRate = 0.01`
 - `OutcomeMultiplier = 1.0` on a win
 - `OutcomeMultiplier = 0.50` on all losses
 - `DailyTierMultiplier = 1.00` for games `1` to `3` that day
@@ -200,10 +199,10 @@ Current defaults:
 
 Examples:
 
-- A player with current price `42.00` is capped to `35.00` for this calculation and earns `0.44` on their first win of the day.
-- The same player earns `0.22` on their first loss of the day.
-- A low-priced player still earns at least `0.20` for an early win and `0.10` for an early loss.
-- After three rewarded matches in a day, later games still pay out, but at `65%` of the early-game payout.
+- A player with current price `42.00` earns `0.50 + (42.00 * 0.01 * 1.0 * 1.0) = 0.92` on their first win of the day.
+- The same player earns `0.25 + (42.00 * 0.01 * 0.5 * 1.0) = 0.46` on their first loss of the day.
+- A low-priced player still earns at least `0.50` for an early win and `0.25` for an early loss.
+- After three rewarded matches in a day, later games still pay out, but at `65%` of the variable component.
 
 ### Processing Rules
 

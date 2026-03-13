@@ -607,13 +607,13 @@ async def test_market_update_job_applies_playing_income_once_per_new_match(
 
     assert user is not None
     assert player is not None
-    assert user.balance == pytest.approx(1000.66)
+    assert user.balance == pytest.approx(1001.50)
     assert [entry.match_id for entry in entries] == ["EUW1_100", "EUW1_101", "EUW1_102"]
     assert entries[1].match_result == PlayingIncomeMatchResult.LOSS
-    assert entries[1].amount == pytest.approx(0.22)
-    assert entries[1].base_rate == pytest.approx(0.0125)
+    assert entries[1].amount == pytest.approx(0.50)
+    assert entries[1].base_rate == pytest.approx(0.01)
     assert entries[2].match_result == PlayingIncomeMatchResult.WIN
-    assert entries[2].amount == pytest.approx(0.44)
+    assert entries[2].amount == pytest.approx(1.00)
     assert entries[2].share_price == pytest.approx(50.0)
     assert player.last_playing_income_match_id == "EUW1_102"
 
@@ -761,9 +761,9 @@ async def test_market_update_job_backfills_playing_income_from_start_date(
 
     assert user is not None
     assert player is not None
-    assert user.balance == pytest.approx(1001.1)
+    assert user.balance == pytest.approx(1002.50)
     assert [entry.match_id for entry in entries] == ["EUW1_300", "EUW1_301", "EUW1_302"]
-    assert [entry.amount for entry in entries] == pytest.approx([0.44, 0.22, 0.44])
+    assert [entry.amount for entry in entries] == pytest.approx([1.00, 0.50, 1.00])
     assert player.last_playing_income_match_id == "EUW1_302"
     assert [call["start"] for call in match_id_calls] == [0, 2]
 
@@ -866,8 +866,8 @@ async def test_market_update_job_applies_minimum_playing_income_amount(
 
     assert user is not None
     assert entry is not None
-    assert user.balance == pytest.approx(1000.1)
-    assert entry.amount == pytest.approx(0.1)
+    assert user.balance == pytest.approx(1000.29)
+    assert entry.amount == pytest.approx(0.29)
 
 
 @pytest.mark.asyncio
@@ -1029,10 +1029,10 @@ async def test_market_update_job_reduces_playing_income_after_three_games_in_day
             .all()
         )
 
-    assert user.balance == pytest.approx(1000.42)
+    assert user.balance == pytest.approx(1001.24)
     assert [entry.match_id for entry in entries[-2:]] == ["EUW1_704", "EUW1_705"]
-    assert entries[-2].amount == pytest.approx(0.28)
-    assert entries[-1].amount == pytest.approx(0.14)
+    assert entries[-2].amount == pytest.approx(0.83)
+    assert entries[-1].amount == pytest.approx(0.41)
 
 
 @pytest.mark.asyncio
@@ -1164,9 +1164,9 @@ async def test_market_update_job_falls_back_when_start_time_query_is_rejected(
         )
 
     assert user is not None
-    assert user.balance == pytest.approx(1000.38)
+    assert user.balance == pytest.approx(1001.05)
     assert [entry.match_id for entry in entries] == ["EUW1_949", "EUW1_950"]
-    assert [entry.amount for entry in entries] == pytest.approx([0.13, 0.25])
+    assert [entry.amount for entry in entries] == pytest.approx([0.35, 0.70])
     assert request_calls[0]["start_time"] is not None
     assert request_calls[1]["start_time"] is None
 
@@ -1372,9 +1372,9 @@ async def test_market_update_job_skips_malformed_match_summary_and_continues(
         )
 
     assert user is not None
-    assert user.balance == pytest.approx(1000.38)
+    assert user.balance == pytest.approx(1001.05)
     assert [entry.match_id for entry in entries] == ["EUW1_1000", "EUW1_1002"]
-    assert [entry.amount for entry in entries] == pytest.approx([0.13, 0.25])
+    assert [entry.amount for entry in entries] == pytest.approx([0.35, 0.70])
 
 
 @pytest.mark.asyncio

@@ -12,8 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.banking import (
     apply_due_interest,
     calculate_playing_income_amount,
+    get_playing_income_base_payout,
     get_playing_income_daily_multiplier,
-    get_playing_income_minimum_amount,
     get_playing_income_outcome_multiplier,
     record_user_wealth_snapshot,
     start_of_utc_day,
@@ -412,7 +412,7 @@ async def _apply_playing_income_for_player(
         amount = calculate_playing_income_amount(
             player.current_price,
             outcome_multiplier,
-            minimum_amount=get_playing_income_minimum_amount(summary.win),
+            base_payout=get_playing_income_base_payout(summary.win),
             daily_multiplier=daily_multiplier,
         )
         if amount <= 0:

@@ -92,35 +92,28 @@ def get_playing_income_outcome_multiplier(
     return settings.playing_income_loss_multiplier
 
 
-def get_playing_income_minimum_amount(won_match: bool) -> float:
+def get_playing_income_base_payout(won_match: bool) -> float:
     return (
-        settings.playing_income_win_min_amount
+        settings.playing_income_win_base_payout
         if won_match
-        else settings.playing_income_loss_min_amount
+        else settings.playing_income_loss_base_payout
     )
-
-
-def get_playing_income_effective_share_price(share_price: float) -> float:
-    return max(0.0, min(share_price, settings.playing_income_price_cap))
 
 
 def calculate_playing_income_amount(
     share_price: float,
     outcome_multiplier: float,
     *,
-    minimum_amount: float,
+    base_payout: float,
     daily_multiplier: float,
 ) -> float:
-    effective_share_price = get_playing_income_effective_share_price(share_price)
-    return round_currency(
-        max(
-            minimum_amount,
-            effective_share_price
-            * settings.playing_income_base_rate
-            * outcome_multiplier,
-        )
+    variable = (
+        share_price
+        * settings.playing_income_base_rate
+        * outcome_multiplier
         * daily_multiplier
     )
+    return round_currency(base_payout + variable)
 
 
 def normalize_datetime(value: datetime | None) -> datetime | None:
@@ -383,13 +376,13 @@ async def build_playing_income_summary(
         projected_next_win_income=calculate_playing_income_amount(
             share_price,
             get_playing_income_outcome_multiplier(True, next_match_number),
-            minimum_amount=get_playing_income_minimum_amount(True),
+            base_payout=get_playing_income_base_payout(True),
             daily_multiplier=next_win_daily_multiplier,
         ),
         projected_next_loss_income=calculate_playing_income_amount(
             share_price,
             get_playing_income_outcome_multiplier(False, next_match_number),
-            minimum_amount=get_playing_income_minimum_amount(False),
+            base_payout=get_playing_income_base_payout(False),
             daily_multiplier=next_loss_daily_multiplier,
         ),
         playing_income_last_24h=round_currency(float(recent_total_result or 0.0)),

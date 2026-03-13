@@ -62,10 +62,9 @@ class Settings(BaseSettings):
     pricing_negative_lp_soft_cap: int = 24
     pricing_positive_lp_excess_efficiency: float = 0.25
     pricing_negative_lp_excess_efficiency: float = 0.50
-    playing_income_base_rate: float = 0.0125
-    playing_income_price_cap: float = 35.0
-    playing_income_win_min_amount: float = 0.20
-    playing_income_loss_min_amount: float = 0.10
+    playing_income_base_rate: float = 0.01
+    playing_income_win_base_payout: float = 0.50
+    playing_income_loss_base_payout: float = 0.25
     playing_income_boosted_games_per_day: int = 3
     playing_income_grind_daily_multiplier: float = 0.65
     playing_income_loss_multiplier: float = 0.50

@@ -307,7 +307,7 @@ async def test_bank_summary_includes_playing_income_metrics(auth_client, db_sess
                 share_price=40.0,
                 base_rate=0.01,
                 outcome_multiplier=1.0,
-                amount=0.4,
+                amount=0.90,  # 0.50 + (40 * 0.01 * 1.0 * 1.0)
             ),
             PlayingIncomeEntry(
                 user_id=user.id,
@@ -319,7 +319,7 @@ async def test_bank_summary_includes_playing_income_metrics(auth_client, db_sess
                 share_price=40.0,
                 base_rate=0.01,
                 outcome_multiplier=0.5,
-                amount=0.2,
+                amount=0.45,  # 0.25 + (40 * 0.01 * 0.5 * 1.0)
             ),
         ]
     )
@@ -328,10 +328,10 @@ async def test_bank_summary_includes_playing_income_metrics(auth_client, db_sess
     summary_resp = await auth_client.get("/api/bank")
     assert summary_resp.status_code == 200
     summary = summary_resp.json()
-    assert summary["projected_next_win_income"] == pytest.approx(0.44)
-    assert summary["projected_next_loss_income"] == pytest.approx(0.22)
-    assert summary["playing_income_last_24h"] == pytest.approx(0.4)
-    assert summary["playing_income_lifetime_total"] == pytest.approx(0.6)
+    assert summary["projected_next_win_income"] == pytest.approx(0.92)
+    assert summary["projected_next_loss_income"] == pytest.approx(0.46)
+    assert summary["playing_income_last_24h"] == pytest.approx(0.90)
+    assert summary["playing_income_lifetime_total"] == pytest.approx(1.35)
     assert [
         entry["match_id"] for entry in summary["recent_playing_income_entries"]
     ] == [
@@ -357,5 +357,5 @@ async def test_bank_summary_applies_minimum_playing_income_projection(
     summary_resp = await auth_client.get("/api/bank")
     assert summary_resp.status_code == 200
     summary = summary_resp.json()
-    assert summary["projected_next_win_income"] == pytest.approx(0.2)
-    assert summary["projected_next_loss_income"] == pytest.approx(0.1)
+    assert summary["projected_next_win_income"] == pytest.approx(0.58)
+    assert summary["projected_next_loss_income"] == pytest.approx(0.29)
