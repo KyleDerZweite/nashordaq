@@ -5,7 +5,6 @@ import type {
   AdminPlayerInsightResponse,
   AdminOverviewResponse,
   AdminUserSummaryResponse,
-  OrderResponse,
   SystemStatusResponse,
 } from "../../types";
 import { getStreamerSafeName } from "../../utils/streamerMode";
@@ -16,7 +15,6 @@ import AdminPortfolioModal from "./AdminPortfolioModal";
 interface Props {
   overview?: AdminOverviewResponse;
   users: AdminUserSummaryResponse[];
-  orders: OrderResponse[];
   systemStatus?: SystemStatusResponse;
   playerInsights: AdminPlayerInsightResponse[];
 }
@@ -24,7 +22,6 @@ interface Props {
 export default function AdminDashboard({
   overview,
   users,
-  orders,
   systemStatus,
   playerInsights,
 }: Props) {
@@ -45,7 +42,7 @@ export default function AdminDashboard({
     },
     {
       label: "Total Orders",
-      value: overview?.total_orders ?? orders.length,
+      value: overview?.total_orders ?? 0,
       suffix: "",
     },
     { label: "Pending", value: overview?.pending_orders ?? 0, suffix: "" },

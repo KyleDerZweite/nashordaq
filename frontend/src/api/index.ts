@@ -20,7 +20,6 @@ export {
   useSystemStatus,
   useAdminOverview,
   useAdminUsers,
-  useAdminOrders,
   useAdminSystemStatus,
   useAdminPlayerInsights,
   useAdminUserPortfolio,

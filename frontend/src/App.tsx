@@ -21,7 +21,6 @@ import { getStreamerSafeName } from "./utils/streamerMode";
 
 import {
   useBankSummary,
-  useAdminOrders,
   useAdminOverview,
   useAdminPlayerInsights,
   useAdminSystemStatus,
@@ -74,12 +73,13 @@ export default function App() {
   const { data: players, isLoading: playersLoading } = usePlayers();
   const { data: portfolio } = usePortfolio(onboardingComplete && !isAdmin);
   const { data: orders } = useOrders(Boolean(user) && !isAdmin);
-  const { data: recentOrders } = useRecentOrders(Boolean(user) && !isAdmin);
+  const { data: recentOrders } = useRecentOrders(
+    Boolean(user) && (!isAdmin || adminViewMode === "spectator"),
+  );
   const { data: leaderboard } = useLeaderboard();
   const { data: systemStatus } = useSystemStatus();
   const { data: adminOverview } = useAdminOverview(isAdmin);
   const { data: adminUsers } = useAdminUsers(isAdmin);
-  const { data: adminOrders } = useAdminOrders(isAdmin);
   const { data: adminSystemStatus } = useAdminSystemStatus(isAdmin);
   const { data: adminPlayerInsights } = useAdminPlayerInsights(
     isAdmin && adminViewMode === "admin",
@@ -318,11 +318,10 @@ export default function App() {
 
               <div className="mt-6">
                 <OrderHistory
-                  ownOrders={adminOrders ?? []}
-                  allOrders={adminOrders ?? []}
+                  ownOrders={recentOrders ?? []}
+                  allOrders={recentOrders ?? []}
                   defaultView="all"
                   allowViewToggle={false}
-                  title="Market Activity"
                 />
               </div>
             </>
@@ -331,7 +330,6 @@ export default function App() {
               <AdminDashboard
                 overview={adminOverview}
                 users={adminUsers ?? []}
-                orders={adminOrders ?? []}
                 systemStatus={adminSystemStatus}
                 playerInsights={adminPlayerInsights ?? []}
               />

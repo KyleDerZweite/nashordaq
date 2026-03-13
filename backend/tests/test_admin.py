@@ -49,7 +49,6 @@ async def test_admin_can_view_overview_users_and_orders(
 
     overview_resp = await auth_client.get("/api/admin/overview")
     users_resp = await auth_client.get("/api/admin/users")
-    orders_resp = await auth_client.get("/api/admin/orders")
     status_resp = await auth_client.get("/api/admin/system/status")
 
     assert overview_resp.status_code == 200
@@ -61,11 +60,6 @@ async def test_admin_can_view_overview_users_and_orders(
     users = users_resp.json()
     assert users[0]["role"] == "admin"
     assert {user["username"] for user in users} >= {"testuser", "seconduser"}
-
-    assert orders_resp.status_code == 200
-    assert len(orders_resp.json()) >= 1
-    assert orders_resp.json()[0]["user_name"] == "Test Player"
-    assert orders_resp.json()[0]["user_game_name"] == "TestPlayer"
 
     assert status_resp.status_code == 200
     assert status_resp.json()["service_status"] == "ok"

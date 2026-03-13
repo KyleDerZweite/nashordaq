@@ -1,7 +1,7 @@
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,7 +22,6 @@ from app.models import (
     User,
 )
 from app.pricing import BETA, WIN_RATE_NEUTRAL, calculate_win_rate
-from app.routers.orders import build_order_responses
 from app.routers.portfolio import build_portfolio_response
 from app.scheduler import (
     classify_market_status,
@@ -37,7 +36,6 @@ from app.schemas import (
     AdminPlayerPoroRewardResponse,
     AdminUserPortfolioResponse,
     AdminUserSummaryResponse,
-    OrderResponse,
     SystemStatusResponse,
 )
 
@@ -487,28 +485,6 @@ async def restore_admin_user_rescue_unlock(
     await session.commit()
     await session.refresh(user)
     return await _build_admin_user_portfolio_response(session, user)
-
-
-@router.get("/orders", response_model=list[OrderResponse])
-async def list_admin_orders(
-    admin_user: CurrentAdminUser,
-    session: SessionDep,
-    status: OrderStatus | None = Query(default=None),  # noqa: B008
-    user_id: int | None = Query(default=None, ge=1),  # noqa: B008
-    limit: int = Query(default=200, ge=1, le=500),  # noqa: B008
-) -> list[OrderResponse]:
-    del admin_user
-
-    stmt = select(Order)
-    if status is not None:
-        stmt = stmt.where(Order.status == status)
-    if user_id is not None:
-        stmt = stmt.where(Order.user_id == user_id)
-    stmt = stmt.order_by(Order.created_at.desc()).limit(limit)
-
-    result = await session.execute(stmt)
-    orders = result.scalars().all()
-    return await build_order_responses(session, orders)
 
 
 @router.get("/system/status", response_model=SystemStatusResponse)
