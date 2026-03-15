@@ -331,10 +331,18 @@ class AdminPlayerInsightResponse(BaseModel):
 
 
 class LeaderboardEntry(BaseModel):
+    user_id: int
     display_name: str
     game_name: str
     total_value: float
     rank: int
+
+
+class LeaderboardPlayerPortfolioResponse(BaseModel):
+    display_name: str
+    game_name: str
+    total_value: float
+    holdings: list[HoldingResponse]
 
 
 class SystemStatusResponse(BaseModel):

@@ -87,6 +87,18 @@ async def create_gamba_position(
     )
     quantity = body.cash_amount / player.current_price
 
+    # Scale settlement multiplier linearly with hold duration:
+    # shorter holds get a lower multiplier, longer holds get a higher one.
+    hold_range = settings.gamba_max_hold_hours - settings.gamba_min_hold_hours
+    if hold_range > 0:
+        hold_fraction = (hold_hours - settings.gamba_min_hold_hours) / hold_range
+    else:
+        hold_fraction = 0.5
+    settlement_multiplier = settings.gamba_settlement_multiplier_min + hold_fraction * (
+        settings.gamba_settlement_multiplier_max
+        - settings.gamba_settlement_multiplier_min
+    )
+
     user.balance -= body.cash_amount
 
     buy_order = Order(
@@ -111,7 +123,7 @@ async def create_gamba_position(
         quantity=quantity,
         entry_price=player.current_price,
         scheduled_settlement_at=now + timedelta(hours=hold_hours),
-        settlement_multiplier=settings.gamba_settlement_multiplier,
+        settlement_multiplier=settlement_multiplier,
         status=GambaStatus.ACTIVE,
     )
     session.add(position)

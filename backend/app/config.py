@@ -44,7 +44,8 @@ class Settings(BaseSettings):
     buy_revert_grace_seconds: int = 60
     gamba_min_hold_hours: float = 24.0
     gamba_max_hold_hours: float = 168.0
-    gamba_settlement_multiplier: float = 2.5
+    gamba_settlement_multiplier_min: float = 2.0
+    gamba_settlement_multiplier_max: float = 4.0
     gamba_max_active_positions_per_user: int = 1
     bank_rescue_interest_rate_per_interval: float = 0.02
     bank_interest_interval_hours: float = 120.0
@@ -58,6 +59,8 @@ class Settings(BaseSettings):
     pricing_win_streak_lp_ratio_max: float = 1.0
     pricing_lp_ratio_bootstrap_offset: int = 5
     pricing_lp_average_ema_alpha: float = 0.35
+    pricing_inactivity_threshold_hours: float = 48.0
+    pricing_inactivity_decay_rate_per_hour: float = 0.00075
     pricing_positive_lp_soft_cap: int = 20
     pricing_negative_lp_soft_cap: int = 24
     pricing_positive_lp_excess_efficiency: float = 0.25

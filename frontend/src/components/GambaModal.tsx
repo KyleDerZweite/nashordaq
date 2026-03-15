@@ -118,14 +118,15 @@ export default function GambaModal({ positions, onClose }: Props) {
           <div className="mt-6 hidden xl:block overflow-x-auto border-2 border-hex-border">
             <table className="w-full table-fixed min-w-0">
               <colgroup>
+                <col className="w-[8%]" />
+                <col className="w-[16%]" />
                 <col className="w-[9%]" />
-                <col className="w-[18%]" />
-                <col className="w-[10%]" />
-                <col className="w-[10%]" />
-                <col className="w-[10%]" />
-                <col className="w-[18%]" />
-                <col className="w-[15%]" />
-                <col className="w-[10%]" />
+                <col className="w-[9%]" />
+                <col className="w-[9%]" />
+                <col className="w-[7%]" />
+                <col className="w-[17%]" />
+                <col className="w-[14%]" />
+                <col className="w-[11%]" />
               </colgroup>
               <thead>
                 <tr className="border-b-2 border-hex-border bg-hex-bg-alt text-left">
@@ -135,6 +136,7 @@ export default function GambaModal({ positions, onClose }: Props) {
                     "Cash",
                     "Qty",
                     "Entry",
+                    "Mult",
                     "Scheduled",
                     "Settled",
                     "Result",
@@ -180,6 +182,9 @@ export default function GambaModal({ positions, onClose }: Props) {
                     <td className="px-4 py-3 text-right font-mono text-sm text-hex-white">
                       {formatAmount(position.entry_price)}
                     </td>
+                    <td className="px-4 py-3 text-right font-mono text-sm text-hex-gold">
+                      x{position.settlement_multiplier.toFixed(1)}
+                    </td>
                     <td className="px-4 py-3 text-right font-mono text-xs text-hex-bronze">
                       {formatCompactDateTime(position.scheduled_settlement_at)}
                     </td>
@@ -198,7 +203,7 @@ export default function GambaModal({ positions, onClose }: Props) {
                 {positions.length === 0 && (
                   <tr>
                     <td
-                      colSpan={8}
+                      colSpan={9}
                       className="px-4 py-8 text-center font-mono text-sm text-hex-bronze"
                     >
                       No gamba positions yet. Start a roll and the full ledger
@@ -252,6 +257,14 @@ export default function GambaModal({ positions, onClose }: Props) {
                     </div>
                     <div className="mt-1 font-mono text-sm text-hex-white">
                       {formatAmount(position.entry_price)}
+                    </div>
+                  </div>
+                  <div className="border border-hex-border/70 bg-hex-bg px-3 py-2">
+                    <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-hex-bronze">
+                      Multiplier
+                    </div>
+                    <div className="mt-1 font-mono text-sm font-bold text-hex-gold">
+                      x{position.settlement_multiplier.toFixed(1)}
                     </div>
                   </div>
                   <div className="border border-hex-border/70 bg-hex-bg px-3 py-2">

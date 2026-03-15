@@ -17,6 +17,7 @@ export {
   useOrderDetail,
   useRecentOrders,
   useLeaderboard,
+  useLeaderboardPlayerPortfolio,
   useSystemStatus,
   useAdminOverview,
   useAdminUsers,

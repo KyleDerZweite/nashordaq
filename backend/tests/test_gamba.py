@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import httpx
@@ -82,7 +82,8 @@ async def test_market_update_job_settles_due_gamba_position(db_engine, monkeypat
         db_engine, class_=AsyncSession, expire_on_commit=False
     )
 
-    due_time = datetime(2026, 3, 9, 12, 0, tzinfo=UTC)
+    # Use a recent due_time so inactivity decay does not trigger.
+    due_time = datetime.now(UTC) - timedelta(hours=1)
 
     async with session_factory() as session:
         player = TrackedPlayer(

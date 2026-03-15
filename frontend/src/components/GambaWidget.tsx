@@ -40,8 +40,6 @@ export default function GambaWidget({ balance, canTrade }: Props) {
       ),
     [activePositions],
   );
-  const displayMultiplier = activePositions[0]?.settlement_multiplier ?? 2.5;
-
   const parsedCashAmount = Number(cashAmount);
   const hasValidAmount =
     Number.isFinite(parsedCashAmount) && parsedCashAmount > 0;
@@ -86,10 +84,7 @@ export default function GambaWidget({ balance, canTrade }: Props) {
               Multiplier
             </div>
             <div className="font-mono text-sm font-bold text-hex-gold">
-              x
-              {Number.isInteger(displayMultiplier)
-                ? displayMultiplier.toFixed(0)
-                : displayMultiplier}
+              x2 &ndash; 4
             </div>
           </div>
         </div>
@@ -189,6 +184,10 @@ export default function GambaWidget({ balance, canTrade }: Props) {
                         <div className="truncate text-[11px] text-hex-bronze">
                           {formatQuantity(position.quantity)} @{" "}
                           {formatAmount(position.entry_price)}
+                          {" · "}
+                          <span className="text-hex-gold">
+                            x{position.settlement_multiplier.toFixed(1)}
+                          </span>
                         </div>
                       </td>
                       <td className="px-3 py-2 text-right font-mono text-xs font-bold text-hex-gold">

@@ -24,6 +24,7 @@ import type {
   UserProfileUpdate,
   PortfolioResponse,
   LeaderboardEntry,
+  LeaderboardPlayerPortfolioResponse,
   SystemStatusResponse,
 } from "../types";
 
@@ -38,6 +39,8 @@ export const queryKeys = {
   orders: ["orders"] as const,
   recentOrders: ["recentOrders"] as const,
   leaderboard: ["leaderboard"] as const,
+  leaderboardPlayerPortfolio: (userId: number) =>
+    ["leaderboardPlayerPortfolio", userId] as const,
   systemStatus: ["systemStatus"] as const,
   adminOverview: ["adminOverview"] as const,
   adminUsers: ["adminUsers"] as const,
@@ -203,6 +206,17 @@ export function useLeaderboard() {
     queryKey: queryKeys.leaderboard,
     queryFn: () => get<LeaderboardEntry[]>("/leaderboard"),
     refetchInterval: 60_000,
+  });
+}
+
+export function useLeaderboardPlayerPortfolio(userId: number | null) {
+  return useQuery<LeaderboardPlayerPortfolioResponse>({
+    queryKey: queryKeys.leaderboardPlayerPortfolio(userId ?? 0),
+    queryFn: () =>
+      get<LeaderboardPlayerPortfolioResponse>(
+        `/leaderboard/${userId}/portfolio`,
+      ),
+    enabled: userId !== null,
   });
 }
 

@@ -41,6 +41,7 @@ from app.models import (
 )
 from app.poro import maintain_poro_states, poro_state_notifier
 from app.pricing import (
+    PRICE_FLOOR,
     calculate_ipo_price,
     calculate_lp_abs,
     calculate_new_price,
@@ -726,11 +727,57 @@ async def market_update_job() -> None:
                 )
 
                 if delta_lp == 0 and not match_summaries:
-                    logger.info(
-                        "No LP change for %s#%s; preserving market state",
-                        player.game_name,
-                        player.tag_line,
-                    )
+                    # Inactivity pressure: decay price toward fair value
+                    # when no LP change for a configurable duration.
+                    if (
+                        player.last_updated is not None
+                        and player.lp_abs > 0
+                        and settings.pricing_inactivity_threshold_hours > 0
+                    ):
+                        hours_since_update = (
+                            now - _normalize_datetime(player.last_updated)
+                        ).total_seconds() / 3600
+                        if (
+                            hours_since_update
+                            > settings.pricing_inactivity_threshold_hours
+                        ):
+                            fair_value = calculate_ipo_price(
+                                player.lp_abs,
+                                calculate_win_rate(
+                                    player.ranked_wins_snapshot or 0,
+                                    player.ranked_losses_snapshot or 0,
+                                ),
+                            )
+                            price_diff = player.current_price - fair_value
+                            if abs(price_diff) > 0.01:
+                                # Time-based decay: scale by cycle
+                                # interval so rate is consistent
+                                # regardless of player count.
+                                cycle_hours = required_interval.total_seconds() / 3600
+                                rate = settings.pricing_inactivity_decay_rate_per_hour
+                                decay_factor = (1 - rate) ** cycle_hours
+                                decay = price_diff * (1 - decay_factor)
+                                player.current_price = max(
+                                    player.current_price - decay, PRICE_FLOOR
+                                )
+                                should_record_market_update = True
+                                logger.info(
+                                    "Inactivity decay for %s#%s: "
+                                    "price %.2f (fair_value=%.2f, "
+                                    "inactive %.1fh)",
+                                    player.game_name,
+                                    player.tag_line,
+                                    player.current_price,
+                                    fair_value,
+                                    hours_since_update,
+                                )
+
+                    if not should_record_market_update:
+                        logger.info(
+                            "No LP change for %s#%s; preserving market state",
+                            player.game_name,
+                            player.tag_line,
+                        )
                 elif match_summaries and delta_lp != 0:
                     # Per-match pricing: attribute LP delta to individual
                     # matches and apply price updates sequentially.

@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { useStreamerMode } from "../contexts/useStreamerMode";
 import type { LeaderboardEntry } from "../types";
 import { getStreamerSafeName } from "../utils/streamerMode";
 import { formatAmount } from "../utils/format";
+import LeaderboardPlayerInsight from "./LeaderboardPlayerInsight";
 
 interface Props {
   entries: LeaderboardEntry[];
@@ -9,6 +11,9 @@ interface Props {
 
 export default function Leaderboard({ entries }: Props) {
   const { isStreamerMode } = useStreamerMode();
+  const [selectedEntry, setSelectedEntry] = useState<LeaderboardEntry | null>(
+    null,
+  );
 
   return (
     <section className="border-2 border-hex-gold-dim bg-hex-panel">
@@ -37,6 +42,7 @@ export default function Leaderboard({ entries }: Props) {
             {entries.map((e) => (
               <tr
                 key={e.rank}
+                onClick={() => setSelectedEntry(e)}
                 className={`border-b border-hex-border/50 transition-colors hover:bg-hex-bg-alt ${
                   e.rank === 1 ? "bg-hex-gold/5" : ""
                 }`}
@@ -69,6 +75,17 @@ export default function Leaderboard({ entries }: Props) {
           </tbody>
         </table>
       </div>
+
+      {selectedEntry && (
+        <LeaderboardPlayerInsight
+          userId={selectedEntry.user_id}
+          displayName={selectedEntry.display_name}
+          gameName={selectedEntry.game_name}
+          totalValue={selectedEntry.total_value}
+          rank={selectedEntry.rank}
+          onClose={() => setSelectedEntry(null)}
+        />
+      )}
     </section>
   );
 }

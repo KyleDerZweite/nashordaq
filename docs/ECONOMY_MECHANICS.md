@@ -110,6 +110,28 @@ Each attributed match produces a `PlayerMatch` row storing `lp_before`, `lp_afte
 
 **Floor:** `P_new` cannot drop below 1.00.
 
+### Inactivity Pressure
+
+When a tracked player has had no LP change for a configurable duration, the price decays toward the IPO price (the price the player would receive if listed fresh with their current LP and win rate) each scheduler cycle.
+
+```
+FairValue = IPO_Price(LP_abs, WinRate)
+PriceDiff = P_current - FairValue
+P_new = P_current - (PriceDiff * DecayRate)
+```
+
+- Decay only starts after `48` hours (default) without an LP change.
+- A player priced above fair value drifts down; a player priced below fair value drifts up.
+- The moment LP changes again, normal pricing resumes.
+- The decay rate is time-based (per hour), scaled by the actual scheduler cycle interval. This keeps decay speed consistent regardless of how many players are tracked.
+
+Current defaults:
+
+- `pricing_inactivity_threshold_hours = 48.0`
+- `pricing_inactivity_decay_rate_per_hour = 0.00075`
+
+Implementation: `app/scheduler.py::market_update_job()` (inactivity branch)
+
 Implementation: `app/pricing.py::calculate_new_price()`, `calculate_win_rate()`, `update_streak()`, `app/scheduler.py::_learn_player_lp_averages()`, `_attribute_lp_to_matches()`, `_apply_per_match_price_updates()`
 
 ## 4. Immediate Execution + Holding Adjustment
@@ -197,7 +219,9 @@ Users can choose to enter a "Gamba" position, which is a leveraged long-term inv
 - After the hold duration expires, the position is automatically settled by the scheduler.
 - The "Raw P&L" is calculated as `(current_price * quantity) - initial_cash_amount`.
 - The settled payout is `initial_cash_amount + (raw_pnl * multiplier)`.
-- The multiplier is `2.5x` (default).
+- The multiplier scales linearly with the randomly drawn hold duration: shorter holds get a lower multiplier, longer holds get a higher one. This makes longer holds feel rewarding rather than purely punishing.
+- `multiplier = min + (hold_hours - min_hold) / (max_hold - min_hold) * (max - min)`
+- Default range: `2.0x` at 24h hold to `4.0x` at 168h hold.
 - The payout is credited to the user's cash balance.
 - Payout cannot drop below `0.0`.
 

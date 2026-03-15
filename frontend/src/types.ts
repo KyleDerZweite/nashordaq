@@ -330,10 +330,18 @@ export interface AdminPlayerInsightResponse {
 }
 
 export interface LeaderboardEntry {
+  user_id: number;
   display_name: string;
   game_name: string;
   total_value: number;
   rank: number;
+}
+
+export interface LeaderboardPlayerPortfolioResponse {
+  display_name: string;
+  game_name: string;
+  total_value: number;
+  holdings: HoldingResponse[];
 }
 
 export interface SystemStatusResponse {

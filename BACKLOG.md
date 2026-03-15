@@ -4,267 +4,78 @@ Ideas and improvements for the Nashordaq economy system, roughly ordered by prio
 
 ---
 
-## ~~1. Per-Match LP Tracking (Match-Driven Pricing)~~ ✅ DONE
+## ~~1. Per-Match LP Tracking (Match-Driven Pricing)~~ DONE
 
-**Problem:** The current scheduler polls league-v4 for an LP snapshot every few minutes and computes an aggregate `delta_lp`. This has multiple downstream issues:
-
-- **Streak accuracy:** If 2 wins happen between polls, streak only increments by 1 instead of 2. Identical player performance produces different prices depending on polling timing.
-- **LP averages are approximations:** The EMA only learns from "pure" refreshes (only wins or only losses changed). Mixed refreshes are discarded.
-- **Recalculation is guesswork:** The `recalculate_player_price_from_matches.py` script assumes fixed LP per win/loss because actual per-game LP was never stored.
-- **No audit trail:** Price movements can't be traced back to specific matches.
-
-**Proposed approach: store every match and attribute LP deltas to individual games.**
-
-The key insight: we already fetch match-v5 history for playing income (`_apply_playing_income_for_player`). We can piggyback on that to also record per-match LP changes.
-
-**Why multi-game polls are rare:** A typical LoL game takes ~30 minutes. With the current polling interval of `ceil(N * 0.5)` minutes per player (1 API call each via league-v4/entries/by-puuid at 20000 req/10s), we'd need 30+ tracked players before the interval exceeds one game length. For a friends group of 5-10, most polls will catch exactly 0 or 1 new games. Multi-game polls only happen when the scheduler is down or during back-to-back remakes/surrenders.
-
-### Data Model
-
-New model `PlayerMatch` to store every detected ranked match:
-
-```python
-class PlayerMatch(Base):
-    __tablename__ = "player_matches"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    player_id: Mapped[int] = mapped_column(ForeignKey("tracked_players.id"), index=True)
-    match_id: Mapped[str] = mapped_column(String(64))
-    win: Mapped[bool]
-    lp_before: Mapped[int] = mapped_column(Integer)
-    lp_after: Mapped[int] = mapped_column(Integer)
-    lp_delta: Mapped[int] = mapped_column(Integer)
-    # Whether lp_delta was directly observed (single-game poll) or estimated
-    # (split from multi-game poll).
-    lp_delta_source: Mapped[str] = mapped_column(String(16))  # "observed" | "estimated"
-    streak_before: Mapped[int] = mapped_column(Integer)
-    streak_after: Mapped[int] = mapped_column(Integer)
-    price_before: Mapped[float] = mapped_column(Float)
-    price_after: Mapped[float] = mapped_column(Float)
-    game_duration_seconds: Mapped[int] = mapped_column(Integer)
-    completed_at: Mapped[datetime] = mapped_column(index=True)
-    recorded_at: Mapped[datetime] = mapped_column(insert_default=func.now())
-
-    __table_args__ = (
-        UniqueConstraint("player_id", "match_id", name="uq_player_match"),
-    )
-```
-
-### Revised Scheduler Flow
-
-```
-For each tracked player:
-  1. league-v4/entries/by-puuid → new LP snapshot        [1 API call, 20000/10s]
-  2. match-v5/matches/by-puuid → new match IDs           [already done for playing income]
-  3. For each new match: match-v5/matches/{id} → details  [already done for playing income]
-  4. Correlate LP delta with detected matches
-  5. Apply per-match price updates
-```
-
-Steps 2-3 already happen for playing income. The only new work is correlating LP deltas with matches (step 4) and applying price updates per-match instead of per-poll (step 5).
-
-### LP Attribution Logic
-
-**Single-game poll (most common case, ~95% of polls for <10 players):**
-```
-new_matches = [1 match detected]
-lp_delta = new_lp_abs - old_lp_abs
-→ Attribute entire lp_delta to the single match.
-→ lp_delta_source = "observed"
-→ Apply one update_streak + calculate_new_price.
-```
-
-**Multi-game poll (rare, same direction):**
-```
-new_matches = [match_a (win), match_b (win)]  # from match-v5, chronologically ordered
-lp_delta = +38 total
-→ Split: lp_per_win = 38 / 2 = 19 each (or use stored avg_lp_gain_on_win if available)
-→ lp_delta_source = "estimated"
-→ Apply update_streak + calculate_new_price TWICE, once per match.
-```
-
-**Multi-game poll (rare, mixed direction):**
-```
-new_matches = [match_a (loss), match_b (win)]  # chronological order from match-v5
-lp_delta = +5 total, 1 win + 1 loss
-→ Use stored averages: avg_gain=22, avg_loss=17
-→ Estimated: loss_lp = -17, win_lp = +22 (sum = +5, matches total delta)
-→ If averages unavailable or don't reconcile: fall back to even split or
-  attribute proportionally (e.g., loss = -(|delta| * loss_share), win = remainder)
-→ Apply updates in chronological order: loss first, then win.
-```
-
-**Zero-game poll with LP change (promotion/demotion LP adjustments):**
-```
-lp_delta != 0 but no new matches detected
-→ Record as a system adjustment (no PlayerMatch row).
-→ Apply single aggregate price update (current behavior).
-```
-
-### Benefits Over Current System
-
-| Aspect | Current | With per-match tracking |
-|--------|---------|------------------------|
-| Streak accuracy | Per-poll (can miss games) | Per-game (exact) |
-| LP averages | EMA on pure refreshes only | Direct per-game observations |
-| Price recalculation | Guesswork (assumed fixed LP) | Deterministic replay from stored data |
-| Audit trail | PriceHistory only | Full match-to-price-movement chain |
-| Playing income correlation | Separate match detection | Shared match detection pipeline |
-
-### Recalculation Script Improvement
-
-With `PlayerMatch` rows stored, the recalculate script becomes trivial:
-
-```python
-matches = session.query(PlayerMatch).filter_by(player_id=player.id).order_by(completed_at)
-price = calculate_ipo_price(matches[0].lp_before)
-streak = 0
-for match in matches:
-    streak = update_streak(streak, match.lp_delta)
-    price = calculate_new_price(price, match.lp_delta, streak, ...)
-```
-
-No Riot API calls needed. No LP assumptions. Fully deterministic.
-
-### Implementation Plan
-
-1. Add `PlayerMatch` model and migration.
-2. Merge match detection from playing income and pricing into a shared pipeline. Currently `_apply_playing_income_for_player` fetches matches independently. Refactor so the scheduler detects new matches once per player and passes them to both the pricing engine and playing income.
-3. Implement LP attribution logic (single-game observed, multi-game estimated).
-4. Apply per-match price updates instead of aggregate delta.
-5. Update `_learn_player_lp_averages` to use direct per-game LP instead of EMA (or keep EMA as a fallback for estimated splits).
-6. Update the recalculate script to replay from `PlayerMatch` rows.
-
-### API Budget Impact
-
-No additional API calls. Match-v5 is already fetched for playing income. League-v4 is already fetched for LP snapshots. We're just correlating data that's already being retrieved.
-
-**Complexity:** Medium-high. The match detection refactor is the biggest piece. LP attribution for multi-game polls needs careful handling. But the payoff is large: accurate per-game pricing, deterministic recalculation, and a complete audit trail.
+Implemented. The scheduler now detects individual ranked matches via Match-V5 (shared pipeline with playing income), attributes LP deltas to each game, and applies streak + price updates per-match in chronological order. A `PlayerMatch` model stores the full audit trail (`lp_before/after`, `streak_before/after`, `price_before/after`, `lp_delta_source`). Single-game polls get `OBSERVED` attribution; multi-game polls use stored LP averages for `ESTIMATED` splits. Price recalculation from stored data is deterministic. See `docs/ECONOMY_MECHANICS.md` section 3 for details.
 
 ---
 
-## 2. Inactivity Pressure
+## ~~2. Inactivity Pressure~~ DONE
 
-**Problem:** When a player stops playing, their price freezes indefinitely. Holdings in inactive players become risk-free stores of value. In a real stock market, uncertainty from low activity causes price drift. This removes a strategic dimension: there's no incentive to sell an inactive player's stock.
+Implemented. When a tracked player has no LP change for 48+ hours, the price decays toward the IPO price (based on current LP and win rate) at `0.075%` per hour (time-based, consistent regardless of cycle frequency). Prices above fair value drift down; prices below drift up. Normal pricing resumes the moment LP changes. See `docs/ECONOMY_MECHANICS.md` section 3 (Inactivity Pressure) for details.
 
-**Proposed approach: slow decay toward fair value.**
+---
 
-Define a fair-value baseline as the IPO formula: `(LP_abs / 100) + 10`. When a tracked player has had no LP change for a configurable duration, begin pulling the price toward this baseline by a small percentage per cycle.
+## 3. Minimum Holding Period (Replace Sell Multiplier)
 
-```python
-# In the scheduler, when delta_lp == 0:
-hours_since_update = (now - player.last_updated).total_seconds() / 3600
-if hours_since_update > INACTIVITY_THRESHOLD_HOURS:  # e.g., 48h
-    fair_value = (player.lp_abs / 100) + 10
-    decay_rate = INACTIVITY_DECAY_RATE  # e.g., 0.002 per cycle (~0.2%)
-    price_diff = player.current_price - fair_value
-    if abs(price_diff) > 0.01:
-        player.current_price -= price_diff * decay_rate
-        # Record price history so chart shows the drift
-```
+**Problem:** The current hold bonus/penalty (+/-2%) is too small to matter. On a 40 P stock with 10 shares, that's +/-8 P -- noise on a 1000 P balance. It doesn't influence sell timing decisions.
+
+**Proposed approach: replace the sliding fee/bonus with a hard 3-hour sell lock.**
+
+After buying shares, those shares cannot be sold for 3 hours. No fee, no bonus -- just a gate. This makes buy decisions more consequential and prevents flip-trading.
+
+- The lock is per-lot (FIFO): buying 10 shares at 9:00 and 10 more at 11:00 means the first batch unlocks at 12:00, the second at 14:00.
+- The 60-second buy-revert grace period stays (that's a cancel, not a sell).
+- `calculate_sell_multiplier` and the hold-duration fee/bonus logic can be removed. The `HoldingLot` model stays (needed for per-lot lock tracking), but its role simplifies to just tracking `acquired_at` for the lock check.
+
+**Interaction with Gamba:** Regular trades lock for 3h; Gamba locks for 24-168h but with 2-4x leverage. The contrast makes both systems feel distinct -- regular trading is "safe but patient," Gamba is "high risk, high reward, longer lock."
 
 **Config knobs:**
-- `pricing_inactivity_threshold_hours: float = 48.0` -- hours without LP change before decay starts.
-- `pricing_inactivity_decay_rate: float = 0.002` -- fraction of (price - fair_value) to decay per cycle.
+- `min_hold_period_hours: float = 3.0`
 
-**Behavior:**
-- A player priced at 45 with fair value 35 would slowly drift down: 45 -> 44.98 -> 44.96 -> ... approaching 35 asymptotically.
-- A player priced below fair value (e.g., after a loss streak) would slowly recover upward.
-- The moment the player plays again and LP changes, normal pricing resumes and the decay stops.
-- The decay is per-cycle (every ~1.25 min per player), so even 0.2% adds up over days of inactivity.
-
-**What users see:** A slowly declining (or recovering) chart line during player inactivity. No explanation is given -- it just looks like natural market drift, which adds to the stock market feel.
-
-**Complexity:** Low. A few lines in the `delta_lp == 0` branch of the scheduler.
+**Complexity:** Low. Remove sell multiplier logic, add a sell-time check against `acquired_at + min_hold_period`.
 
 ---
 
-## 3. Sell Multiplier: Increase or Remove
+## 4. Limited Share Supply + Player-to-Player Trading
 
-**Problem:** The current hold bonus/penalty is +/-2% max. On a 40 P stock with 10 shares, that's +/-8 P. With 1000 P starting balance, this is noise. It doesn't meaningfully influence sell timing decisions.
+**Problem:** Shares are unlimited. Price is 100% LP-driven. Users cannot influence price through trading. There's no scarcity, no reason to time trades, no FOMO or sentiment-driven dynamics.
 
-**Option A: Increase to make it matter.**
+**Proposed approach: cap the total share supply per stock and enable player-to-player sell orders.**
 
-Raise the rates so players actually feel the difference:
+Instead of an artificial demand premium, introduce real scarcity. When all available shares of a player are bought, nobody can buy more until someone sells. Users who want to sell post limit orders at their desired price, and buyers pick from available offers.
 
-```
-Short hold fee:     -5% at 0h, ramping to 0% at 6h (from -2%)
-Long hold bonus:    +5% after 24h (from +2% after 12h)
-```
+### Share Supply Cap
 
-At 40 P * 10 shares = 400 P total, a 5% fee/bonus = 20 P. That's noticeable on a 1000 P balance.
+Each tracked player has a fixed total supply of shares (e.g., 100). The LP-driven price becomes a reference/fair-value indicator, but actual trade prices are set by user offers when P2P trading is used.
 
-Could also make the long-hold bonus scale with duration (logarithmic), so diamond-hands holding is rewarded:
+Open questions:
+- **Fixed vs dynamic supply?** A flat cap (e.g., 100 shares per player) is simplest. A dynamic cap tied to LP or tier adds complexity but could make higher-ranked players more liquid.
+- **What happens to existing holdings?** Need a migration strategy if current holdings exceed the new cap.
 
-```python
-# Progressive bonus: grows with hold time, diminishing returns
-if held_hours >= long_hold_bonus_start_hours:
-    days_held = held_hours / 24
-    bonus = base_bonus * math.log2(1 + days_held)  # e.g., 0.02 * log2(1+days)
-    return 1 + min(bonus, max_bonus_cap)  # cap at e.g., 10%
-```
+### Player-to-Player Trading
 
-**Option B: Remove entirely.**
+Users can post sell orders at a price they choose. Other users can buy from those offers. This creates a bid/ask spread and organic price discovery.
 
-Delete `calculate_sell_multiplier`, the FIFO lot tracking for hold duration, and the `HoldingLot` model complexity. Sells just execute at market price. Reduces code and cognitive load.
+- Sell offers sit in an order book until filled or cancelled.
+- The LP-driven "market price" is still displayed as a reference.
+- Direct market buys (at LP price) could still be allowed when shares are available from the "house" pool, or all buys could go through the order book.
 
-**Recommendation:** Option A with moderate numbers (5% fee, 5% base bonus, logarithmic scaling capped at 10%) is probably more fun than removing it. But if simplicity is the priority, Option B is fine since the current 2% is essentially the same as having no multiplier at all.
+### Position Limits
 
-**Complexity:** Trivial for either option. Config changes + one function edit.
+To prevent one user cornering a stock:
+- Max shares per user per stock (e.g., 30% of total supply).
+- Or max portfolio concentration (e.g., no more than 50% of net worth in one stock).
 
----
+### Open Design Questions
 
-## 4. Demand-Driven Price Component
+This is a major architectural change that needs its own design doc:
+- How do "house" shares (not owned by any user) enter circulation? IPO-style release? Always available at LP price?
+- Does the LP-driven price still matter for settlement (Gamba, playing income), or does everything move to the order book price?
+- How does the UI present the order book without overwhelming a casual audience?
+- Impact on Bank failsafe net-worth calculations.
 
-**Problem:** Price is 100% LP-driven. Users can observe but cannot influence price through trading. This is the biggest gap between Nashordaq and a real stock market. There's no reason to time your trades, no FOMO, no bubbles, no crashes driven by sentiment.
-
-**Proposed approach: net-demand premium.**
-
-Track rolling buy/sell volume per player over a window. Compute a small demand premium that nudges the price up when buying pressure is high and down when selling pressure is high.
-
-**Data model addition:**
-```python
-# On TrackedPlayer:
-net_demand_shares_24h: float  # rolling net buy - sell shares in last 24h
-```
-
-Updated each time an order executes:
-```python
-# In order execution:
-if side == BUY:
-    player.net_demand_shares_24h += quantity
-elif side == SELL:
-    player.net_demand_shares_24h -= quantity
-```
-
-Decayed periodically by the scheduler (exponential decay toward 0):
-```python
-# Each market cycle:
-player.net_demand_shares_24h *= DEMAND_DECAY_RATE  # e.g., 0.995 per cycle
-```
-
-**Price integration (two possible approaches):**
-
-*Approach A -- Additive premium on price delta:*
-```python
-demand_premium = clamp(player.net_demand_shares_24h * DEMAND_SENSITIVITY, -max, +max)
-# e.g., DEMAND_SENSITIVITY = 0.05, max = 3% of current price
-player.current_price += demand_premium
-```
-
-*Approach B -- Multiplicative spread on execution price:*
-```python
-# Buy price slightly higher when demand is high:
-buy_spread  = 1 + clamp(net_demand * 0.001, 0, 0.03)
-# Sell price slightly lower when supply pressure is high:
-sell_spread = 1 - clamp(-net_demand * 0.001, 0, 0.03)
-```
-
-Approach A is simpler and affects the canonical price everyone sees. Approach B only affects execution and keeps the "true" price LP-driven, which might be cleaner.
-
-**What users see:** "Everyone is buying Player X" -> price creeps up slightly beyond what LP alone justifies -> early buyers profit, late buyers pay a premium -> organic bubble/crash dynamics.
-
-**Complexity:** Medium. Needs a new model field, order execution hooks, scheduler decay, and a decision on where the premium is applied. Worth designing carefully before implementing since it touches the core pricing path.
+**Complexity:** High. Touches orders, holdings, pricing display, UI, and possibly Gamba settlement. Needs dedicated design before implementation.
 
 ---
 
@@ -316,41 +127,9 @@ This creates visible "crash" patterns on the price chart during loss streaks, wh
 
 ---
 
-## 6. Gamba: Allow Player Selection
+## ~~6. Gamba: Scale Multiplier with Hold Duration~~ DONE
 
-**Problem:** Gamba picks a random player, removing all user agency. Users can't express a thesis ("I think Player X will pop off this weekend"). The randomness makes it feel like a slot machine rather than a leveraged trade.
-
-**Proposed options (pick one):**
-
-**Option A -- Full choice:**
-Let the user pick any tracked player (except their own linked player). Simple, maximum agency. The random hold duration still adds uncertainty.
-
-**Option B -- Filtered shortlist:**
-Present 2-3 randomly selected players. User picks from those. Keeps some randomness while allowing preference expression. Refresh the shortlist on each Gamba page visit.
-
-**Option C -- Tiered choice:**
-Picking your own choice costs more (e.g., 1.5x the cash amount) or has a lower multiplier (e.g., 2.0x instead of 2.5x). Random pick keeps the current terms. This creates a risk/reward tradeoff.
-
-**Implementation for Option A (simplest):**
-```python
-# In gamba router, change from:
-eligible_players = [p for p in players if p.id != user.linked_player_id]
-chosen_player = random.choice(eligible_players)
-
-# To:
-if request.player_id:
-    chosen_player = await session.get(TrackedPlayer, request.player_id)
-    if chosen_player is None or chosen_player.id == user.linked_player_id:
-        raise HTTPException(400, "Invalid player selection")
-else:
-    # Fallback to random for backwards compatibility
-    eligible_players = [p for p in players if p.id != user.linked_player_id]
-    chosen_player = random.choice(eligible_players)
-```
-
-**Frontend change:** Add a player selector dropdown to the Gamba UI, with an optional "random" button.
-
-**Complexity:** Low for Option A. Medium for B/C due to additional UI and backend logic.
+Implemented. Settlement multiplier scales linearly with the random hold duration: 2.0x at 24h to 4.0x at 168h. Both player and duration remain fully random. See `docs/ECONOMY_MECHANICS.md` section 7 for details.
 
 ---
 
