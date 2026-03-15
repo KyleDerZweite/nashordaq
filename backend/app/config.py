@@ -52,11 +52,11 @@ class Settings(BaseSettings):
     bank_rescue_net_worth_threshold: float = 250.0
     pricing_max_effective_streak: int = 10
     pricing_alpha: float = 0.12
-    pricing_win_rate_price_weight: float = 0.25
     pricing_loss_move_multiplier: float = 1.10
-    pricing_win_streak_lp_ratio_default: float = 1.0
-    pricing_win_streak_lp_ratio_min: float = 0.25
+    pricing_win_streak_lp_ratio_default: float = 0.85
+    pricing_win_streak_lp_ratio_min: float = 0.3
     pricing_win_streak_lp_ratio_max: float = 1.0
+    pricing_lp_ratio_bootstrap_offset: int = 5
     pricing_lp_average_ema_alpha: float = 0.35
     pricing_positive_lp_soft_cap: int = 20
     pricing_negative_lp_soft_cap: int = 24
@@ -72,8 +72,8 @@ class Settings(BaseSettings):
     playing_income_start_date: datetime = datetime(2026, 1, 1, tzinfo=UTC)
     playing_income_recent_match_count: int = 10
     poro_enabled: bool = True
-    poro_min_interval_minutes: int = 20
-    poro_max_interval_minutes: int = 120
+    poro_min_interval_minutes: int = 15
+    poro_max_interval_minutes: int = 60
     poro_min_interval_seconds_override: int | None = None
     poro_max_interval_seconds_override: int | None = None
     poro_spawn_min_duration_seconds: float = 6.0

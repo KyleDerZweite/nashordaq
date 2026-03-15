@@ -77,51 +77,22 @@ async def get_account_by_riot_id(
     )
 
 
-async def get_rank(
-    client: httpx.AsyncClient,
-    base_url: str,
-    region_url: str,
-    api_key: str,
-    game_name: str,
-    tag_line: str,
+def _extract_solo_queue_rank(
+    puuid: str,
+    entries: list[dict],
+    display_hint: str = "",
 ) -> RankData:
-    headers = {"X-Riot-Token": api_key}
-    account = await get_account_by_riot_id(
-        client=client,
-        base_url=base_url,
-        api_key=api_key,
-        game_name=game_name,
-        tag_line=tag_line,
-    )
-    puuid = account.puuid
-
-    summoner_resp = await client.get(
-        f"{region_url}/lol/summoner/v4/summoners/by-puuid/{puuid}",
-        headers=headers,
-    )
-    _check_response(summoner_resp)
-    summoner_payload = summoner_resp.json()
-    summoner_id = summoner_payload.get("id") or summoner_payload.get("summonerId")
-
-    league_url = (
-        f"{region_url}/lol/league/v4/entries/by-summoner/{summoner_id}"
-        if summoner_id
-        else f"{region_url}/lol/league/v4/entries/by-puuid/{puuid}"
-    )
-    league_resp = await client.get(league_url, headers=headers)
-    _check_response(league_resp)
-
-    entries: list[dict] = league_resp.json()
     solo_queue = next(
         (e for e in entries if e["queueType"] == "RANKED_SOLO_5x5"),
         None,
     )
     if solo_queue is None:
-        raise PlayerNotFoundError(f"No Solo Queue data for {game_name}#{tag_line}")
+        hint = display_hint or f"puuid {puuid}"
+        raise PlayerNotFoundError(f"No Solo Queue data for {hint}")
 
     return RankData(
         puuid=puuid,
-        summoner_id=summoner_id or puuid,
+        summoner_id=solo_queue.get("summonerId") or puuid,
         tier=solo_queue["tier"],
         rank=solo_queue["rank"],
         league_points=solo_queue["leaguePoints"],
@@ -130,6 +101,52 @@ async def get_rank(
         hot_streak=solo_queue.get("hotStreak", False),
         inactive=solo_queue.get("inactive", False),
     )
+
+
+async def _fetch_league_entries(
+    client: httpx.AsyncClient,
+    region_url: str,
+    api_key: str,
+    puuid: str,
+) -> list[dict]:
+    headers = {"X-Riot-Token": api_key}
+    resp = await client.get(
+        f"{region_url}/lol/league/v4/entries/by-puuid/{puuid}",
+        headers=headers,
+    )
+    _check_response(resp)
+    return resp.json()
+
+
+async def get_rank_by_puuid(
+    client: httpx.AsyncClient,
+    region_url: str,
+    api_key: str,
+    puuid: str,
+) -> RankData:
+    """Fast rank refresh: single league-v4/entries/by-puuid call (20000 req/10s)."""
+    entries = await _fetch_league_entries(client, region_url, api_key, puuid)
+    return _extract_solo_queue_rank(puuid, entries)
+
+
+async def get_rank(
+    client: httpx.AsyncClient,
+    base_url: str,
+    region_url: str,
+    api_key: str,
+    game_name: str,
+    tag_line: str,
+) -> RankData:
+    """Full rank lookup from Riot ID: account-v1 + league-v4 (2 API calls)."""
+    account = await get_account_by_riot_id(
+        client=client,
+        base_url=base_url,
+        api_key=api_key,
+        game_name=game_name,
+        tag_line=tag_line,
+    )
+    entries = await _fetch_league_entries(client, region_url, api_key, account.puuid)
+    return _extract_solo_queue_rank(account.puuid, entries, f"{game_name}#{tag_line}")
 
 
 async def get_recent_match_ids(

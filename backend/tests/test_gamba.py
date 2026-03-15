@@ -95,7 +95,6 @@ async def test_market_update_job_settles_due_gamba_position(db_engine, monkeypat
             lp_abs=1500,
             previous_lp_abs=1500,
             streak=0,
-            gamma_factor=1.0,
             last_updated=due_time,
         )
         user = User(username="gamba-user", balance=900.0)
@@ -145,7 +144,7 @@ async def test_market_update_job_settles_due_gamba_position(db_engine, monkeypat
 
     http_client = httpx.AsyncClient()
     monkeypatch.setattr(scheduler_module, "SessionLocal", session_factory)
-    monkeypatch.setattr(scheduler_module, "get_rank", fake_get_rank)
+    monkeypatch.setattr(scheduler_module, "get_rank_by_puuid", fake_get_rank)
     monkeypatch.setattr(
         scheduler_module,
         "_app",

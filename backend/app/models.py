@@ -117,12 +117,12 @@ class TrackedPlayer(Base):
     lp_abs: Mapped[int] = mapped_column(Integer, default=0)
     previous_lp_abs: Mapped[int] = mapped_column(Integer, default=0)
     streak: Mapped[int] = mapped_column(Integer, default=0)
-    gamma_factor: Mapped[float] = mapped_column(Float, default=1.0)
     ranked_wins_snapshot: Mapped[int | None] = mapped_column(Integer, default=None)
     ranked_losses_snapshot: Mapped[int | None] = mapped_column(Integer, default=None)
     avg_lp_gain_on_win: Mapped[float | None] = mapped_column(Float, default=None)
     avg_lp_loss_on_loss: Mapped[float | None] = mapped_column(Float, default=None)
     last_updated: Mapped[datetime | None] = mapped_column(default=None)
+    last_match_pricing_at: Mapped[datetime | None] = mapped_column(default=None)
     last_playing_income_match_id: Mapped[str | None] = mapped_column(
         String(64), default=None
     )
@@ -142,6 +142,7 @@ class TrackedPlayer(Base):
         back_populates="player"
     )
     price_history: Mapped[list["PriceHistory"]] = relationship(back_populates="player")
+    player_matches: Mapped[list["PlayerMatch"]] = relationship(back_populates="player")
     playing_income_entries: Mapped[list["PlayingIncomeEntry"]] = relationship(
         back_populates="player"
     )
@@ -374,6 +375,39 @@ class UserWealthSnapshot(Base):
     recorded_at: Mapped[datetime] = mapped_column(insert_default=func.now(), index=True)
 
     user: Mapped["User"] = relationship(back_populates="wealth_snapshots")
+
+
+class PlayerMatchLpSource(enum.StrEnum):
+    OBSERVED = "OBSERVED"
+    ESTIMATED = "ESTIMATED"
+
+
+class PlayerMatch(Base):
+    __tablename__ = "player_matches"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    player_id: Mapped[int] = mapped_column(ForeignKey("tracked_players.id"), index=True)
+    match_id: Mapped[str] = mapped_column(String(64))
+    win: Mapped[bool]
+    lp_before: Mapped[int] = mapped_column(Integer)
+    lp_after: Mapped[int] = mapped_column(Integer)
+    lp_delta: Mapped[int] = mapped_column(Integer)
+    lp_delta_source: Mapped[PlayerMatchLpSource] = mapped_column(
+        Enum(PlayerMatchLpSource)
+    )
+    streak_before: Mapped[int] = mapped_column(Integer)
+    streak_after: Mapped[int] = mapped_column(Integer)
+    price_before: Mapped[float] = mapped_column(Float)
+    price_after: Mapped[float] = mapped_column(Float)
+    game_duration_seconds: Mapped[int] = mapped_column(Integer)
+    completed_at: Mapped[datetime] = mapped_column(index=True)
+    recorded_at: Mapped[datetime] = mapped_column(insert_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("player_id", "match_id", name="uq_player_match"),
+    )
+
+    player: Mapped["TrackedPlayer"] = relationship(back_populates="player_matches")
 
 
 class PriceHistory(Base):

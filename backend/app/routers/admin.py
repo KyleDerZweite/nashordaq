@@ -15,13 +15,14 @@ from app.models import (
     Holding,
     Order,
     OrderStatus,
+    PlayerMatch,
     PlayingIncomeEntry,
     PoroSpawn,
     PoroSpawnStatus,
     TrackedPlayer,
     User,
 )
-from app.pricing import BETA, WIN_RATE_NEUTRAL, calculate_win_rate
+from app.pricing import BETA, calculate_win_rate
 from app.routers.portfolio import build_portfolio_response
 from app.scheduler import (
     classify_market_status,
@@ -32,6 +33,7 @@ from app.scheduler import (
 from app.schemas import (
     AdminOverviewResponse,
     AdminPlayerInsightResponse,
+    AdminPlayerMatchResponse,
     AdminPlayerPlayingIncomeEntryResponse,
     AdminPlayerPoroRewardResponse,
     AdminUserPortfolioResponse,
@@ -114,29 +116,22 @@ def _estimate_ratio_metrics(
         max(player.streak, 0),
         max(1, settings.pricing_max_effective_streak),
     )
-    streak_multiplier = 1 + (BETA * effective_positive_streak * clamped_ratio)
+    streak_multiplier = 1 + (BETA * effective_positive_streak)
     return raw_ratio, clamped_ratio, effective_positive_streak, streak_multiplier
 
 
-def _estimate_win_rate_metrics(
-    player: TrackedPlayer,
-) -> tuple[float | None, float | None]:
+def _estimate_win_rate(player: TrackedPlayer) -> float | None:
     if (
         player.ranked_wins_snapshot is None
         or player.ranked_losses_snapshot is None
         or player.ranked_wins_snapshot < 0
         or player.ranked_losses_snapshot < 0
     ):
-        return None, None
-
-    estimated_win_rate = calculate_win_rate(
+        return None
+    return calculate_win_rate(
         player.ranked_wins_snapshot,
         player.ranked_losses_snapshot,
     )
-    estimated_win_rate_multiplier = 1 + (
-        (estimated_win_rate - WIN_RATE_NEUTRAL) * settings.pricing_win_rate_price_weight
-    )
-    return estimated_win_rate, estimated_win_rate_multiplier
 
 
 @router.get("/overview", response_model=AdminOverviewResponse)
@@ -357,12 +352,20 @@ async def list_admin_player_insights(
             )
             poro_claim_count = len(claimed_rewards)
 
+        player_matches_result = await session.execute(
+            select(PlayerMatch)
+            .where(PlayerMatch.player_id == player.id)
+            .order_by(PlayerMatch.completed_at.desc())
+        )
+        player_matches = player_matches_result.scalars().all()
+        income_by_match_id = {
+            entry.match_id: entry.amount for entry in playing_income_entries
+        }
+
         raw_ratio, clamped_ratio, effective_positive_streak, streak_multiplier = (
             _estimate_ratio_metrics(player)
         )
-        estimated_win_rate, estimated_win_rate_multiplier = _estimate_win_rate_metrics(
-            player
-        )
+        estimated_win_rate = _estimate_win_rate(player)
 
         insights.append(
             AdminPlayerInsightResponse(
@@ -405,11 +408,9 @@ async def list_admin_player_insights(
                 lp_delta=player.lp_abs - player.previous_lp_abs,
                 streak=player.streak,
                 effective_positive_streak=effective_positive_streak,
-                gamma_factor=player.gamma_factor,
                 ranked_wins_snapshot=player.ranked_wins_snapshot,
                 ranked_losses_snapshot=player.ranked_losses_snapshot,
                 estimated_win_rate=estimated_win_rate,
-                estimated_win_rate_multiplier=estimated_win_rate_multiplier,
                 avg_lp_gain_on_win=player.avg_lp_gain_on_win,
                 avg_lp_loss_on_loss=player.avg_lp_loss_on_loss,
                 estimated_lp_ratio_raw=raw_ratio,
@@ -425,6 +426,19 @@ async def list_admin_player_insights(
                 playing_income_last_24h=playing_income_last_24h,
                 poro_claim_count=poro_claim_count,
                 poro_rewards_total=poro_rewards_total,
+                recent_player_matches=[
+                    AdminPlayerMatchResponse(
+                        match_id=pm.match_id,
+                        win=pm.win,
+                        lp_delta=pm.lp_delta,
+                        lp_delta_source=pm.lp_delta_source,
+                        price_before=pm.price_before,
+                        price_after=pm.price_after,
+                        playing_income_amount=income_by_match_id.get(pm.match_id),
+                        completed_at=pm.completed_at,
+                    )
+                    for pm in player_matches[:50]
+                ],
                 recent_playing_income_entries=[
                     AdminPlayerPlayingIncomeEntryResponse(
                         match_id=entry.match_id,

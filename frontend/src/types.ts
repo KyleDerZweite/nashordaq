@@ -275,6 +275,19 @@ export interface AdminPlayerPoroRewardResponse {
   status: PoroSpawnStatus;
 }
 
+export type PlayerMatchLpSource = "OBSERVED" | "ESTIMATED";
+
+export interface AdminPlayerMatchResponse {
+  match_id: string;
+  win: boolean;
+  lp_delta: number;
+  lp_delta_source: PlayerMatchLpSource;
+  price_before: number;
+  price_after: number;
+  playing_income_amount: number | null;
+  completed_at: string;
+}
+
 export interface AdminPlayerInsightResponse {
   player_id: number;
   display_name: string;
@@ -293,11 +306,9 @@ export interface AdminPlayerInsightResponse {
   lp_delta: number;
   streak: number;
   effective_positive_streak: number;
-  gamma_factor: number;
   ranked_wins_snapshot: number | null;
   ranked_losses_snapshot: number | null;
   estimated_win_rate: number | null;
-  estimated_win_rate_multiplier: number | null;
   avg_lp_gain_on_win: number | null;
   avg_lp_loss_on_loss: number | null;
   estimated_lp_ratio_raw: number | null;
@@ -313,6 +324,7 @@ export interface AdminPlayerInsightResponse {
   playing_income_last_24h: number;
   poro_claim_count: number;
   poro_rewards_total: number;
+  recent_player_matches: AdminPlayerMatchResponse[];
   recent_playing_income_entries: AdminPlayerPlayingIncomeEntryResponse[];
   recent_poro_rewards: AdminPlayerPoroRewardResponse[];
 }

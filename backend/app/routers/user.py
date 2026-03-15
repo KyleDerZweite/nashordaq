@@ -15,7 +15,6 @@ from app.pricing import (
     calculate_ipo_price,
     calculate_lp_abs,
     calculate_win_rate,
-    generate_gamma_base,
 )
 from app.riot import PlayerNotFoundError, RateLimitedError, get_rank
 from app.schemas import (
@@ -104,7 +103,6 @@ async def _initialize_player_market_state(
     )
     player.lp_abs = new_lp_abs
     player.previous_lp_abs = new_lp_abs
-    player.gamma_factor = generate_gamma_base(hash(player.puuid) % 10000)
     player.last_updated = datetime.now(UTC)
 
     session.add(

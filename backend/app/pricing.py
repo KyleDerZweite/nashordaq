@@ -34,19 +34,25 @@ def _clamp(value: float, low: float, high: float) -> float:
     return max(low, min(high, value))
 
 
-def _win_streak_lp_ratio_multiplier(
+def _lp_gain_dampener(
     avg_lp_loss_on_loss: float | None,
     avg_lp_gain_on_win: float | None,
 ) -> float:
-    if (
-        avg_lp_loss_on_loss is None
-        or avg_lp_gain_on_win is None
-        or avg_lp_loss_on_loss <= 0
-        or avg_lp_gain_on_win <= 0
-    ):
+    has_loss = avg_lp_loss_on_loss is not None and avg_lp_loss_on_loss > 0
+    has_gain = avg_lp_gain_on_win is not None and avg_lp_gain_on_win > 0
+    offset = settings.pricing_lp_ratio_bootstrap_offset
+
+    if has_loss and has_gain:
+        raw_ratio = avg_lp_loss_on_loss / avg_lp_gain_on_win
+    elif has_gain and not has_loss:
+        bootstrapped_loss = max(1.0, avg_lp_gain_on_win - offset)
+        raw_ratio = bootstrapped_loss / avg_lp_gain_on_win
+    elif has_loss and not has_gain:
+        bootstrapped_gain = avg_lp_loss_on_loss + offset
+        raw_ratio = avg_lp_loss_on_loss / bootstrapped_gain
+    else:
         return settings.pricing_win_streak_lp_ratio_default
 
-    raw_ratio = avg_lp_loss_on_loss / avg_lp_gain_on_win
     return _clamp(
         raw_ratio,
         settings.pricing_win_streak_lp_ratio_min,
@@ -93,42 +99,27 @@ def calculate_ipo_price(
     return max(base_price * (1 + win_rate_premium), PRICE_FLOOR)
 
 
-def generate_gamma_base(account_identifier: int) -> float:
-    return 1 + ((account_identifier % 100) / 1000)
-
-
-def generate_epsilon() -> float:
-    return 0.0
-
-
 def calculate_new_price(
     old_price: float,
     delta_lp: int,
     streak: int,
-    gamma_base: float,
     *,
-    win_rate: float = WIN_RATE_NEUTRAL,
     avg_lp_loss_on_loss: float | None = None,
     avg_lp_gain_on_win: float | None = None,
-    inactive: bool = False,
 ) -> float:
     if delta_lp == 0:
         return max(old_price, PRICE_FLOOR)
 
     effective_delta_lp = _apply_lp_efficiency(delta_lp)
+
+    if effective_delta_lp > 0:
+        gain_dampener = _lp_gain_dampener(avg_lp_loss_on_loss, avg_lp_gain_on_win)
+        effective_delta_lp *= gain_dampener
+
     effective_streak = min(max(0, streak), _max_effective_streak())
-    outcome_balance_factor = _win_streak_lp_ratio_multiplier(
-        avg_lp_loss_on_loss,
-        avg_lp_gain_on_win,
-    )
     streak_multiplier = 1 + (BETA * effective_streak)
 
-    lp_move = (
-        effective_delta_lp
-        * settings.pricing_alpha
-        * streak_multiplier
-        * outcome_balance_factor
-    )
+    lp_move = effective_delta_lp * settings.pricing_alpha * streak_multiplier
     if effective_delta_lp < 0:
         lp_move *= settings.pricing_loss_move_multiplier
 

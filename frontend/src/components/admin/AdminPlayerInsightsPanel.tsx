@@ -146,10 +146,6 @@ export default function AdminPlayerInsightsPanel({ insights }: Props) {
                   tone: toneForSignedNumber(selectedInsight.lp_delta),
                 },
                 {
-                  label: "Gamma",
-                  value: selectedInsight.gamma_factor.toFixed(3),
-                },
-                {
                   label: "Stored Streak",
                   value: `${selectedInsight.streak}`,
                 },
@@ -226,15 +222,6 @@ export default function AdminPlayerInsightsPanel({ insights }: Props) {
                       value: formatNullablePercent(
                         selectedInsight.estimated_win_rate,
                       ),
-                    },
-                    {
-                      label: "Win Rate Multiplier",
-                      value:
-                        selectedInsight.estimated_win_rate_multiplier === null
-                          ? "--"
-                          : selectedInsight.estimated_win_rate_multiplier.toFixed(
-                              3,
-                            ),
                     },
                   ].map((item) => (
                     <div
@@ -395,64 +382,99 @@ export default function AdminPlayerInsightsPanel({ insights }: Props) {
               </article>
             </section>
 
-            <section className="grid gap-6 xl:grid-cols-2">
-              <article className="border border-hex-border px-4 py-4">
-                <h3 className="font-serif text-lg font-bold text-hex-gold">
-                  Recent Playing Income Entries
-                </h3>
-                <div className="mt-4 max-h-80 overflow-y-auto overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="sticky top-0 z-10 bg-hex-panel">
-                      <tr className="border-b border-hex-border text-left">
-                        <th className="px-2 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-hex-bronze">
-                          Match
-                        </th>
-                        <th className="px-2 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-hex-bronze">
-                          Result
-                        </th>
-                        <th className="px-2 py-2 text-right font-mono text-[10px] uppercase tracking-[0.18em] text-hex-bronze">
-                          Amount
-                        </th>
+            <section className="border border-hex-border px-4 py-4">
+              <h3 className="font-serif text-lg font-bold text-hex-gold">
+                Match History
+              </h3>
+              <p className="mt-1 font-mono text-[11px] text-hex-bronze">
+                Per-match LP attribution, price impact, and playing income
+              </p>
+              <div className="mt-4 max-h-[28rem] overflow-y-auto overflow-x-auto">
+                <table className="w-full">
+                  <thead className="sticky top-0 z-10 bg-hex-panel">
+                    <tr className="border-b border-hex-border text-left">
+                      <th className="px-2 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-hex-bronze">
+                        Match ID
+                      </th>
+                      <th className="px-2 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-hex-bronze">
+                        Result
+                      </th>
+                      <th className="px-2 py-2 text-right font-mono text-[10px] uppercase tracking-[0.18em] text-hex-bronze">
+                        LP Change
+                      </th>
+                      <th className="px-2 py-2 text-right font-mono text-[10px] uppercase tracking-[0.18em] text-hex-bronze">
+                        Income
+                      </th>
+                      <th className="px-2 py-2 text-right font-mono text-[10px] uppercase tracking-[0.18em] text-hex-bronze">
+                        Price Change
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedInsight.recent_player_matches.map((match) => (
+                      <tr
+                        key={match.match_id}
+                        className="border-b border-hex-border/50"
+                      >
+                        <td className="px-2 py-2 font-mono text-xs text-hex-white">
+                          <div>{match.match_id}</div>
+                          <div className="text-[11px] text-hex-bronze">
+                            {formatLocalDateTime(match.completed_at)}
+                          </div>
+                        </td>
+                        <td className="px-2 py-2 font-mono text-xs">
+                          <span
+                            className={
+                              match.win ? "text-emerald-400" : "text-red-400"
+                            }
+                          >
+                            {match.win ? "WIN" : "LOSS"}
+                          </span>
+                        </td>
+                        <td className="px-2 py-2 text-right font-mono text-xs">
+                          <span className={toneForSignedNumber(match.lp_delta)}>
+                            {match.lp_delta > 0 ? "+" : ""}
+                            {match.lp_delta}
+                          </span>
+                          <span className="ml-1 text-[10px] text-hex-bronze">
+                            {match.lp_delta_source === "OBSERVED"
+                              ? "\u2713"
+                              : "\u2248"}
+                          </span>
+                        </td>
+                        <td className="px-2 py-2 text-right font-mono text-xs text-hex-gold">
+                          {match.playing_income_amount !== null
+                            ? `${formatAmount(match.playing_income_amount)} P`
+                            : "--"}
+                        </td>
+                        <td className="px-2 py-2 text-right font-mono text-xs">
+                          <span
+                            className={toneForSignedNumber(
+                              match.price_after - match.price_before,
+                            )}
+                          >
+                            {formatAmount(match.price_before)} {"\u2192"}{" "}
+                            {formatAmount(match.price_after)}
+                          </span>
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {selectedInsight.recent_playing_income_entries.map(
-                        (entry) => (
-                          <tr
-                            key={entry.match_id}
-                            className="border-b border-hex-border/50"
-                          >
-                            <td className="px-2 py-2 font-mono text-xs text-hex-white">
-                              <div>{entry.match_id}</div>
-                              <div className="text-[11px] text-hex-bronze">
-                                {formatLocalDateTime(entry.match_completed_at)}
-                              </div>
-                            </td>
-                            <td className="px-2 py-2 font-mono text-xs text-hex-bronze">
-                              {entry.match_result}
-                            </td>
-                            <td className="px-2 py-2 text-right font-mono text-xs font-bold text-hex-gold">
-                              {formatAmount(entry.amount)} P
-                            </td>
-                          </tr>
-                        ),
-                      )}
-                      {selectedInsight.recent_playing_income_entries.length ===
-                        0 && (
-                        <tr>
-                          <td
-                            colSpan={3}
-                            className="px-2 py-4 text-center font-mono text-sm text-hex-bronze"
-                          >
-                            No playing income records yet.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </article>
+                    ))}
+                    {selectedInsight.recent_player_matches.length === 0 && (
+                      <tr>
+                        <td
+                          colSpan={5}
+                          className="px-2 py-4 text-center font-mono text-sm text-hex-bronze"
+                        >
+                          No match history recorded yet.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
 
+            <section className="grid gap-6 xl:grid-cols-2">
               <article className="border border-hex-border px-4 py-4">
                 <h3 className="font-serif text-lg font-bold text-hex-gold">
                   Recent Poro Rewards

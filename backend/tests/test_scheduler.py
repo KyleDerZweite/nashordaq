@@ -9,6 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 import app.scheduler as scheduler_module
 from app.models import (
     BankLedgerEntry,
+    PlayerMatch,
+    PlayerMatchLpSource,
     PlayingIncomeEntry,
     PlayingIncomeMatchResult,
     PriceHistory,
@@ -40,7 +42,6 @@ async def test_market_update_job_skips_persistence_without_lp_change(
             lp_abs=1500,
             previous_lp_abs=1400,
             streak=3,
-            gamma_factor=1.02,
             last_updated=original_last_updated,
         )
         session.add(player)
@@ -70,7 +71,7 @@ async def test_market_update_job_skips_persistence_without_lp_change(
 
     http_client = httpx.AsyncClient()
     monkeypatch.setattr(scheduler_module, "SessionLocal", session_factory)
-    monkeypatch.setattr(scheduler_module, "get_rank", fake_get_rank)
+    monkeypatch.setattr(scheduler_module, "get_rank_by_puuid", fake_get_rank)
 
     async def fake_get_recent_match_ids(**_: object) -> list[str]:
         return []
@@ -115,7 +116,7 @@ async def test_market_update_job_accrues_due_bank_interest(db_engine, monkeypatc
         db_engine, class_=AsyncSession, expire_on_commit=False
     )
 
-    due_time = datetime(2026, 3, 10, 12, 0, tzinfo=UTC)
+    due_time = datetime.now(UTC).replace(microsecond=0) - timedelta(minutes=1)
 
     async with session_factory() as session:
         player = TrackedPlayer(
@@ -128,7 +129,6 @@ async def test_market_update_job_accrues_due_bank_interest(db_engine, monkeypatc
             lp_abs=1500,
             previous_lp_abs=1500,
             streak=0,
-            gamma_factor=1.0,
             last_updated=due_time,
         )
         user = User(
@@ -157,7 +157,7 @@ async def test_market_update_job_accrues_due_bank_interest(db_engine, monkeypatc
 
     http_client = httpx.AsyncClient()
     monkeypatch.setattr(scheduler_module, "SessionLocal", session_factory)
-    monkeypatch.setattr(scheduler_module, "get_rank", fake_get_rank)
+    monkeypatch.setattr(scheduler_module, "get_rank_by_puuid", fake_get_rank)
 
     async def fake_get_recent_match_ids(**_: object) -> list[str]:
         return []
@@ -209,7 +209,6 @@ async def test_market_update_job_learns_win_lp_average_and_passes_to_pricing(
             lp_abs=1500,
             previous_lp_abs=1500,
             streak=0,
-            gamma_factor=1.0,
             ranked_wins_snapshot=10,
             ranked_losses_snapshot=10,
         )
@@ -235,14 +234,11 @@ async def test_market_update_job_learns_win_lp_average_and_passes_to_pricing(
         old_price: float,
         delta_lp: int,
         streak: int,
-        gamma_base: float,
         *,
-        win_rate: float,
         avg_lp_loss_on_loss: float | None,
         avg_lp_gain_on_win: float | None,
-        inactive: bool,
     ) -> float:
-        del delta_lp, streak, gamma_base, win_rate, inactive
+        del delta_lp, streak
         captured_kwargs["avg_lp_loss_on_loss"] = avg_lp_loss_on_loss
         captured_kwargs["avg_lp_gain_on_win"] = avg_lp_gain_on_win
         return old_price + 5.0
@@ -252,7 +248,7 @@ async def test_market_update_job_learns_win_lp_average_and_passes_to_pricing(
 
     http_client = httpx.AsyncClient()
     monkeypatch.setattr(scheduler_module, "SessionLocal", session_factory)
-    monkeypatch.setattr(scheduler_module, "get_rank", fake_get_rank)
+    monkeypatch.setattr(scheduler_module, "get_rank_by_puuid", fake_get_rank)
     monkeypatch.setattr(
         scheduler_module,
         "get_recent_match_ids",
@@ -306,7 +302,6 @@ async def test_market_update_job_learns_loss_lp_average_with_ema(
             lp_abs=1500,
             previous_lp_abs=1500,
             streak=0,
-            gamma_factor=1.0,
             ranked_wins_snapshot=12,
             ranked_losses_snapshot=10,
             avg_lp_gain_on_win=28.0,
@@ -334,14 +329,11 @@ async def test_market_update_job_learns_loss_lp_average_with_ema(
         old_price: float,
         delta_lp: int,
         streak: int,
-        gamma_base: float,
         *,
-        win_rate: float,
         avg_lp_loss_on_loss: float | None,
         avg_lp_gain_on_win: float | None,
-        inactive: bool,
     ) -> float:
-        del delta_lp, streak, gamma_base, win_rate, inactive
+        del delta_lp, streak
         captured_kwargs["avg_lp_loss_on_loss"] = avg_lp_loss_on_loss
         captured_kwargs["avg_lp_gain_on_win"] = avg_lp_gain_on_win
         return old_price - 2.0
@@ -351,7 +343,7 @@ async def test_market_update_job_learns_loss_lp_average_with_ema(
 
     http_client = httpx.AsyncClient()
     monkeypatch.setattr(scheduler_module, "SessionLocal", session_factory)
-    monkeypatch.setattr(scheduler_module, "get_rank", fake_get_rank)
+    monkeypatch.setattr(scheduler_module, "get_rank_by_puuid", fake_get_rank)
     monkeypatch.setattr(
         scheduler_module,
         "get_recent_match_ids",
@@ -395,7 +387,7 @@ async def test_market_update_job_uses_rescue_interest_rate_at_five_hundred_debt(
         db_engine, class_=AsyncSession, expire_on_commit=False
     )
 
-    due_time = datetime(2026, 3, 10, 12, 0, tzinfo=UTC)
+    due_time = datetime.now(UTC).replace(microsecond=0) - timedelta(minutes=1)
 
     async with session_factory() as session:
         player = TrackedPlayer(
@@ -408,7 +400,6 @@ async def test_market_update_job_uses_rescue_interest_rate_at_five_hundred_debt(
             lp_abs=1500,
             previous_lp_abs=1500,
             streak=0,
-            gamma_factor=1.0,
             last_updated=due_time,
         )
         user = User(
@@ -437,7 +428,7 @@ async def test_market_update_job_uses_rescue_interest_rate_at_five_hundred_debt(
 
     http_client = httpx.AsyncClient()
     monkeypatch.setattr(scheduler_module, "SessionLocal", session_factory)
-    monkeypatch.setattr(scheduler_module, "get_rank", fake_get_rank)
+    monkeypatch.setattr(scheduler_module, "get_rank_by_puuid", fake_get_rank)
 
     async def fake_get_recent_match_ids(**_: object) -> list[str]:
         return []
@@ -491,7 +482,6 @@ async def test_market_update_job_applies_playing_income_once_per_new_match(
             lp_abs=1500,
             previous_lp_abs=1500,
             streak=0,
-            gamma_factor=1.0,
             last_updated=datetime(2026, 3, 10, 12, 0, tzinfo=UTC),
             last_playing_income_match_id="EUW1_100",
         )
@@ -558,7 +548,7 @@ async def test_market_update_job_applies_playing_income_once_per_new_match(
 
     http_client = httpx.AsyncClient()
     monkeypatch.setattr(scheduler_module, "SessionLocal", session_factory)
-    monkeypatch.setattr(scheduler_module, "get_rank", fake_get_rank)
+    monkeypatch.setattr(scheduler_module, "get_rank_by_puuid", fake_get_rank)
     monkeypatch.setattr(
         scheduler_module.settings,
         "playing_income_start_date",
@@ -639,7 +629,6 @@ async def test_market_update_job_backfills_playing_income_from_start_date(
             lp_abs=1500,
             previous_lp_abs=1500,
             streak=0,
-            gamma_factor=1.0,
             last_updated=datetime(2026, 3, 10, 12, 0, tzinfo=UTC),
             last_playing_income_match_id="EUW1_299",
         )
@@ -707,7 +696,7 @@ async def test_market_update_job_backfills_playing_income_from_start_date(
 
     http_client = httpx.AsyncClient()
     monkeypatch.setattr(scheduler_module, "SessionLocal", session_factory)
-    monkeypatch.setattr(scheduler_module, "get_rank", fake_get_rank)
+    monkeypatch.setattr(scheduler_module, "get_rank_by_puuid", fake_get_rank)
     monkeypatch.setattr(
         scheduler_module.settings,
         "playing_income_start_date",
@@ -787,7 +776,6 @@ async def test_market_update_job_applies_minimum_playing_income_amount(
             lp_abs=1500,
             previous_lp_abs=1500,
             streak=0,
-            gamma_factor=1.0,
             last_updated=datetime(2026, 3, 10, 12, 0, tzinfo=UTC),
         )
         session.add(player)
@@ -828,7 +816,7 @@ async def test_market_update_job_applies_minimum_playing_income_amount(
 
     http_client = httpx.AsyncClient()
     monkeypatch.setattr(scheduler_module, "SessionLocal", session_factory)
-    monkeypatch.setattr(scheduler_module, "get_rank", fake_get_rank)
+    monkeypatch.setattr(scheduler_module, "get_rank_by_puuid", fake_get_rank)
     monkeypatch.setattr(
         scheduler_module.settings,
         "playing_income_start_date",
@@ -891,7 +879,6 @@ async def test_market_update_job_reduces_playing_income_after_three_games_in_day
             lp_abs=1500,
             previous_lp_abs=1500,
             streak=0,
-            gamma_factor=1.0,
             last_updated=datetime(2026, 3, 10, 12, 0, tzinfo=UTC),
             last_playing_income_match_id="EUW1_703",
         )
@@ -984,7 +971,7 @@ async def test_market_update_job_reduces_playing_income_after_three_games_in_day
 
     http_client = httpx.AsyncClient()
     monkeypatch.setattr(scheduler_module, "SessionLocal", session_factory)
-    monkeypatch.setattr(scheduler_module, "get_rank", fake_get_rank)
+    monkeypatch.setattr(scheduler_module, "get_rank_by_puuid", fake_get_rank)
     monkeypatch.setattr(
         scheduler_module.settings,
         "playing_income_start_date",
@@ -1054,7 +1041,6 @@ async def test_market_update_job_falls_back_when_start_time_query_is_rejected(
             lp_abs=1500,
             previous_lp_abs=1500,
             streak=0,
-            gamma_factor=1.0,
             last_updated=datetime(2026, 3, 10, 12, 0, tzinfo=UTC),
         )
         session.add(player)
@@ -1119,7 +1105,7 @@ async def test_market_update_job_falls_back_when_start_time_query_is_rejected(
 
     http_client = httpx.AsyncClient()
     monkeypatch.setattr(scheduler_module, "SessionLocal", session_factory)
-    monkeypatch.setattr(scheduler_module, "get_rank", fake_get_rank)
+    monkeypatch.setattr(scheduler_module, "get_rank_by_puuid", fake_get_rank)
     monkeypatch.setattr(
         scheduler_module.settings,
         "playing_income_start_date",
@@ -1190,7 +1176,6 @@ async def test_market_update_job_refreshes_stale_puuid_before_match_history(
             lp_abs=1500,
             previous_lp_abs=1500,
             streak=0,
-            gamma_factor=1.0,
             last_updated=datetime(2026, 3, 10, 12, 0, tzinfo=UTC),
         )
         session.add(player)
@@ -1225,7 +1210,7 @@ async def test_market_update_job_refreshes_stale_puuid_before_match_history(
 
     http_client = httpx.AsyncClient()
     monkeypatch.setattr(scheduler_module, "SessionLocal", session_factory)
-    monkeypatch.setattr(scheduler_module, "get_rank", fake_get_rank)
+    monkeypatch.setattr(scheduler_module, "get_rank_by_puuid", fake_get_rank)
     monkeypatch.setattr(
         scheduler_module,
         "get_recent_match_ids",
@@ -1273,7 +1258,6 @@ async def test_market_update_job_skips_malformed_match_summary_and_continues(
             lp_abs=1500,
             previous_lp_abs=1500,
             streak=0,
-            gamma_factor=1.0,
             last_updated=datetime(2026, 3, 10, 12, 0, tzinfo=UTC),
         )
         session.add(player)
@@ -1327,7 +1311,7 @@ async def test_market_update_job_skips_malformed_match_summary_and_continues(
 
     http_client = httpx.AsyncClient()
     monkeypatch.setattr(scheduler_module, "SessionLocal", session_factory)
-    monkeypatch.setattr(scheduler_module, "get_rank", fake_get_rank)
+    monkeypatch.setattr(scheduler_module, "get_rank_by_puuid", fake_get_rank)
     monkeypatch.setattr(
         scheduler_module.settings,
         "playing_income_start_date",
@@ -1396,7 +1380,6 @@ async def test_market_update_job_skips_short_match_playing_income(
             lp_abs=1500,
             previous_lp_abs=1500,
             streak=0,
-            gamma_factor=1.0,
             last_updated=datetime(2026, 3, 10, 12, 0, tzinfo=UTC),
             last_playing_income_match_id="EUW1_200",
         )
@@ -1438,7 +1421,7 @@ async def test_market_update_job_skips_short_match_playing_income(
 
     http_client = httpx.AsyncClient()
     monkeypatch.setattr(scheduler_module, "SessionLocal", session_factory)
-    monkeypatch.setattr(scheduler_module, "get_rank", fake_get_rank)
+    monkeypatch.setattr(scheduler_module, "get_rank_by_puuid", fake_get_rank)
     monkeypatch.setattr(
         scheduler_module,
         "get_recent_match_ids",
@@ -1494,7 +1477,6 @@ async def test_market_update_job_records_wealth_snapshots(db_engine, monkeypatch
             lp_abs=1500,
             previous_lp_abs=1500,
             streak=0,
-            gamma_factor=1.0,
             last_updated=datetime(2026, 3, 10, 12, 0, tzinfo=UTC),
         )
         session.add(player)
@@ -1526,7 +1508,7 @@ async def test_market_update_job_records_wealth_snapshots(db_engine, monkeypatch
 
     http_client = httpx.AsyncClient()
     monkeypatch.setattr(scheduler_module, "SessionLocal", session_factory)
-    monkeypatch.setattr(scheduler_module, "get_rank", fake_get_rank)
+    monkeypatch.setattr(scheduler_module, "get_rank_by_puuid", fake_get_rank)
     monkeypatch.setattr(
         scheduler_module,
         "get_recent_match_ids",
@@ -1550,3 +1532,328 @@ async def test_market_update_job_records_wealth_snapshots(db_engine, monkeypatch
         )
 
     assert snapshot_count == 1
+
+
+@pytest.mark.asyncio
+async def test_market_update_job_creates_player_match_for_single_game(
+    db_engine, monkeypatch
+):
+    """When a single match is detected between LP polls, a PlayerMatch row is
+    created with lp_delta_source=OBSERVED, and per-match pricing is applied."""
+    session_factory = async_sessionmaker(
+        db_engine, class_=AsyncSession, expire_on_commit=False
+    )
+
+    async with session_factory() as session:
+        player = TrackedPlayer(
+            game_name="PerMatchPlayer",
+            tag_line="EUW",
+            display_name="Per Match Player",
+            puuid="permatch-puuid",
+            summoner_id="permatch-summoner",
+            current_price=30.0,
+            lp_abs=1500,
+            previous_lp_abs=1480,
+            streak=2,
+            ranked_wins_snapshot=15,
+            ranked_losses_snapshot=10,
+            avg_lp_gain_on_win=22.0,
+            avg_lp_loss_on_loss=18.0,
+        )
+        session.add(player)
+        await session.commit()
+
+    async def fake_get_rank(**_: object) -> RankData:
+        return RankData(
+            puuid="permatch-puuid",
+            summoner_id="permatch-summoner",
+            tier="GOLD",
+            rank="I",
+            league_points=20,
+            wins=16,
+            losses=10,
+            hot_streak=False,
+            inactive=False,
+        )
+
+    async def fake_get_recent_match_ids(**_: object) -> list[str]:
+        return ["EUW1_PM1"]
+
+    async def fake_get_match_summary(**kwargs: object) -> MatchSummary:
+        return MatchSummary(
+            match_id="EUW1_PM1",
+            queue_id=420,
+            win=True,
+            game_duration_seconds=1800,
+            game_end_timestamp=1_710_000_100_000,
+        )
+
+    http_client = httpx.AsyncClient()
+    monkeypatch.setattr(scheduler_module, "SessionLocal", session_factory)
+    monkeypatch.setattr(scheduler_module, "get_rank_by_puuid", fake_get_rank)
+    monkeypatch.setattr(
+        scheduler_module.settings,
+        "playing_income_start_date",
+        datetime(2024, 1, 1, tzinfo=UTC),
+    )
+    monkeypatch.setattr(
+        scheduler_module,
+        "get_recent_match_ids",
+        fake_get_recent_match_ids,
+    )
+    monkeypatch.setattr(
+        scheduler_module,
+        "get_match_summary",
+        fake_get_match_summary,
+    )
+    monkeypatch.setattr(
+        scheduler_module,
+        "_app",
+        SimpleNamespace(state=SimpleNamespace(http_client=http_client)),
+    )
+    monkeypatch.setattr(scheduler_module, "_last_market_update_at", None)
+
+    try:
+        await scheduler_module.market_update_job()
+    finally:
+        await http_client.aclose()
+
+    async with session_factory() as session:
+        player = await session.scalar(
+            select(TrackedPlayer).where(TrackedPlayer.game_name == "PerMatchPlayer")
+        )
+        pm = await session.scalar(
+            select(PlayerMatch).where(PlayerMatch.match_id == "EUW1_PM1")
+        )
+        price_history_count = await session.scalar(
+            select(func.count()).select_from(PriceHistory)
+        )
+
+    assert player is not None
+    assert pm is not None
+
+    # LP delta: 1520 - 1500 = 20, single match -> OBSERVED
+    assert pm.lp_delta == 20
+    assert pm.lp_delta_source == PlayerMatchLpSource.OBSERVED
+    assert pm.win is True
+    assert pm.lp_before == 1500
+    assert pm.lp_after == 1520
+    assert pm.streak_before == 2
+    assert pm.streak_after == 3
+    assert pm.price_before == 30.0
+
+    # Per-match pricing was applied
+    assert player.current_price == pm.price_after
+    assert player.lp_abs == 1520
+    assert player.streak == 3
+    assert price_history_count == 1
+
+
+@pytest.mark.asyncio
+async def test_market_update_job_creates_multiple_player_matches_for_multi_game(
+    db_engine, monkeypatch
+):
+    """When two matches are detected, LP is split between them and two
+    PlayerMatch rows are created with lp_delta_source=ESTIMATED."""
+    session_factory = async_sessionmaker(
+        db_engine, class_=AsyncSession, expire_on_commit=False
+    )
+
+    async with session_factory() as session:
+        player = TrackedPlayer(
+            game_name="MultiMatchPlayer",
+            tag_line="EUW",
+            display_name="Multi Match Player",
+            puuid="multimatch-puuid",
+            summoner_id="multimatch-summoner",
+            current_price=30.0,
+            lp_abs=1500,
+            previous_lp_abs=1460,
+            streak=1,
+            ranked_wins_snapshot=15,
+            ranked_losses_snapshot=10,
+        )
+        session.add(player)
+        await session.commit()
+
+    async def fake_get_rank(**_: object) -> RankData:
+        return RankData(
+            puuid="multimatch-puuid",
+            summoner_id="multimatch-summoner",
+            tier="GOLD",
+            rank="I",
+            league_points=40,
+            wins=17,
+            losses=10,
+            hot_streak=False,
+            inactive=False,
+        )
+
+    async def fake_get_recent_match_ids(**_: object) -> list[str]:
+        return ["EUW1_MM2", "EUW1_MM1"]
+
+    async def fake_get_match_summary(**kwargs: object) -> MatchSummary:
+        match_id = str(kwargs["match_id"])
+        summaries = {
+            "EUW1_MM1": MatchSummary(
+                match_id="EUW1_MM1",
+                queue_id=420,
+                win=True,
+                game_duration_seconds=1800,
+                game_end_timestamp=1_710_000_100_000,
+            ),
+            "EUW1_MM2": MatchSummary(
+                match_id="EUW1_MM2",
+                queue_id=420,
+                win=True,
+                game_duration_seconds=2000,
+                game_end_timestamp=1_710_000_200_000,
+            ),
+        }
+        return summaries[match_id]
+
+    http_client = httpx.AsyncClient()
+    monkeypatch.setattr(scheduler_module, "SessionLocal", session_factory)
+    monkeypatch.setattr(scheduler_module, "get_rank_by_puuid", fake_get_rank)
+    monkeypatch.setattr(
+        scheduler_module.settings,
+        "playing_income_start_date",
+        datetime(2024, 1, 1, tzinfo=UTC),
+    )
+    monkeypatch.setattr(
+        scheduler_module,
+        "get_recent_match_ids",
+        fake_get_recent_match_ids,
+    )
+    monkeypatch.setattr(
+        scheduler_module,
+        "get_match_summary",
+        fake_get_match_summary,
+    )
+    monkeypatch.setattr(
+        scheduler_module,
+        "_app",
+        SimpleNamespace(state=SimpleNamespace(http_client=http_client)),
+    )
+    monkeypatch.setattr(scheduler_module, "_last_market_update_at", None)
+
+    try:
+        await scheduler_module.market_update_job()
+    finally:
+        await http_client.aclose()
+
+    async with session_factory() as session:
+        player = await session.scalar(
+            select(TrackedPlayer).where(TrackedPlayer.game_name == "MultiMatchPlayer")
+        )
+        matches = (
+            (
+                await session.execute(
+                    select(PlayerMatch)
+                    .where(PlayerMatch.player_id == player.id)
+                    .order_by(PlayerMatch.completed_at.asc())
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+    assert player is not None
+    assert len(matches) == 2
+
+    # Both wins, LP delta 40, split evenly: 20 each
+    assert matches[0].match_id == "EUW1_MM1"
+    assert matches[0].lp_delta == 20
+    assert matches[0].lp_delta_source == PlayerMatchLpSource.ESTIMATED
+    assert matches[0].win is True
+
+    assert matches[1].match_id == "EUW1_MM2"
+    assert matches[1].lp_delta == 20
+    assert matches[1].lp_delta_source == PlayerMatchLpSource.ESTIMATED
+    assert matches[1].win is True
+
+    # Sequential pricing: second match builds on first
+    assert matches[1].price_before == matches[0].price_after
+    assert player.current_price == matches[1].price_after
+    assert player.lp_abs == 1540
+
+
+@pytest.mark.asyncio
+async def test_market_update_job_falls_back_to_aggregate_when_no_matches(
+    db_engine, monkeypatch
+):
+    """When LP changes but no ranked matches are detected (e.g., promotion
+    adjustment), aggregate pricing is used as fallback."""
+    session_factory = async_sessionmaker(
+        db_engine, class_=AsyncSession, expire_on_commit=False
+    )
+
+    async with session_factory() as session:
+        player = TrackedPlayer(
+            game_name="AggregatePlayer",
+            tag_line="EUW",
+            display_name="Aggregate Player",
+            puuid="aggregate-puuid",
+            summoner_id="aggregate-summoner",
+            current_price=30.0,
+            lp_abs=1500,
+            previous_lp_abs=1480,
+            streak=2,
+            ranked_wins_snapshot=15,
+            ranked_losses_snapshot=10,
+        )
+        session.add(player)
+        await session.commit()
+
+    async def fake_get_rank(**_: object) -> RankData:
+        return RankData(
+            puuid="aggregate-puuid",
+            summoner_id="aggregate-summoner",
+            tier="GOLD",
+            rank="II",
+            league_points=0,
+            wins=15,
+            losses=10,
+            hot_streak=False,
+            inactive=False,
+        )
+
+    async def fake_get_recent_match_ids(**_: object) -> list[str]:
+        return []
+
+    http_client = httpx.AsyncClient()
+    monkeypatch.setattr(scheduler_module, "SessionLocal", session_factory)
+    monkeypatch.setattr(scheduler_module, "get_rank_by_puuid", fake_get_rank)
+    monkeypatch.setattr(
+        scheduler_module,
+        "get_recent_match_ids",
+        fake_get_recent_match_ids,
+    )
+    monkeypatch.setattr(
+        scheduler_module,
+        "_app",
+        SimpleNamespace(state=SimpleNamespace(http_client=http_client)),
+    )
+    monkeypatch.setattr(scheduler_module, "_last_market_update_at", None)
+
+    try:
+        await scheduler_module.market_update_job()
+    finally:
+        await http_client.aclose()
+
+    async with session_factory() as session:
+        player = await session.scalar(
+            select(TrackedPlayer).where(TrackedPlayer.game_name == "AggregatePlayer")
+        )
+        pm_count = await session.scalar(select(func.count()).select_from(PlayerMatch))
+        price_history_count = await session.scalar(
+            select(func.count()).select_from(PriceHistory)
+        )
+
+    assert player is not None
+    # No matches -> no PlayerMatch rows, but aggregate pricing applied
+    assert pm_count == 0
+    # LP delta: Gold II 0 LP = (3*400)+(2*100)+0 = 1400, was 1500, delta = -100
+    assert player.lp_abs == 1400
+    assert player.current_price != 30.0  # price changed
+    assert price_history_count == 1

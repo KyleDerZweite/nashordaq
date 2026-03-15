@@ -114,6 +114,13 @@ async def init_db() -> None:
             await conn.execute(
                 text("ALTER TABLE tracked_players ADD COLUMN avg_lp_loss_on_loss FLOAT")
             )
+        if "last_match_pricing_at" not in tracked_player_columns:
+            await conn.execute(
+                text(
+                    "ALTER TABLE tracked_players "
+                    "ADD COLUMN last_match_pricing_at DATETIME"
+                )
+            )
 
         result = await conn.execute(text("PRAGMA table_info(holding_lots)"))
         columns = {row[1] for row in result.fetchall()}

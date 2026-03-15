@@ -29,6 +29,8 @@ from app.models import (
     OrderSide,
     OrderSource,
     OrderStatus,
+    PlayerMatch,
+    PlayerMatchLpSource,
     PlayingIncomeEntry,
     PlayingIncomeMatchResult,
     PriceHistory,
@@ -51,6 +53,7 @@ from app.riot import (
     RateLimitedError,
     get_match_summary,
     get_rank,
+    get_rank_by_puuid,
     get_recent_match_ids,
 )
 
@@ -74,7 +77,7 @@ def is_scheduler_running() -> bool:
 
 
 def get_required_market_update_interval(player_count: int) -> timedelta:
-    return timedelta(minutes=math.ceil(max(1, player_count) * 1.25))
+    return timedelta(minutes=math.ceil(max(1, player_count) * 0.5))
 
 
 def classify_market_status(
@@ -135,6 +138,118 @@ def _ema(previous: float | None, sample: float, alpha: float) -> float:
     if previous is None:
         return sample
     return ((1 - alpha) * previous) + (alpha * sample)
+
+
+def _attribute_lp_to_matches(
+    total_lp_delta: int,
+    summaries: list[MatchSummary],
+    *,
+    avg_lp_gain: float | None,
+    avg_lp_loss: float | None,
+) -> list[tuple[MatchSummary, int, PlayerMatchLpSource]]:
+    """Attribute a total LP delta across detected matches.
+
+    Returns a list of (summary, lp_delta, source) tuples in the same order as
+    the input summaries (chronological).
+    """
+    if not summaries:
+        return []
+
+    if len(summaries) == 1:
+        return [(summaries[0], total_lp_delta, PlayerMatchLpSource.OBSERVED)]
+
+    wins = [s for s in summaries if s.win]
+    losses = [s for s in summaries if not s.win]
+    n_wins = len(wins)
+    n_losses = len(losses)
+
+    # All same direction -- split evenly.
+    if n_losses == 0 and n_wins > 0:
+        per_game = total_lp_delta // n_wins
+        remainder = total_lp_delta - per_game * n_wins
+        result: list[tuple[MatchSummary, int, PlayerMatchLpSource]] = []
+        for i, s in enumerate(summaries):
+            lp = per_game + (1 if i < remainder else 0)
+            result.append((s, lp, PlayerMatchLpSource.ESTIMATED))
+        return result
+
+    if n_wins == 0 and n_losses > 0:
+        per_game = total_lp_delta // n_losses
+        remainder = total_lp_delta - per_game * n_losses
+        result = []
+        for i, s in enumerate(summaries):
+            lp = per_game + (-1 if i < abs(remainder) else 0)
+            result.append((s, lp, PlayerMatchLpSource.ESTIMATED))
+        return result
+
+    # Mixed direction -- use averages if available, else proportional split.
+    est_gain = avg_lp_gain if avg_lp_gain and avg_lp_gain > 0 else 20.0
+    est_loss = avg_lp_loss if avg_lp_loss and avg_lp_loss > 0 else 20.0
+
+    # Scale estimates to match total delta.
+    raw_total = (n_wins * est_gain) - (n_losses * est_loss)
+    if abs(raw_total) > 0.01:
+        scale = total_lp_delta / raw_total
+        scaled_gain = round(est_gain * scale)
+        scaled_loss = round(est_loss * scale)
+    else:
+        # Fallback: even split
+        scaled_gain = round(abs(total_lp_delta) / max(1, n_wins + n_losses))
+        scaled_loss = scaled_gain
+
+    result = []
+    for s in summaries:
+        if s.win:
+            result.append((s, max(1, scaled_gain), PlayerMatchLpSource.ESTIMATED))
+        else:
+            result.append((s, -max(1, scaled_loss), PlayerMatchLpSource.ESTIMATED))
+    return result
+
+
+def _apply_per_match_price_updates(
+    player: TrackedPlayer,
+    attributed_matches: list[tuple[MatchSummary, int, PlayerMatchLpSource]],
+    session: AsyncSession,
+) -> list[PlayerMatch]:
+    """Apply price updates for each attributed match. Returns PlayerMatch rows."""
+    recorded: list[PlayerMatch] = []
+    running_lp = player.lp_abs
+
+    for summary, lp_delta, source in attributed_matches:
+        price_before = player.current_price
+        streak_before = player.streak
+        lp_before = running_lp
+
+        running_lp += lp_delta
+        player.streak = update_streak(player.streak, lp_delta)
+        player.current_price = calculate_new_price(
+            player.current_price,
+            lp_delta,
+            player.streak,
+            avg_lp_loss_on_loss=player.avg_lp_loss_on_loss,
+            avg_lp_gain_on_win=player.avg_lp_gain_on_win,
+        )
+
+        pm = PlayerMatch(
+            player_id=player.id,
+            match_id=summary.match_id,
+            win=summary.win,
+            lp_before=lp_before,
+            lp_after=running_lp,
+            lp_delta=lp_delta,
+            lp_delta_source=source,
+            streak_before=streak_before,
+            streak_after=player.streak,
+            price_before=price_before,
+            price_after=player.current_price,
+            game_duration_seconds=summary.game_duration_seconds,
+            completed_at=_match_completed_at(summary),
+        )
+        session.add(pm)
+        recorded.append(pm)
+
+    player.lp_abs = running_lp
+    return recorded
 
 
 def _learn_player_lp_averages(
@@ -356,10 +471,15 @@ async def _apply_playing_income_for_player(
     session: AsyncSession,
     player: TrackedPlayer,
     http_client,
+    *,
+    prefetched: tuple[list[MatchSummary], MatchSummary | None] | None = None,
 ) -> None:
-    summaries, newest_summary = await _get_unprocessed_match_summaries(
-        session, player, http_client
-    )
+    if prefetched is not None:
+        summaries, newest_summary = prefetched
+    else:
+        summaries, newest_summary = await _get_unprocessed_match_summaries(
+            session, player, http_client
+        )
 
     if not summaries:
         if newest_summary is not None:
@@ -482,14 +602,22 @@ async def market_update_job() -> None:
 
         for player in players:
             try:
-                rank_data = await get_rank(
-                    client=http_client,
-                    base_url=settings.riot_api_base_url,
-                    region_url=settings.riot_api_region_url,
-                    api_key=settings.riot_api_key,
-                    game_name=player.game_name,
-                    tag_line=player.tag_line,
-                )
+                if player.puuid:
+                    rank_data = await get_rank_by_puuid(
+                        client=http_client,
+                        region_url=settings.riot_api_region_url,
+                        api_key=settings.riot_api_key,
+                        puuid=player.puuid,
+                    )
+                else:
+                    rank_data = await get_rank(
+                        client=http_client,
+                        base_url=settings.riot_api_base_url,
+                        region_url=settings.riot_api_region_url,
+                        api_key=settings.riot_api_key,
+                        game_name=player.game_name,
+                        tag_line=player.tag_line,
+                    )
             except PlayerNotFoundError:
                 logger.warning(
                     "Player not found: %s#%s", player.game_name, player.tag_line
@@ -526,7 +654,6 @@ async def market_update_job() -> None:
                 )
                 player.lp_abs = new_lp_abs
                 player.previous_lp_abs = new_lp_abs
-                player.gamma_factor = 1.0
                 player.ranked_wins_snapshot = rank_data.wins
                 player.ranked_losses_snapshot = rank_data.losses
                 should_record_market_update = True
@@ -538,6 +665,59 @@ async def market_update_job() -> None:
                 )
             else:
                 delta_lp = new_lp_abs - player.lp_abs
+
+                # Fetch matches (shared with playing income pipeline).
+                match_summaries: list[MatchSummary] = []
+                fetched_for_income: (
+                    tuple[list[MatchSummary], MatchSummary | None] | None
+                ) = None
+                try:
+                    (
+                        all_summaries,
+                        newest_summary,
+                    ) = await _get_unprocessed_match_summaries(
+                        session, player, http_client
+                    )
+                    fetched_for_income = (all_summaries, newest_summary)
+                    # Filter to ranked matches not already in player_matches.
+                    recorded_match_ids_result = await session.execute(
+                        select(PlayerMatch.match_id).where(
+                            PlayerMatch.player_id == player.id,
+                        )
+                    )
+                    recorded_pricing_ids = set(
+                        recorded_match_ids_result.scalars().all()
+                    )
+                    match_summaries = [
+                        s
+                        for s in all_summaries
+                        if s.queue_id == RANKED_SOLO_QUEUE_ID
+                        and s.match_id not in recorded_pricing_ids
+                        and s.game_duration_seconds
+                        >= settings.playing_income_min_match_duration_seconds
+                    ]
+                except PlayerNotFoundError:
+                    logger.warning(
+                        "Missing match data for %s#%s; skipping match-based pricing",
+                        player.game_name,
+                        player.tag_line,
+                    )
+                    all_summaries = []
+                except RateLimitedError:
+                    logger.warning(
+                        "Rate limited while fetching matches for %s#%s",
+                        player.game_name,
+                        player.tag_line,
+                    )
+                    all_summaries = []
+                except Exception:
+                    logger.exception(
+                        "Error fetching matches for %s#%s",
+                        player.game_name,
+                        player.tag_line,
+                    )
+                    all_summaries = []
+
                 _learn_player_lp_averages(
                     player,
                     wins=rank_data.wins,
@@ -545,34 +725,85 @@ async def market_update_job() -> None:
                     delta_lp=delta_lp,
                 )
 
-                if delta_lp == 0:
+                if delta_lp == 0 and not match_summaries:
                     logger.info(
                         "No LP change for %s#%s; preserving market state",
                         player.game_name,
                         player.tag_line,
                     )
-                else:
+                elif match_summaries and delta_lp != 0:
+                    # Per-match pricing: attribute LP delta to individual
+                    # matches and apply price updates sequentially.
                     player.previous_lp_abs = player.lp_abs
-                    player.lp_abs = new_lp_abs
-                    player.streak = update_streak(player.streak, delta_lp)
-                    player.current_price = calculate_new_price(
-                        player.current_price,
+                    attributed = _attribute_lp_to_matches(
                         delta_lp,
-                        player.streak,
-                        player.gamma_factor,
-                        win_rate=win_rate,
-                        avg_lp_loss_on_loss=player.avg_lp_loss_on_loss,
-                        avg_lp_gain_on_win=player.avg_lp_gain_on_win,
-                        inactive=rank_data.inactive,
+                        match_summaries,
+                        avg_lp_gain=player.avg_lp_gain_on_win,
+                        avg_lp_loss=player.avg_lp_loss_on_loss,
+                    )
+                    recorded_matches = _apply_per_match_price_updates(
+                        player, attributed, session
                     )
                     should_record_market_update = True
+                    player.last_match_pricing_at = datetime.now(UTC)
                     logger.info(
-                        "Updated price for %s#%s to %.2f (delta_lp=%d, win_rate=%.3f)",
+                        "Per-match pricing for %s#%s: %d matches, "
+                        "price %.2f -> %.2f (delta_lp=%d)",
                         player.game_name,
                         player.tag_line,
+                        len(recorded_matches),
+                        recorded_matches[0].price_before
+                        if recorded_matches
+                        else player.current_price,
                         player.current_price,
                         delta_lp,
-                        win_rate,
+                    )
+                else:
+                    # Fallback: aggregate pricing (no matches detected, or
+                    # LP changed via promotion/demotion adjustment).
+                    if delta_lp != 0:
+                        player.previous_lp_abs = player.lp_abs
+                        player.lp_abs = new_lp_abs
+                        player.streak = update_streak(player.streak, delta_lp)
+                        player.current_price = calculate_new_price(
+                            player.current_price,
+                            delta_lp,
+                            player.streak,
+                            avg_lp_loss_on_loss=player.avg_lp_loss_on_loss,
+                            avg_lp_gain_on_win=player.avg_lp_gain_on_win,
+                        )
+                        should_record_market_update = True
+                        logger.info(
+                            "Aggregate pricing for %s#%s: "
+                            "price %.2f (delta_lp=%d, no matches detected)",
+                            player.game_name,
+                            player.tag_line,
+                            player.current_price,
+                            delta_lp,
+                        )
+
+                # Apply playing income using already-fetched summaries.
+                try:
+                    await _apply_playing_income_for_player(
+                        session, player, http_client, prefetched=fetched_for_income
+                    )
+                except PlayerNotFoundError:
+                    logger.warning(
+                        "Missing match data for %s#%s; skipping playing income",
+                        player.game_name,
+                        player.tag_line,
+                    )
+                except RateLimitedError:
+                    logger.warning(
+                        "Rate limited while fetching matches for %s#%s",
+                        player.game_name,
+                        player.tag_line,
+                    )
+                except Exception:
+                    logger.exception(
+                        "Error applying playing income for %s#%s",
+                        player.game_name,
+                        player.tag_line,
                     )
 
             if should_record_market_update:
@@ -583,28 +814,6 @@ async def market_update_job() -> None:
                         price=player.current_price,
                         lp_abs=player.lp_abs,
                     )
-                )
-
-            try:
-                await _apply_playing_income_for_player(session, player, http_client)
-            except PlayerNotFoundError:
-                logger.warning(
-                    "Missing match data for %s#%s; skipping playing income",
-                    player.game_name,
-                    player.tag_line,
-                )
-            except RateLimitedError:
-                logger.warning(
-                    "Rate limited while fetching matches for %s#%s",
-                    player.game_name,
-                    player.tag_line,
-                )
-                break
-            except Exception:
-                logger.exception(
-                    "Error applying playing income for %s#%s",
-                    player.game_name,
-                    player.tag_line,
                 )
 
             await asyncio.sleep(0.1)

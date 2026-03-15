@@ -7,6 +7,7 @@ from app.riot import (
     PlayerNotFoundError,
     get_match_summary,
     get_rank,
+    get_rank_by_puuid,
     get_recent_match_ids,
 )
 
@@ -16,6 +17,18 @@ BASE_URL = "https://europe.api.riotgames.com"
 REGION_URL = "https://euw1.api.riotgames.com"
 API_KEY = "test-api-key"
 
+SOLO_QUEUE_ENTRY = {
+    "queueType": "RANKED_SOLO_5x5",
+    "summonerId": SUMMONER_ID,
+    "tier": "CHALLENGER",
+    "rank": "I",
+    "leaguePoints": 1200,
+    "wins": 70,
+    "losses": 30,
+    "hotStreak": True,
+    "inactive": False,
+}
+
 
 async def test_get_rank_success(httpx_mock):
     httpx_mock.add_response(
@@ -23,22 +36,9 @@ async def test_get_rank_success(httpx_mock):
         json={"puuid": PUUID, "gameName": "Faker", "tagLine": "KR1"},
     )
     httpx_mock.add_response(
-        url=f"{REGION_URL}/lol/summoner/v4/summoners/by-puuid/{PUUID}",
-        json={"id": SUMMONER_ID, "puuid": PUUID},
-    )
-    httpx_mock.add_response(
-        url=f"{REGION_URL}/lol/league/v4/entries/by-summoner/{SUMMONER_ID}",
+        url=f"{REGION_URL}/lol/league/v4/entries/by-puuid/{PUUID}",
         json=[
-            {
-                "queueType": "RANKED_SOLO_5x5",
-                "tier": "CHALLENGER",
-                "rank": "I",
-                "leaguePoints": 1200,
-                "wins": 70,
-                "losses": 30,
-                "hotStreak": True,
-                "inactive": False,
-            },
+            SOLO_QUEUE_ENTRY,
             {
                 "queueType": "RANKED_FLEX_SR",
                 "tier": "DIAMOND",
@@ -87,45 +87,67 @@ async def test_get_rank_player_not_found(httpx_mock):
             )
 
 
-async def test_get_rank_fallback_to_by_puuid(httpx_mock):
+async def test_get_rank_by_puuid_success(httpx_mock):
     httpx_mock.add_response(
-        url=f"{BASE_URL}/riot/account/v1/accounts/by-riot-id/Faker/KR1",
-        json={"puuid": PUUID, "gameName": "Faker", "tagLine": "KR1"},
+        url=f"{REGION_URL}/lol/league/v4/entries/by-puuid/{PUUID}",
+        json=[SOLO_QUEUE_ENTRY],
     )
-    httpx_mock.add_response(
-        url=f"{REGION_URL}/lol/summoner/v4/summoners/by-puuid/{PUUID}",
-        json={"puuid": PUUID},
-    )
+
+    async with httpx.AsyncClient() as client:
+        result = await get_rank_by_puuid(
+            client=client,
+            region_url=REGION_URL,
+            api_key=API_KEY,
+            puuid=PUUID,
+        )
+
+    assert result.tier == "CHALLENGER"
+    assert result.puuid == PUUID
+    assert result.summoner_id == SUMMONER_ID
+
+
+async def test_get_rank_by_puuid_no_solo_queue(httpx_mock):
     httpx_mock.add_response(
         url=f"{REGION_URL}/lol/league/v4/entries/by-puuid/{PUUID}",
         json=[
             {
-                "queueType": "RANKED_SOLO_5x5",
-                "tier": "CHALLENGER",
-                "rank": "I",
-                "leaguePoints": 1200,
-                "wins": 10,
-                "losses": 5,
-                "hotStreak": False,
-                "inactive": False,
+                "queueType": "RANKED_FLEX_SR",
+                "tier": "GOLD",
+                "rank": "IV",
+                "leaguePoints": 0,
             }
         ],
     )
 
     async with httpx.AsyncClient() as client:
-        result = await get_rank(
+        with pytest.raises(PlayerNotFoundError):
+            await get_rank_by_puuid(
+                client=client,
+                region_url=REGION_URL,
+                api_key=API_KEY,
+                puuid=PUUID,
+            )
+
+
+async def test_get_rank_by_puuid_falls_back_summoner_id_to_puuid(httpx_mock):
+    entry_without_summoner_id = {
+        **SOLO_QUEUE_ENTRY,
+        "summonerId": None,
+    }
+    del entry_without_summoner_id["summonerId"]
+    httpx_mock.add_response(
+        url=f"{REGION_URL}/lol/league/v4/entries/by-puuid/{PUUID}",
+        json=[entry_without_summoner_id],
+    )
+
+    async with httpx.AsyncClient() as client:
+        result = await get_rank_by_puuid(
             client=client,
-            base_url=BASE_URL,
             region_url=REGION_URL,
             api_key=API_KEY,
-            game_name="Faker",
-            tag_line="KR1",
+            puuid=PUUID,
         )
 
-    assert result.tier == "CHALLENGER"
-    assert result.rank == "I"
-    assert result.league_points == 1200
-    assert result.puuid == PUUID
     assert result.summoner_id == PUUID
 
 

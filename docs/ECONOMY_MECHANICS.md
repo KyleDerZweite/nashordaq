@@ -43,25 +43,48 @@ EffectiveDeltaLP =
 	20 + ((Delta_LP_abs - 20) * 0.25)        if Delta_LP_abs > 20
 	-24 + ((Delta_LP_abs + 24) * 0.50)       if Delta_LP_abs < -24
 
+GainDampener (only applied when EffectiveDeltaLP > 0):
+	clamp(AvgLpLossOnLoss / AvgLpGainOnWin, 0.3, 1.0)  if both averages known
+	clamp((AvgLpGainOnWin - 5) / AvgLpGainOnWin, 0.3, 1.0)  if only gain known
+	clamp(AvgLpLossOnLoss / (AvgLpLossOnLoss + 5), 0.3, 1.0)  if only loss known
+	0.85  if neither average is known
+
+EffectiveDeltaLP = EffectiveDeltaLP * GainDampener   (positive moves only)
+
 EffectiveStreak = min(max(S, 0), 10)
 StreakMultiplier = 1 + (Beta * EffectiveStreak)
 
-OutcomeBalanceFactor = clamp(AvgLpLossOnLoss / AvgLpGainOnWin, 0.25, 1.0)
-OutcomeBalanceFactor = 1.0 when averages are unavailable
-
-PriceDelta = EffectiveDeltaLP * Alpha * StreakMultiplier * OutcomeBalanceFactor
+PriceDelta = EffectiveDeltaLP * Alpha * StreakMultiplier
 PriceDelta = PriceDelta * 1.10 if EffectiveDeltaLP < 0 else PriceDelta
 P_new = P_old + PriceDelta
 ```
 
-If `Delta_LP_abs == 0`, the market state is left unchanged for that cycle.
+If `Delta_LP_abs == 0` and no new matches are detected, the market state is left unchanged for that cycle.
 
 | Variable | Description | Value |
 |---|---|---|
 | Delta_LP_abs | Change in Absolute LP since last update | Computed per cycle |
 | Alpha | Base volatility scalar | 0.12 |
-| StreakMultiplier | Internal streak momentum scaled by LP loss/win ratio factor | See below |
-| OutcomeBalanceFactor | LP-per-loss vs LP-per-win balancing factor | `clamp(loss/win, 0.25, 1.0)` |
+| StreakMultiplier | Internal streak momentum | See below |
+| GainDampener | LP ratio scalar applied to positive moves only | `clamp(loss/win, 0.3, 1.0)` or `0.85` default |
+
+### Per-Match Pricing
+
+Price updates are applied per-match rather than per-poll when individual games are detected between LP snapshots. This produces accurate per-game streaks and a complete audit trail.
+
+Each scheduler cycle:
+1. Polls `league-v4/entries/by-puuid` for the LP snapshot.
+2. Fetches match history via `match-v5` (shared with the playing income pipeline).
+3. Correlates the LP delta with detected matches and attributes LP to each game.
+4. Applies `update_streak` + `calculate_new_price` once per match in chronological order.
+
+**LP attribution logic:**
+- **Single match (most common):** The entire LP delta is attributed to that match. Source: `OBSERVED`.
+- **Multiple matches, same direction:** LP is split evenly across games. Source: `ESTIMATED`.
+- **Multiple matches, mixed direction:** Uses stored LP averages (or `20 LP` default) to split proportionally between wins and losses, scaled to match the total delta.
+- **No matches with LP change:** Falls back to aggregate pricing (one update with the total delta). This covers promotion/demotion LP adjustments.
+
+Each attributed match produces a `PlayerMatch` row storing `lp_before`, `lp_after`, `lp_delta`, `lp_delta_source`, `streak_before`, `streak_after`, `price_before`, and `price_after`. This enables deterministic price recalculation from stored data.
 
 ### League-V4 Risk Adjustments
 
@@ -70,37 +93,24 @@ If `Delta_LP_abs == 0`, the market state is left unchanged for that cycle.
 	- The first `-24 LP` of a negative refresh count at full strength; additional LP only count at `50%` efficiency.
 - Negative LP bias
 	- Negative refreshes are multiplied by `1.10` after the LP efficiency taper, so losses hit a bit harder than similarly sized gains.
-- LP outcome balance factor
-	- `AvgLpLossOnLoss / AvgLpGainOnWin` is clamped to `[0.25, 1.0]` and applied to the full LP move.
-	- If these average values are unavailable, the factor defaults to `1.0`.
+- LP gain dampener
+	- Applied only to positive LP moves (gains). Losses are not dampened.
+	- `AvgLpLossOnLoss / AvgLpGainOnWin` is clamped to `[0.3, 1.0]`.
+	- If only one average is available, the missing one is bootstrapped with a `5 LP` offset (loss = gain - 5, or gain = loss + 5).
+	- If neither average is available, the dampener defaults to `0.85`.
 	- The scheduler persists rolling LP averages per tracked player using an EMA (`alpha = 0.35` default).
 	- Samples are learned from pure refresh directions only:
 		- Wins-only refresh (`wins` increased, `losses` unchanged, `Delta_LP_abs > 0`) updates `AvgLpGainOnWin`.
 		- Losses-only refresh (`losses` increased, `wins` unchanged, `Delta_LP_abs < 0`) updates `AvgLpLossOnLoss`.
 	- Mixed or ambiguous refreshes still update snapshot counters but do not create LP-per-win/loss samples.
 - Flat LP cycle
-	- If Riot reports the same Absolute LP as the previous refresh, Nashordaq does not change price, streak, `last_updated`, or stored price history for that cycle.
+	- If Riot reports the same Absolute LP as the previous refresh and no new matches are detected, Nashordaq does not change price, streak, `last_updated`, or stored price history for that cycle.
 
 **Internal streak:** A signed integer tracking consecutive same-direction updates. Positive for consecutive LP gains and negative for consecutive losses. Resets to +1 or -1 on direction change, and is capped at `+10` / `-10`. It is only recalculated on cycles where LP changes. Only positive streak contributes to price momentum.
 
-```
-OutcomeBalanceFactor = clamp(AvgLpLossOnLoss / AvgLpGainOnWin, 0.25, 1.0)
-OutcomeBalanceFactor = 1.0 when averages are unavailable
-EffectiveStreak = min(max(S, 0), 10)
-StreakMultiplier = 1 + (Beta * EffectiveStreak)
-
-EffectiveDeltaLP =
-	Delta_LP_abs                              if -24 <= Delta_LP_abs <= 20
-	20 + ((Delta_LP_abs - 20) * 0.25)        if Delta_LP_abs > 20
-	-24 + ((Delta_LP_abs + 24) * 0.50)       if Delta_LP_abs < -24
-
-PriceDelta = EffectiveDeltaLP * Alpha * StreakMultiplier * OutcomeBalanceFactor
-PriceDelta = PriceDelta * 1.10 if EffectiveDeltaLP < 0 else PriceDelta
-```
-
 **Floor:** `P_new` cannot drop below 1.00.
 
-Implementation: `app/pricing.py::calculate_new_price()`, `calculate_win_rate()`, `update_streak()`, `app/scheduler.py::_learn_player_lp_averages()`
+Implementation: `app/pricing.py::calculate_new_price()`, `calculate_win_rate()`, `update_streak()`, `app/scheduler.py::_learn_player_lp_averages()`, `_attribute_lp_to_matches()`, `_apply_per_match_price_updates()`
 
 ## 4. Immediate Execution + Holding Adjustment
 
@@ -246,7 +256,7 @@ Nashordaq can occasionally spawn a small clickable poro that flies across the UI
 ### Spawn Rules
 
 - Scheduling is per-user and server-authoritative.
-- Each completed interval rolls a result between `20 minutes` and `2 hours`.
+- Each completed interval rolls a result between `13 minutes` and `75 minutes`.
 - Some intervals intentionally produce no poro.
 - Only one active poro can exist per user at a time.
 - Rewards can be claimed once and expire when the poro flight ends.
@@ -255,13 +265,13 @@ Nashordaq can occasionally spawn a small clickable poro that flies across the UI
 
 ### Current Tier Odds And Flat Rewards
 
-- `No spawn`: `50.2864%`
-- `Tier 1`: `20.0%`, reward `5`
-- `Tier 2`: `12.5%`, reward `8`
-- `Tier 3`: `7.6923%`, reward `13`
-- `Tier 4`: `4.7619%`, reward `21`
-- `Tier 5`: `2.9412%`, reward `34`
-- `Tier 6`: `1.8182%`, reward `55`
+- `No spawn`: `69.1628%`
+- `Tier 1`: `12.5%`, reward `8`
+- `Tier 2`: `7.6923%`, reward `13`
+- `Tier 3`: `4.7619%`, reward `21`
+- `Tier 4`: `2.9412%`, reward `34`
+- `Tier 5`: `1.8182%`, reward `55`
+- `Tier 6`: `1.1236%`, reward `89`
 
 This table uses `1 / reward` as the spawn probability for each reward tier, with the remainder allocated to `No spawn`. That yields an average payout of about `6.0` per roll, including `No spawn` outcomes.
 

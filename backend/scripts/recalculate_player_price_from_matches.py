@@ -33,7 +33,6 @@ class Implementations:
     calculate_lp_abs: Any
     calculate_new_price: Any
     calculate_win_rate: Any
-    generate_gamma_base: Any
     update_streak: Any
     get_match_summary: Any
     get_rank: Any
@@ -53,7 +52,6 @@ def _load_implementations() -> Implementations:
         calculate_lp_abs,
         calculate_new_price,
         calculate_win_rate,
-        generate_gamma_base,
         update_streak,
     )
     from app.riot import (
@@ -69,7 +67,6 @@ def _load_implementations() -> Implementations:
         calculate_lp_abs=calculate_lp_abs,
         calculate_new_price=calculate_new_price,
         calculate_win_rate=calculate_win_rate,
-        generate_gamma_base=generate_gamma_base,
         update_streak=update_streak,
         get_match_summary=get_match_summary,
         get_rank=get_rank,
@@ -87,6 +84,14 @@ def _parse_args(*, min_duration_default: int) -> argparse.Namespace:
     )
     parser.add_argument("--game-name", default=DEFAULT_GAME_NAME)
     parser.add_argument("--tag-line", default=DEFAULT_TAG_LINE)
+    parser.add_argument(
+        "--from-db",
+        action="store_true",
+        help=(
+            "Replay from stored PlayerMatch rows in the database instead of "
+            "fetching from the Riot API. Uses exact per-game LP deltas."
+        ),
+    )
     parser.add_argument(
         "--lp-win",
         type=int,
@@ -119,12 +124,6 @@ def _parse_args(*, min_duration_default: int) -> argparse.Namespace:
         type=int,
         default=None,
         help="Optional currently stored streak for comparison output.",
-    )
-    parser.add_argument(
-        "--gamma-factor",
-        type=float,
-        default=None,
-        help="Optional gamma_factor override. Defaults to generated value from puuid.",
     )
     parser.add_argument(
         "--seed",
@@ -203,7 +202,6 @@ def _replay_price(
     *,
     current_lp_abs: int,
     win_rate: float,
-    gamma_factor: float,
     matches: list[Any],
     lp_win: int,
     lp_loss: int,
@@ -224,9 +222,6 @@ def _replay_price(
             reconstructed_price,
             delta_lp,
             reconstructed_streak,
-            gamma_factor,
-            win_rate=win_rate,
-            inactive=False,
         )
 
     return ReplayResult(
@@ -239,12 +234,102 @@ def _replay_price(
     )
 
 
+async def _replay_from_db(impl: Implementations, args: argparse.Namespace) -> None:
+    """Replay price deterministically from stored PlayerMatch rows."""
+    from sqlalchemy import select
+    from sqlalchemy.ext.asyncio import (
+        AsyncSession,
+        async_sessionmaker,
+        create_async_engine,
+    )
+
+    from app.models import PlayerMatch, TrackedPlayer
+
+    engine = create_async_engine(impl.settings.database_url, echo=False)
+    session_factory = async_sessionmaker(
+        engine, class_=AsyncSession, expire_on_commit=False
+    )
+
+    async with session_factory() as session:
+        player = await session.scalar(
+            select(TrackedPlayer).where(
+                TrackedPlayer.game_name == args.game_name,
+                TrackedPlayer.tag_line == args.tag_line,
+            )
+        )
+        if player is None:
+            print(f"Player {args.game_name}#{args.tag_line} not found in database.")
+            return
+
+        matches = (
+            (
+                await session.execute(
+                    select(PlayerMatch)
+                    .where(PlayerMatch.player_id == player.id)
+                    .order_by(PlayerMatch.completed_at.asc())
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+    await engine.dispose()
+
+    if not matches:
+        print(f"No PlayerMatch rows found for {args.game_name}#{args.tag_line}.")
+        return
+
+    # Reconstruct from first match's lp_before.
+    start_lp_abs = matches[0].lp_before
+    win_rate = impl.calculate_win_rate(
+        player.ranked_wins_snapshot or 0,
+        player.ranked_losses_snapshot or 0,
+    )
+    price = impl.calculate_ipo_price(start_lp_abs, win_rate)
+    streak = 0
+    running_lp = start_lp_abs
+
+    for match in matches:
+        running_lp += match.lp_delta
+        streak = impl.update_streak(streak, match.lp_delta)
+        price = impl.calculate_new_price(price, match.lp_delta, streak)
+
+    net_delta = sum(m.lp_delta for m in matches)
+    observed_count = sum(1 for m in matches if m.lp_delta_source == "OBSERVED")
+    estimated_count = len(matches) - observed_count
+
+    print("=== Nashordaq Price Recalculation (From DB) ===")
+    print(f"Player: {args.game_name}#{args.tag_line}")
+    print(
+        f"PlayerMatch rows: {len(matches)} "
+        f"({observed_count} observed, {estimated_count} estimated)"
+    )
+    print(f"Start LP_abs (first match): {start_lp_abs}")
+    print(f"Net LP delta from matches: {net_delta:+d}")
+    print(f"Replay end LP_abs: {running_lp}")
+    print(f"Reconstructed price: {price:.4f}")
+    print(f"Reconstructed streak: {streak}")
+    print(f"Current stored price: {player.current_price:.4f}")
+    print(f"Price delta (reconstructed - stored): {price - player.current_price:+.4f}")
+    print(f"Current stored streak: {player.streak}")
+    print(f"Streak delta (reconstructed - stored): {streak - player.streak:+d}")
+
+    if matches:
+        first_at = matches[0].completed_at.isoformat()
+        last_at = matches[-1].completed_at.isoformat()
+        print(f"Match window: {first_at} -> {last_at}")
+
+
 async def _run() -> None:
     impl = _load_implementations()
     args = _parse_args(
         min_duration_default=impl.settings.playing_income_min_match_duration_seconds
     )
     random.seed(args.seed)
+
+    if args.from_db:
+        await _replay_from_db(impl, args)
+        return
 
     start_time = impl.settings.playing_income_start_date
     if start_time.tzinfo is None:
@@ -282,17 +367,10 @@ async def _run() -> None:
             min_duration_seconds=args.min_duration_seconds,
         )
 
-    gamma_factor = (
-        args.gamma_factor
-        if args.gamma_factor is not None
-        else impl.generate_gamma_base(hash(rank_data.puuid) % 10000)
-    )
-
     replay = _replay_price(
         impl,
         current_lp_abs=current_lp_abs,
         win_rate=win_rate,
-        gamma_factor=gamma_factor,
         matches=match_summaries,
         lp_win=args.lp_win,
         lp_loss=args.lp_loss,
@@ -307,7 +385,6 @@ async def _run() -> None:
         f"min_duration={args.min_duration_seconds}s"
     )
     print(f"Random seed: {args.seed}")
-    print(f"Gamma factor used: {gamma_factor:.6f}")
     print(f"Matches considered: {len(replay.considered_matches)}")
     print(f"Current Riot LP_abs: {current_lp_abs}")
     print(f"Reconstructed LP_abs at start: {replay.start_lp_abs}")

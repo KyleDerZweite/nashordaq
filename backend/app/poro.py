@@ -69,12 +69,12 @@ TIER_ORDER = (
 )
 
 TIER_REWARDS = {
-    PoroTier.TIER_1: 5.0,
-    PoroTier.TIER_2: 8.0,
-    PoroTier.TIER_3: 13.0,
-    PoroTier.TIER_4: 21.0,
-    PoroTier.TIER_5: 34.0,
-    PoroTier.TIER_6: 55.0,
+    PoroTier.TIER_1: 8.0,
+    PoroTier.TIER_2: 13.0,
+    PoroTier.TIER_3: 21.0,
+    PoroTier.TIER_4: 34.0,
+    PoroTier.TIER_5: 55.0,
+    PoroTier.TIER_6: 89.0,
 }
 
 TIER_ASSET_KEYS = {
@@ -87,13 +87,13 @@ TIER_ASSET_KEYS = {
 }
 
 SPAWN_WEIGHTS = (
-    (None, 50.2864),
-    (PoroTier.TIER_1, 20.0),
-    (PoroTier.TIER_2, 12.5),
-    (PoroTier.TIER_3, 7.6923),
-    (PoroTier.TIER_4, 4.7619),
-    (PoroTier.TIER_5, 2.9412),
-    (PoroTier.TIER_6, 1.8182),
+    (None, 69.1628),
+    (PoroTier.TIER_1, 12.5),
+    (PoroTier.TIER_2, 7.6923),
+    (PoroTier.TIER_3, 4.7619),
+    (PoroTier.TIER_4, 2.9412),
+    (PoroTier.TIER_5, 1.8182),
+    (PoroTier.TIER_6, 1.1236),
 )
 
 

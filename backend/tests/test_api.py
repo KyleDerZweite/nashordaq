@@ -105,7 +105,7 @@ async def test_system_status_is_degraded_when_market_refresh_is_stale(
     assert data["scheduler_running"] is True
     assert data["market_status"] == "degraded"
     assert data["tracked_player_count"] == 2
-    assert data["expected_update_interval_minutes"] == 2
+    assert data["expected_update_interval_minutes"] == 1
     assert data["last_market_update_at"] is not None
 
 

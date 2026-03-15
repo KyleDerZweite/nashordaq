@@ -105,7 +105,7 @@ async def test_poro_state_creates_spawn_when_roll_is_due(
     spawn = body["active_spawn"]
     assert spawn is not None
     assert spawn["tier"] == 3
-    assert spawn["reward_amount"] == pytest.approx(13.0)
+    assert spawn["reward_amount"] == pytest.approx(21.0)
     assert spawn["duration_ms"] == 12000
     assert body["next_roll_at"] is None
     assert spawn["spawned_at"].endswith("Z")
@@ -146,8 +146,8 @@ async def test_poro_claim_increases_balance_and_records_snapshot(
     claim_resp = await auth_client.post("/api/poro/claim", json={"spawn_id": spawn_id})
     assert claim_resp.status_code == 200
     claim_body = claim_resp.json()
-    assert claim_body["reward_amount"] == pytest.approx(13.0)
-    assert claim_body["balance"] == pytest.approx(starting_balance + 13.0)
+    assert claim_body["reward_amount"] == pytest.approx(21.0)
+    assert claim_body["balance"] == pytest.approx(starting_balance + 21.0)
 
     spawn_result = await db_session.execute(
         select(PoroSpawn).where(PoroSpawn.public_id == spawn_id)
@@ -321,7 +321,7 @@ async def test_poro_maintenance_creates_spawn_without_get(
     spawn = await db_session.get(PoroSpawn, state.active_spawn_id)
     assert spawn is not None
     assert spawn.status == PoroSpawnStatus.ACTIVE
-    assert spawn.reward_amount == pytest.approx(13.0)
+    assert spawn.reward_amount == pytest.approx(21.0)
 
 
 async def test_poro_stream_emits_initial_state(

@@ -9,6 +9,7 @@ from app.models import (
     OrderSide,
     OrderSource,
     OrderStatus,
+    PlayerMatchLpSource,
     PlayingIncomeMatchResult,
     PoroSpawnStatus,
     UserWealthSnapshotSource,
@@ -277,6 +278,17 @@ class AdminPlayerPoroRewardResponse(BaseModel):
     status: PoroSpawnStatus
 
 
+class AdminPlayerMatchResponse(BaseModel):
+    match_id: str
+    win: bool
+    lp_delta: int
+    lp_delta_source: PlayerMatchLpSource
+    price_before: float
+    price_after: float
+    playing_income_amount: float | None
+    completed_at: datetime
+
+
 class AdminPlayerInsightResponse(BaseModel):
     player_id: int
     display_name: str
@@ -295,11 +307,9 @@ class AdminPlayerInsightResponse(BaseModel):
     lp_delta: int
     streak: int
     effective_positive_streak: int
-    gamma_factor: float
     ranked_wins_snapshot: int | None
     ranked_losses_snapshot: int | None
     estimated_win_rate: float | None
-    estimated_win_rate_multiplier: float | None
     avg_lp_gain_on_win: float | None
     avg_lp_loss_on_loss: float | None
     estimated_lp_ratio_raw: float | None
@@ -315,6 +325,7 @@ class AdminPlayerInsightResponse(BaseModel):
     playing_income_last_24h: float
     poro_claim_count: int
     poro_rewards_total: float
+    recent_player_matches: list[AdminPlayerMatchResponse]
     recent_playing_income_entries: list[AdminPlayerPlayingIncomeEntryResponse]
     recent_poro_rewards: list[AdminPlayerPoroRewardResponse]
 

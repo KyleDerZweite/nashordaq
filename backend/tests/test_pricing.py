@@ -1,5 +1,3 @@
-from unittest.mock import patch
-
 import pytest
 
 from app.pricing import (
@@ -8,7 +6,6 @@ from app.pricing import (
     calculate_new_price,
     calculate_sell_multiplier,
     calculate_win_rate,
-    generate_gamma_base,
     update_streak,
 )
 
@@ -54,62 +51,29 @@ def test_ipo_price_with_win_rate_bonus():
     assert price == pytest.approx(21.6)
 
 
-def test_gamma_base():
-    assert generate_gamma_base(0) == 1.0
-    assert generate_gamma_base(50) == 1.05
-    assert generate_gamma_base(99) == 1.099
-    assert generate_gamma_base(100) == 1.0  # wraps at 100
-
-
 def test_new_price_positive_delta():
-    with patch("app.pricing.generate_epsilon", return_value=0.0):
-        price = calculate_new_price(
-            old_price=20.0, delta_lp=100, streak=0, gamma_base=1.0
-        )
-    # First +20 LP are full strength; the remaining +80 LP apply at 25% efficiency.
-    assert price == pytest.approx(24.8)
+    price = calculate_new_price(old_price=20.0, delta_lp=100, streak=0)
+    # First +20 LP full; remaining +80 at 25% = 20+20=40 effective.
+    # Default dampener 0.85 applied: 40 * 0.85 = 34.
+    # 34 * 0.12 * 1.0 = 4.08
+    assert price == pytest.approx(24.08)
 
 
 def test_new_price_negative_delta():
-    with patch("app.pricing.generate_epsilon", return_value=0.0):
-        price = calculate_new_price(
-            old_price=20.0, delta_lp=-50, streak=-1, gamma_base=1.0
-        )
-    # First -24 LP are full strength; the remaining -26 LP apply at 50% efficiency.
+    price = calculate_new_price(old_price=20.0, delta_lp=-50, streak=-1)
+    # First -24 full; remaining -26 at 50% = -24 + -13 = -37 effective.
+    # Negative: no dampener. streak=-1 -> effective_streak=0 -> mult=1.0.
+    # -37 * 0.12 * 1.0 * 1.10 = -4.884
     assert price == pytest.approx(15.116)
 
 
 def test_price_floor():
-    with patch("app.pricing.generate_epsilon", return_value=0.0):
-        price = calculate_new_price(
-            old_price=2.0, delta_lp=-1000, streak=0, gamma_base=1.0
-        )
+    price = calculate_new_price(old_price=2.0, delta_lp=-1000, streak=0)
     assert price == 1.0
 
 
-def test_new_price_with_win_rate_modifier():
-    with patch("app.pricing.generate_epsilon", return_value=0.0):
-        price = calculate_new_price(
-            old_price=20.0,
-            delta_lp=100,
-            streak=0,
-            gamma_base=1.0,
-            win_rate=0.7,
-        )
-
-    assert price == pytest.approx(24.8)
-
-
 def test_new_price_unchanged_without_lp_change():
-    with patch("app.pricing.generate_epsilon", return_value=0.0):
-        price = calculate_new_price(
-            old_price=20.0,
-            delta_lp=0,
-            streak=0,
-            gamma_base=1.0,
-            inactive=True,
-        )
-
+    price = calculate_new_price(old_price=20.0, delta_lp=0, streak=0)
     assert price == 20.0
 
 
@@ -141,67 +105,90 @@ def test_streak_no_change():
 
 
 def test_new_price_uses_capped_streak_multiplier():
-    with patch("app.pricing.generate_epsilon", return_value=0.0):
-        price = calculate_new_price(
-            old_price=20.0,
-            delta_lp=100,
-            streak=10,
-            gamma_base=1.0,
-        )
-
-    assert price == pytest.approx(29.6)
+    price = calculate_new_price(old_price=20.0, delta_lp=100, streak=10)
+    # Effective delta: 40, dampener: 0.85 -> 34.
+    # Streak=10 -> mult=1+(0.1*10)=2.0.
+    # 34 * 0.12 * 2.0 = 8.16
+    assert price == pytest.approx(28.16)
 
 
-def test_new_price_ratio_scales_win_streak_bonus():
-    with patch("app.pricing.generate_epsilon", return_value=0.0):
-        price = calculate_new_price(
-            old_price=20.0,
-            delta_lp=100,
-            streak=10,
-            gamma_base=1.0,
-            avg_lp_loss_on_loss=10.0,
-            avg_lp_gain_on_win=30.0,
-        )
-
+def test_new_price_gain_dampener_scales_positive_delta():
+    price = calculate_new_price(
+        old_price=20.0,
+        delta_lp=100,
+        streak=10,
+        avg_lp_loss_on_loss=10.0,
+        avg_lp_gain_on_win=30.0,
+    )
+    # Effective delta: 40, dampener: clamp(10/30, 0.3, 1.0) = 0.333...
+    # 40 * 0.333 = 13.333. Streak mult 2.0. 13.333 * 0.12 * 2.0 = 3.2
     assert price == pytest.approx(23.2)
 
 
-def test_new_price_ratio_is_clamped_to_configured_minimum():
-    with patch("app.pricing.generate_epsilon", return_value=0.0):
-        price = calculate_new_price(
-            old_price=20.0,
-            delta_lp=100,
-            streak=10,
-            gamma_base=1.0,
-            avg_lp_loss_on_loss=2.0,
-            avg_lp_gain_on_win=100.0,
-        )
+def test_new_price_gain_dampener_clamped_to_minimum():
+    price = calculate_new_price(
+        old_price=20.0,
+        delta_lp=100,
+        streak=10,
+        avg_lp_loss_on_loss=2.0,
+        avg_lp_gain_on_win=100.0,
+    )
+    # ratio=0.02, clamped to 0.3. Effective delta: 40 * 0.3 = 12.
+    # Streak mult 2.0. 12 * 0.12 * 2.0 = 2.88
+    assert price == pytest.approx(22.88)
 
-    assert price == pytest.approx(22.4)
+
+def test_new_price_gain_dampener_not_applied_to_losses():
+    # Losses should NOT be dampened by the gain dampener.
+    price_no_avg = calculate_new_price(old_price=20.0, delta_lp=-20, streak=0)
+    price_with_avg = calculate_new_price(
+        old_price=20.0,
+        delta_lp=-20,
+        streak=0,
+        avg_lp_loss_on_loss=10.0,
+        avg_lp_gain_on_win=30.0,
+    )
+    assert price_no_avg == price_with_avg
 
 
 def test_new_price_softens_positive_lp_above_threshold_before_pricing():
-    with patch("app.pricing.generate_epsilon", return_value=0.0):
-        price = calculate_new_price(
-            old_price=20.0,
-            delta_lp=30,
-            streak=0,
-            gamma_base=1.0,
-        )
-
-    assert price == pytest.approx(22.7)
+    price = calculate_new_price(old_price=20.0, delta_lp=30, streak=0)
+    # First 20 full + 10 * 0.25 = 22.5 effective. Dampener 0.85 -> 19.125.
+    # 19.125 * 0.12 = 2.295
+    assert price == pytest.approx(22.295)
 
 
 def test_new_price_softens_negative_lp_above_threshold_before_loss_bias():
-    with patch("app.pricing.generate_epsilon", return_value=0.0):
-        price = calculate_new_price(
-            old_price=20.0,
-            delta_lp=-30,
-            streak=0,
-            gamma_base=1.0,
-        )
-
+    price = calculate_new_price(old_price=20.0, delta_lp=-30, streak=0)
+    # First -24 full + -6 * 0.50 = -27 effective. No dampener on losses.
+    # -27 * 0.12 * 1.10 = -3.564
     assert price == pytest.approx(16.436)
+
+
+def test_new_price_bootstrap_gain_only():
+    # Only gain average known; loss bootstrapped as gain - 5.
+    price = calculate_new_price(
+        old_price=20.0,
+        delta_lp=20,
+        streak=0,
+        avg_lp_gain_on_win=25.0,
+    )
+    # Bootstrapped loss = 25 - 5 = 20. Ratio = 20/25 = 0.8.
+    # 20 * 0.8 = 16. 16 * 0.12 = 1.92
+    assert price == pytest.approx(21.92)
+
+
+def test_new_price_bootstrap_loss_only():
+    # Only loss average known; gain bootstrapped as loss + 5.
+    price = calculate_new_price(
+        old_price=20.0,
+        delta_lp=20,
+        streak=0,
+        avg_lp_loss_on_loss=15.0,
+    )
+    # Bootstrapped gain = 15 + 5 = 20. Ratio = 15/20 = 0.75.
+    # 20 * 0.75 = 15. 15 * 0.12 = 1.8
+    assert price == pytest.approx(21.8)
 
 
 def test_sell_multiplier_short_hold_penalty():
