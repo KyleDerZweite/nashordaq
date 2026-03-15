@@ -351,3 +351,52 @@ else:
 **Frontend change:** Add a player selector dropdown to the Gamba UI, with an optional "random" button.
 
 **Complexity:** Low for Option A. Medium for B/C due to additional UI and backend logic.
+
+---
+
+## 7. Auth Identity: Switch from Username to Email
+
+**Problem:** `auth.py:70` does `WHERE username == <Remote-User header>`. If someone renames their username in Pangolin, a new user row gets created and their portfolio/balance is lost. The Remote-User header is mutable and not a stable identity key.
+
+**Current users in the DB** (mapped by Remote-User header):
+`admin@kylehub.dev`, `an.leklep`, `elinnerz`, `emil`, `fabialwe`, `firefreez3r`, `hanswarmbier`, `kate.jung`, `kolb.lukas`, `kyle`, `meru.buwumet`, `redpandaprincess`, `test@kylehub.dev`, `tobias.allgayer`
+
+**Pangolin injects these headers** (standard behavior):
+- `Remote-User` — username (mutable)
+- `Remote-Email` — email address (stable, doesn't change)
+- `Remote-Name` — display name
+
+**Proposed fix: use Remote-Email as the stable identity key, keep Remote-User as the display name.**
+
+### Required Changes
+
+1. **Add `email` column to `users` table** (unique, indexed) — new lookup key.
+2. **Keep `username` column** for display purposes only.
+3. **Update `auth.py`** to look up by email, update username on login if it changed.
+4. **Add `remote_email_header` config** (default `Remote-Email`).
+5. **DB migration for existing rows** — need to fill in emails for the 14 existing users.
+
+### Display Name Strategy
+
+The display name shown in the application should come from what the user sets directly (e.g., their linked League profile name), not from the Zitadel/Pangolin username. On login, upsert the display name in the application with the `Remote-Name` header value as a fallback, but let the user override it via their linked League profile.
+
+### Implementation Sketch
+
+```python
+# auth.py — revised lookup
+email = request.headers.get(settings.remote_email_header)  # "Remote-Email"
+username = request.headers.get(settings.remote_user_header)  # "Remote-User"
+
+user = await session.execute(select(User).where(User.email == email))
+user = user.scalar_one_or_none()
+
+if user is None:
+    # First login — create user with email as stable key
+    user = User(email=email, username=username)
+    session.add(user)
+elif user.username != username:
+    # Username changed in Pangolin — update display name
+    user.username = username
+```
+
+**Complexity:** Low-medium. The code change is small, but the migration for existing users requires manually mapping the 14 current usernames to their email addresses.
