@@ -405,3 +405,73 @@ export interface PoroClaimResponse {
   claimed_at: string;
   balance: number;
 }
+
+export interface SimulationMatch {
+  delta_lp: number;
+  win: boolean;
+}
+
+export interface SimulationParameterSet {
+  label: string;
+  pricing_alpha?: number | null;
+  pricing_loss_move_multiplier?: number | null;
+  pricing_max_effective_streak?: number | null;
+  pricing_positive_lp_soft_cap?: number | null;
+  pricing_negative_lp_soft_cap?: number | null;
+  pricing_positive_lp_excess_efficiency?: number | null;
+  pricing_negative_lp_excess_efficiency?: number | null;
+  pricing_win_streak_lp_ratio_default?: number | null;
+}
+
+export interface SimulationRequest {
+  matches?: SimulationMatch[] | null;
+  player_id?: number | null;
+  starting_price: number;
+  starting_streak: number;
+  parameter_sets: SimulationParameterSet[];
+}
+
+export interface SimulationStep {
+  match_index: number;
+  delta_lp: number;
+  win: boolean;
+  streak_before: number;
+  streak_after: number;
+  price_before: number;
+  price_after: number;
+  effective_delta_lp: number;
+  streak_multiplier: number;
+  price_move: number;
+}
+
+export interface SimulationTrajectory {
+  label: string;
+  parameters: Record<string, number>;
+  steps: SimulationStep[];
+}
+
+export interface SimulationResponse {
+  results: SimulationTrajectory[];
+}
+
+export interface SimulationDefaultsResponse {
+  pricing_alpha: number;
+  pricing_loss_move_multiplier: number;
+  pricing_max_effective_streak: number;
+  pricing_positive_lp_soft_cap: number;
+  pricing_negative_lp_soft_cap: number;
+  pricing_positive_lp_excess_efficiency: number;
+  pricing_negative_lp_excess_efficiency: number;
+  pricing_win_streak_lp_ratio_default: number;
+}
+
+export interface SimulationPlayerMatchResponse {
+  match_id: string;
+  win: boolean;
+  lp_delta: number;
+  streak_before: number;
+  streak_after: number;
+  price_before: number;
+  price_after: number;
+  completed_at: string;
+}

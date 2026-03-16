@@ -26,6 +26,10 @@ import type {
   LeaderboardEntry,
   LeaderboardPlayerPortfolioResponse,
   SystemStatusResponse,
+  SimulationDefaultsResponse,
+  SimulationPlayerMatchResponse,
+  SimulationRequest,
+  SimulationResponse,
 } from "../types";
 
 // ---- Keys ----
@@ -52,6 +56,9 @@ export const queryKeys = {
   bank: ["bank"] as const,
   balanceInsights: ["balanceInsights"] as const,
   poro: ["poro"] as const,
+  simulationDefaults: ["simulationDefaults"] as const,
+  simulationPlayerMatches: (playerId: number) =>
+    ["simulationPlayerMatches", playerId] as const,
 };
 
 const PORO_ACTIVE_POLL_MS = 5_000;
@@ -468,5 +475,35 @@ export function useClaimPoro() {
       void qc.invalidateQueries({ queryKey: queryKeys.bank });
       void qc.invalidateQueries({ queryKey: queryKeys.leaderboard });
     },
+  });
+}
+
+// ---- Simulation ----
+
+export function useSimulationDefaults(enabled = true) {
+  return useQuery<SimulationDefaultsResponse>({
+    queryKey: queryKeys.simulationDefaults,
+    queryFn: () => get<SimulationDefaultsResponse>("/simulate/defaults"),
+    enabled,
+  });
+}
+
+export function useSimulationPlayerMatches(
+  playerId: number | null,
+  enabled = true,
+) {
+  return useQuery<SimulationPlayerMatchResponse[]>({
+    queryKey: queryKeys.simulationPlayerMatches(playerId ?? 0),
+    queryFn: () =>
+      get<SimulationPlayerMatchResponse[]>(
+        `/simulate/players/${playerId}/matches`,
+      ),
+    enabled: enabled && playerId !== null,
+  });
+}
+
+export function useRunSimulation() {
+  return useMutation<SimulationResponse, Error, SimulationRequest>({
+    mutationFn: (body) => post<SimulationResponse>("/simulate", body),
   });
 }

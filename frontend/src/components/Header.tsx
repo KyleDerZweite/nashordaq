@@ -12,8 +12,10 @@ export default function Header({
   canEditProfile = false,
   canToggleAdminView = false,
   adminViewMode = "spectator",
+  showSimulation = false,
   onOpenBalanceInsights,
   onEditProfile,
+  onOpenSimulation,
   onToggleAdminView,
 }: {
   balance: number;
@@ -24,8 +26,10 @@ export default function Header({
   canEditProfile?: boolean;
   canToggleAdminView?: boolean;
   adminViewMode?: "spectator" | "admin";
+  showSimulation?: boolean;
   onOpenBalanceInsights?: () => void;
   onEditProfile?: () => void;
+  onOpenSimulation?: () => void;
   onToggleAdminView?: () => void;
 }) {
   const { isStreamerMode, toggleStreamerMode } = useStreamerMode();
@@ -114,6 +118,23 @@ export default function Header({
                   >
                     View Mode:{" "}
                     {adminViewMode === "admin" ? "Admin" : "Spectator"}
+                  </button>
+                )}
+
+                {canToggleAdminView && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onOpenSimulation?.();
+                    }}
+                    className={`mt-3 w-full border px-3 py-2 text-left font-mono text-xs font-bold uppercase tracking-wider transition-colors ${
+                      showSimulation
+                        ? "border-hex-gold bg-hex-gold text-hex-bg"
+                        : "border-hex-border text-hex-bronze hover:border-hex-gold hover:text-hex-gold"
+                    }`}
+                  >
+                    Simulation Lab
                   </button>
                 )}
 

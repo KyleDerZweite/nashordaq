@@ -393,3 +393,75 @@ class PoroClaimResponse(BaseModel):
     reward_amount: float
     claimed_at: datetime
     balance: float
+
+
+class SimulationMatch(BaseModel):
+    delta_lp: int
+    win: bool
+
+
+class SimulationParameterSet(BaseModel):
+    label: str = "Default"
+    pricing_alpha: float | None = None
+    pricing_loss_move_multiplier: float | None = None
+    pricing_max_effective_streak: int | None = None
+    pricing_positive_lp_soft_cap: int | None = None
+    pricing_negative_lp_soft_cap: int | None = None
+    pricing_positive_lp_excess_efficiency: float | None = None
+    pricing_negative_lp_excess_efficiency: float | None = None
+    pricing_win_streak_lp_ratio_default: float | None = None
+
+
+class SimulationRequest(BaseModel):
+    matches: list[SimulationMatch] | None = None
+    player_id: int | None = None
+    starting_price: float = 25.0
+    starting_streak: int = 0
+    parameter_sets: list[SimulationParameterSet] = Field(
+        default_factory=lambda: [SimulationParameterSet()]
+    )
+
+
+class SimulationStep(BaseModel):
+    match_index: int
+    delta_lp: int
+    win: bool
+    streak_before: int
+    streak_after: int
+    price_before: float
+    price_after: float
+    effective_delta_lp: float
+    streak_multiplier: float
+    price_move: float
+
+
+class SimulationTrajectory(BaseModel):
+    label: str
+    parameters: dict[str, float | int]
+    steps: list[SimulationStep]
+
+
+class SimulationResponse(BaseModel):
+    results: list[SimulationTrajectory]
+
+
+class SimulationDefaultsResponse(BaseModel):
+    pricing_alpha: float
+    pricing_loss_move_multiplier: float
+    pricing_max_effective_streak: int
+    pricing_positive_lp_soft_cap: int
+    pricing_negative_lp_soft_cap: int
+    pricing_positive_lp_excess_efficiency: float
+    pricing_negative_lp_excess_efficiency: float
+    pricing_win_streak_lp_ratio_default: float
+
+
+class SimulationPlayerMatchResponse(BaseModel):
+    match_id: str
+    win: bool
+    lp_delta: int
+    streak_before: int
+    streak_after: int
+    price_before: float
+    price_after: float
+    completed_at: datetime

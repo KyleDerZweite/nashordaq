@@ -27,6 +27,7 @@ from app.routers import (
     orders,
     poro,
     portfolio,
+    simulation,
     user,
 )
 from app.scheduler import (
@@ -84,6 +85,7 @@ app.include_router(bank.router, prefix="/api")
 app.include_router(poro.router, prefix="/api")
 app.include_router(portfolio.router, prefix="/api")
 app.include_router(leaderboard.router, prefix="/api")
+app.include_router(simulation.router, prefix="/api")
 
 
 @app.get("/health")

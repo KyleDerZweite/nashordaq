@@ -3,6 +3,7 @@ import BalanceInsightsModal from "./components/BalanceInsightsModal";
 import AdminDashboard from "./components/admin/AdminDashboard";
 import Header from "./components/Header";
 import BankModal from "./components/BankModal";
+import SimulationView from "./components/SimulationView";
 import FlyingPoro from "./components/FlyingPoro";
 import MarketGrid from "./components/MarketGrid";
 import Portfolio from "./components/Portfolio";
@@ -66,6 +67,7 @@ export default function App() {
   const [adminViewMode, setAdminViewMode] = useState<AdminViewMode>(
     getInitialAdminViewMode,
   );
+  const [showSimulation, setShowSimulation] = useState(false);
 
   const { data: user } = useUser();
   const onboardingComplete = user?.onboarding_complete ?? false;
@@ -184,6 +186,8 @@ export default function App() {
         adminViewMode={effectiveAdminViewMode}
         onOpenBalanceInsights={() => setIsBalanceInsightsOpen(true)}
         onEditProfile={() => setIsProfileEditorOpen(true)}
+        showSimulation={showSimulation}
+        onOpenSimulation={() => setShowSimulation(true)}
         onToggleAdminView={() =>
           setAdminViewMode((current) =>
             current === "admin" ? "spectator" : "admin",
@@ -192,179 +196,198 @@ export default function App() {
       />
 
       <main className="mx-auto w-full max-w-[88rem] flex-1 px-6 py-8">
-        {/* Market ticker bar */}
-        {players && players.length > 0 && (!isAdmin || isAdminSpectator) && (
-          <div className="mb-8 overflow-hidden border-2 border-hex-border bg-hex-bg-alt">
-            <div className="flex items-center justify-between border-b-2 border-hex-border px-4 py-2">
-              <span className="font-mono text-xs font-bold uppercase tracking-wider text-hex-bronze">
-                Market Snapshot
-              </span>
-              <div className="flex items-center gap-2">
-                <span className="font-mono text-xs uppercase tracking-wider text-hex-bronze">
-                  Sort
-                </span>
-                <div className="flex border border-hex-border">
-                  <button
-                    type="button"
-                    onClick={() => setTickerSortMode("value")}
-                    className={`px-3 py-1 font-mono text-xs font-bold uppercase tracking-wider transition-colors ${
-                      tickerSortMode === "value"
-                        ? "bg-hex-gold text-hex-bg"
-                        : "bg-transparent text-hex-bronze hover:bg-hex-panel hover:text-hex-white"
-                    }`}
-                  >
-                    Value
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setTickerSortMode("name")}
-                    className={`border-l border-hex-border px-3 py-1 font-mono text-xs font-bold uppercase tracking-wider transition-colors ${
-                      tickerSortMode === "name"
-                        ? "bg-hex-gold text-hex-bg"
-                        : "bg-transparent text-hex-bronze hover:bg-hex-panel hover:text-hex-white"
-                    }`}
-                  >
-                    Name
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex divide-x-2 divide-hex-border overflow-x-auto">
-              {sortedTickerPlayers.map((p) => (
-                <div key={p.id} className="flex items-center gap-3 px-5 py-2.5">
-                  <span className="font-mono text-xs font-bold text-hex-white">
-                    {isStreamerMode
-                      ? getStreamerSafeName(p.game_name, p.display_name)
-                      : p.display_name}
-                  </span>
-                  <span
-                    className={`font-mono text-xs font-bold ${
-                      p.trend === "up"
-                        ? "text-emerald-400"
-                        : p.trend === "down"
-                          ? "text-red-400"
-                          : "text-hex-bronze"
-                    }`}
-                    title={
-                      p.trend === "up"
-                        ? "Rising"
-                        : p.trend === "down"
-                          ? "Falling"
-                          : "Flat"
-                    }
-                  >
-                    {p.trend === "up" ? "▲" : p.trend === "down" ? "▼" : "■"}
-                  </span>
-                  <span className="font-mono text-sm font-bold text-hex-gold">
-                    {formatAmount(p.current_price)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Loading state */}
-        {playersLoading && (
-          <p className="py-12 text-center font-mono text-sm text-hex-bronze">
-            Loading market data...
-          </p>
-        )}
-
-        {/* Main grid: market + sidebar */}
-        {isAdmin ? (
-          isAdminSpectator ? (
-            <>
-              <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-                <div className="lg:col-span-2">
-                  <MarketGrid
-                    players={players ?? []}
-                    onTrade={() => undefined}
-                    onOpenDetails={(playerId) => setSelectedPlayerId(playerId)}
-                    canTrade={false}
-                    ownPlayerId={null}
-                    showTradeActions={false}
-                  />
-                </div>
-
-                <div className="flex flex-col gap-6">
-                  <section className="border-2 border-hex-gold-dim bg-hex-panel px-5 py-4">
-                    <h2 className="font-serif text-xl font-bold text-hex-gold">
-                      Spectator Mode
-                    </h2>
-                    <p className="mt-2 font-mono text-sm leading-6 text-hex-bronze">
-                      Admin is viewing the player-facing market shell in
-                      read-only mode. Trading, selling, gamba, and other player
-                      actions stay disabled here.
-                    </p>
-                    <div className="mt-4 grid gap-3 font-mono text-xs text-hex-bronze">
-                      <div className="border border-hex-border bg-hex-bg-alt px-3 py-2">
-                        Market status:{" "}
-                        {adminSystemStatus?.market_status ?? "idle"}
-                      </div>
-                      <div className="border border-hex-border bg-hex-bg-alt px-3 py-2">
-                        Scheduler:{" "}
-                        {adminSystemStatus?.scheduler_running
-                          ? "Running"
-                          : "Stopped"}
-                      </div>
-                    </div>
-                  </section>
-
-                  <Leaderboard entries={leaderboard ?? []} />
-                </div>
-              </div>
-
-              <div className="mt-6">
-                <OrderHistory
-                  ownOrders={recentOrders ?? []}
-                  allOrders={recentOrders ?? []}
-                  defaultView="all"
-                  allowViewToggle={false}
-                />
-              </div>
-            </>
-          ) : (
-            <div className="space-y-8">
-              <AdminDashboard
-                overview={adminOverview}
-                users={adminUsers ?? []}
-                systemStatus={adminSystemStatus}
-                playerInsights={adminPlayerInsights ?? []}
-              />
-            </div>
-          )
+        {showSimulation ? (
+          <SimulationView onClose={() => setShowSimulation(false)} />
         ) : (
           <>
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-              <div className="lg:col-span-2">
-                <MarketGrid
-                  players={players ?? []}
-                  onTrade={(playerId, side) => setTrade({ playerId, side })}
-                  onOpenDetails={(playerId) => setSelectedPlayerId(playerId)}
-                  canTrade={canTrade}
-                  ownPlayerId={user?.linked_player_id ?? null}
-                />
-              </div>
+            {/* Market ticker bar */}
+            {players &&
+              players.length > 0 &&
+              (!isAdmin || isAdminSpectator) && (
+                <div className="mb-8 overflow-hidden border-2 border-hex-border bg-hex-bg-alt">
+                  <div className="flex items-center justify-between border-b-2 border-hex-border px-4 py-2">
+                    <span className="font-mono text-xs font-bold uppercase tracking-wider text-hex-bronze">
+                      Market Snapshot
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs uppercase tracking-wider text-hex-bronze">
+                        Sort
+                      </span>
+                      <div className="flex border border-hex-border">
+                        <button
+                          type="button"
+                          onClick={() => setTickerSortMode("value")}
+                          className={`px-3 py-1 font-mono text-xs font-bold uppercase tracking-wider transition-colors ${
+                            tickerSortMode === "value"
+                              ? "bg-hex-gold text-hex-bg"
+                              : "bg-transparent text-hex-bronze hover:bg-hex-panel hover:text-hex-white"
+                          }`}
+                        >
+                          Value
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setTickerSortMode("name")}
+                          className={`border-l border-hex-border px-3 py-1 font-mono text-xs font-bold uppercase tracking-wider transition-colors ${
+                            tickerSortMode === "name"
+                              ? "bg-hex-gold text-hex-bg"
+                              : "bg-transparent text-hex-bronze hover:bg-hex-panel hover:text-hex-white"
+                          }`}
+                        >
+                          Name
+                        </button>
+                      </div>
+                    </div>
+                  </div>
 
-              <div className="flex flex-col gap-6">
-                <Portfolio
-                  portfolio={portfolio}
-                  onOpenInsights={() => setIsPortfolioInsightsOpen(true)}
-                />
-                <Leaderboard entries={leaderboard ?? []} />
-                <GambaWidget balance={balance} canTrade={canTrade} />
-              </div>
-            </div>
+                  <div className="flex divide-x-2 divide-hex-border overflow-x-auto">
+                    {sortedTickerPlayers.map((p) => (
+                      <div
+                        key={p.id}
+                        className="flex items-center gap-3 px-5 py-2.5"
+                      >
+                        <span className="font-mono text-xs font-bold text-hex-white">
+                          {isStreamerMode
+                            ? getStreamerSafeName(p.game_name, p.display_name)
+                            : p.display_name}
+                        </span>
+                        <span
+                          className={`font-mono text-xs font-bold ${
+                            p.trend === "up"
+                              ? "text-emerald-400"
+                              : p.trend === "down"
+                                ? "text-red-400"
+                                : "text-hex-bronze"
+                          }`}
+                          title={
+                            p.trend === "up"
+                              ? "Rising"
+                              : p.trend === "down"
+                                ? "Falling"
+                                : "Flat"
+                          }
+                        >
+                          {p.trend === "up"
+                            ? "▲"
+                            : p.trend === "down"
+                              ? "▼"
+                              : "■"}
+                        </span>
+                        <span className="font-mono text-sm font-bold text-hex-gold">
+                          {formatAmount(p.current_price)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
-            <div className="mt-6">
-              <OrderHistory
-                ownOrders={orders ?? []}
-                allOrders={recentOrders ?? []}
-                defaultView="own"
-              />
-            </div>
+            {/* Loading state */}
+            {playersLoading && (
+              <p className="py-12 text-center font-mono text-sm text-hex-bronze">
+                Loading market data...
+              </p>
+            )}
+
+            {/* Main grid: market + sidebar */}
+            {isAdmin ? (
+              isAdminSpectator ? (
+                <>
+                  <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+                    <div className="lg:col-span-2">
+                      <MarketGrid
+                        players={players ?? []}
+                        onTrade={() => undefined}
+                        onOpenDetails={(playerId) =>
+                          setSelectedPlayerId(playerId)
+                        }
+                        canTrade={false}
+                        ownPlayerId={null}
+                        showTradeActions={false}
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-6">
+                      <section className="border-2 border-hex-gold-dim bg-hex-panel px-5 py-4">
+                        <h2 className="font-serif text-xl font-bold text-hex-gold">
+                          Spectator Mode
+                        </h2>
+                        <p className="mt-2 font-mono text-sm leading-6 text-hex-bronze">
+                          Admin is viewing the player-facing market shell in
+                          read-only mode. Trading, selling, gamba, and other
+                          player actions stay disabled here.
+                        </p>
+                        <div className="mt-4 grid gap-3 font-mono text-xs text-hex-bronze">
+                          <div className="border border-hex-border bg-hex-bg-alt px-3 py-2">
+                            Market status:{" "}
+                            {adminSystemStatus?.market_status ?? "idle"}
+                          </div>
+                          <div className="border border-hex-border bg-hex-bg-alt px-3 py-2">
+                            Scheduler:{" "}
+                            {adminSystemStatus?.scheduler_running
+                              ? "Running"
+                              : "Stopped"}
+                          </div>
+                        </div>
+                      </section>
+
+                      <Leaderboard entries={leaderboard ?? []} />
+                    </div>
+                  </div>
+
+                  <div className="mt-6">
+                    <OrderHistory
+                      ownOrders={recentOrders ?? []}
+                      allOrders={recentOrders ?? []}
+                      defaultView="all"
+                      allowViewToggle={false}
+                    />
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-8">
+                  <AdminDashboard
+                    overview={adminOverview}
+                    users={adminUsers ?? []}
+                    systemStatus={adminSystemStatus}
+                    playerInsights={adminPlayerInsights ?? []}
+                  />
+                </div>
+              )
+            ) : (
+              <>
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+                  <div className="lg:col-span-2">
+                    <MarketGrid
+                      players={players ?? []}
+                      onTrade={(playerId, side) => setTrade({ playerId, side })}
+                      onOpenDetails={(playerId) =>
+                        setSelectedPlayerId(playerId)
+                      }
+                      canTrade={canTrade}
+                      ownPlayerId={user?.linked_player_id ?? null}
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-6">
+                    <Portfolio
+                      portfolio={portfolio}
+                      onOpenInsights={() => setIsPortfolioInsightsOpen(true)}
+                    />
+                    <Leaderboard entries={leaderboard ?? []} />
+                    <GambaWidget balance={balance} canTrade={canTrade} />
+                  </div>
+                </div>
+
+                <div className="mt-6">
+                  <OrderHistory
+                    ownOrders={orders ?? []}
+                    allOrders={recentOrders ?? []}
+                    defaultView="own"
+                  />
+                </div>
+              </>
+            )}
           </>
         )}
       </main>
