@@ -64,51 +64,9 @@ This is a major architectural change that needs its own design doc:
 
 ---
 
-## 5. Negative Streak Amplification
+## ~~5. Negative Streak Amplification~~ DONE
 
-**Problem:** Only positive streaks amplify price movement. A player on a 10-loss streak loses the same LP-to-price ratio per loss as on the first loss. This doesn't match real market dynamics where panic selling during a crash accelerates the decline.
-
-**Current behavior:**
-```python
-effective_streak = min(max(0, streak), 10)  # Negative streaks clamped to 0
-streak_multiplier = 1 + (BETA * effective_streak)  # Always 1.0 for losses
-```
-
-**Proposed change:**
-```python
-if effective_delta_lp > 0:
-    effective_streak = min(max(0, streak), max_streak)
-else:
-    effective_streak = min(abs(min(0, streak)), max_streak)
-
-streak_multiplier = 1 + (BETA_POSITIVE * effective_streak)  # for gains
-# or
-streak_multiplier = 1 + (BETA_NEGATIVE * effective_streak)  # for losses
-```
-
-Use a separate (lower) beta for negative streaks to keep crashes dramatic but less severe than equivalent win streaks:
-
-```
-BETA_POSITIVE = 0.10  (max 2.0x at streak 10) -- unchanged
-BETA_NEGATIVE = 0.06  (max 1.6x at streak 10) -- new, milder
-```
-
-**Config knobs:**
-- `pricing_beta_negative: float = 0.06`
-
-**Example impact:**
-
-A -20 LP loss at streak -5:
-- Current: `-20 * 0.12 * 1.0 * 1.10 = -2.64`
-- Proposed: `-20 * 0.12 * 1.30 * 1.10 = -3.432` (30% more severe)
-
-At streak -10:
-- Current: `-20 * 0.12 * 1.0 * 1.10 = -2.64`
-- Proposed: `-20 * 0.12 * 1.60 * 1.10 = -4.224` (60% more severe)
-
-This creates visible "crash" patterns on the price chart during loss streaks, which is exciting to watch and creates buying opportunities for users who believe the player will recover.
-
-**Complexity:** Trivial. One config value, a few lines in `calculate_new_price`.
+Implemented. Negative streaks now amplify loss-side price movement using a separate beta (`pricing_beta_negative = 0.06`, max 1.6x at streak -10) that is milder than the positive-streak beta (`BETA = 0.10`, max 2.0x at streak 10). This creates visible crash patterns during loss streaks. See `docs/ECONOMY_MECHANICS.md` section 3 for details.
 
 ---
 

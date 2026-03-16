@@ -50,6 +50,7 @@ class Settings(BaseSettings):
     bank_rescue_net_worth_threshold: float = 250.0
     pricing_max_effective_streak: int = 10
     pricing_alpha: float = 0.12
+    pricing_beta_negative: float = 0.06
     pricing_loss_move_multiplier: float = 1.10
     pricing_win_streak_lp_ratio_default: float = 0.85
     pricing_win_streak_lp_ratio_min: float = 0.3

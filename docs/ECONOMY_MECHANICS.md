@@ -106,7 +106,7 @@ Each attributed match produces a `PlayerMatch` row storing `lp_before`, `lp_afte
 - Flat LP cycle
 	- If Riot reports the same Absolute LP as the previous refresh and no new matches are detected, Nashordaq does not change price, streak, `last_updated`, or stored price history for that cycle.
 
-**Internal streak:** A signed integer tracking consecutive same-direction updates. Positive for consecutive LP gains and negative for consecutive losses. Resets to +1 or -1 on direction change, and is capped at `+10` / `-10`. It is only recalculated on cycles where LP changes. Only positive streak contributes to price momentum.
+**Internal streak:** A signed integer tracking consecutive same-direction updates. Positive for consecutive LP gains and negative for consecutive losses. Resets to +1 or -1 on direction change, and is capped at `+10` / `-10`. It is only recalculated on cycles where LP changes. Both positive and negative streaks contribute to price momentum, using separate beta coefficients: `BETA = 0.10` for win streaks (max 2.0x at streak 10) and `pricing_beta_negative = 0.06` for loss streaks (max 1.6x at streak 10). The milder negative beta creates visible crash patterns during loss streaks without being as punishing as equivalent win-streak bonuses.
 
 **Floor:** `P_new` cannot drop below 1.00.
 

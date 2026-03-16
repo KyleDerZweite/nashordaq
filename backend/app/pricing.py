@@ -116,8 +116,12 @@ def calculate_new_price(
         gain_dampener = _lp_gain_dampener(avg_lp_loss_on_loss, avg_lp_gain_on_win)
         effective_delta_lp *= gain_dampener
 
-    effective_streak = min(max(0, streak), _max_effective_streak())
-    streak_multiplier = 1 + (BETA * effective_streak)
+    if effective_delta_lp > 0:
+        effective_streak = min(max(0, streak), _max_effective_streak())
+        streak_multiplier = 1 + (BETA * effective_streak)
+    else:
+        effective_streak = min(abs(min(0, streak)), _max_effective_streak())
+        streak_multiplier = 1 + (settings.pricing_beta_negative * effective_streak)
 
     lp_move = effective_delta_lp * settings.pricing_alpha * streak_multiplier
     if effective_delta_lp < 0:

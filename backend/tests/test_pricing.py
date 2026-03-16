@@ -61,9 +61,9 @@ def test_new_price_positive_delta():
 def test_new_price_negative_delta():
     price = calculate_new_price(old_price=20.0, delta_lp=-50, streak=-1)
     # First -24 full; remaining -26 at 50% = -24 + -13 = -37 effective.
-    # Negative: no dampener. streak=-1 -> effective_streak=0 -> mult=1.0.
-    # -37 * 0.12 * 1.0 * 1.10 = -4.884
-    assert price == pytest.approx(15.116)
+    # Negative: no dampener. streak=-1 -> effective_streak=1 -> mult=1+(0.06*1)=1.06.
+    # -37 * 0.12 * 1.06 * 1.10 = -5.17704
+    assert price == pytest.approx(14.82296)
 
 
 def test_price_floor():
@@ -135,6 +135,22 @@ def test_new_price_gain_dampener_clamped_to_minimum():
     # ratio=0.02, clamped to 0.3. Effective delta: 40 * 0.3 = 12.
     # Streak mult 2.0. 12 * 0.12 * 2.0 = 2.88
     assert price == pytest.approx(22.88)
+
+
+def test_new_price_negative_streak_amplification():
+    price = calculate_new_price(old_price=20.0, delta_lp=-20, streak=-5)
+    # -20 within soft cap -> -20 effective. No dampener on losses.
+    # streak=-5 -> effective_streak=5 -> mult=1+(0.06*5)=1.30.
+    # -20 * 0.12 * 1.30 * 1.10 = -3.432
+    assert price == pytest.approx(16.568)
+
+
+def test_new_price_negative_streak_max_amplification():
+    price = calculate_new_price(old_price=20.0, delta_lp=-20, streak=-10)
+    # -20 within soft cap -> -20 effective. No dampener on losses.
+    # streak=-10 -> effective_streak=10 -> mult=1+(0.06*10)=1.60.
+    # -20 * 0.12 * 1.60 * 1.10 = -4.224
+    assert price == pytest.approx(15.776)
 
 
 def test_new_price_gain_dampener_not_applied_to_losses():
