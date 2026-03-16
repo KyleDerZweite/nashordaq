@@ -103,6 +103,10 @@ Each attributed match produces a `PlayerMatch` row storing `lp_before`, `lp_afte
 		- Wins-only refresh (`wins` increased, `losses` unchanged, `Delta_LP_abs > 0`) updates `AvgLpGainOnWin`.
 		- Losses-only refresh (`losses` increased, `wins` unchanged, `Delta_LP_abs < 0`) updates `AvgLpLossOnLoss`.
 	- Mixed or ambiguous refreshes still update snapshot counters but do not create LP-per-win/loss samples.
+- Low-price loss dampening
+	- When a stock's price is below `pricing_low_price_threshold` (default `15.0 P`), negative price moves are scaled by `price / threshold`.
+	- This caps the percentage loss at the threshold-level rate, preventing low-priced stocks from spiraling into the floor.
+	- Gains are not dampened; low-priced stocks recover at full speed.
 - Flat LP cycle
 	- If Riot reports the same Absolute LP as the previous refresh and no new matches are detected, Nashordaq does not change price, streak, `last_updated`, or stored price history for that cycle.
 

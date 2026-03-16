@@ -204,3 +204,36 @@ def test_new_price_bootstrap_loss_only():
     # Bootstrapped gain = 15 + 5 = 20. Ratio = 15/20 = 0.75.
     # 20 * 0.75 = 15. 15 * 0.12 = 1.8
     assert price == pytest.approx(21.8)
+
+
+def test_low_price_dampening_reduces_loss():
+    price = calculate_new_price(old_price=5.0, delta_lp=-20, streak=0)
+    # Raw lp_move: -20 * 0.12 * 1.0 * 1.10 = -2.64
+    # Dampened: -2.64 * (5.0 / 15.0) = -0.88
+    assert price == pytest.approx(4.12)
+
+
+def test_low_price_dampening_no_effect_above_threshold():
+    price = calculate_new_price(old_price=20.0, delta_lp=-20, streak=0)
+    # Above threshold (15.0), no dampening. -20 * 0.12 * 1.0 * 1.10 = -2.64
+    assert price == pytest.approx(17.36)
+
+
+def test_low_price_dampening_not_applied_to_gains():
+    price_low = calculate_new_price(old_price=5.0, delta_lp=20, streak=0)
+    price_high = calculate_new_price(old_price=5.0, delta_lp=20, streak=0)
+    # Gains are never dampened regardless of price level.
+    assert price_low == price_high
+
+
+def test_low_price_dampening_at_threshold_boundary():
+    price = calculate_new_price(old_price=15.0, delta_lp=-20, streak=0)
+    # At exactly threshold, factor = 15/15 = 1.0, no dampening.
+    # -20 * 0.12 * 1.0 * 1.10 = -2.64
+    assert price == pytest.approx(12.36)
+
+
+def test_low_price_dampening_near_floor():
+    price = calculate_new_price(old_price=1.5, delta_lp=-20, streak=0)
+    # Raw: -2.64. Dampened: -2.64 * (1.5 / 15.0) = -0.264
+    assert price == pytest.approx(1.236)

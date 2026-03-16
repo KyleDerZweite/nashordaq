@@ -28,6 +28,8 @@ PRICE_FLOOR = 1.0
 _PARAM_KEYS = [
     "pricing_alpha",
     "pricing_loss_move_multiplier",
+    "pricing_low_price_threshold",
+    "pricing_beta_negative",
     "pricing_max_effective_streak",
     "pricing_positive_lp_soft_cap",
     "pricing_negative_lp_soft_cap",
@@ -82,12 +84,20 @@ def _compute_step(
         eff_lp *= float(params["pricing_win_streak_lp_ratio_default"])
 
     max_streak = max(1, int(params["pricing_max_effective_streak"]))
-    eff_streak = min(max(0, streak), max_streak)
-    streak_mult = 1 + (BETA * eff_streak)
+    if eff_lp > 0:
+        eff_streak = min(max(0, streak), max_streak)
+        streak_mult = 1 + (BETA * eff_streak)
+    else:
+        eff_streak = min(abs(min(0, streak)), max_streak)
+        streak_mult = 1 + (float(params["pricing_beta_negative"]) * eff_streak)
 
     move = eff_lp * float(params["pricing_alpha"]) * streak_mult
     if eff_lp < 0:
         move *= float(params["pricing_loss_move_multiplier"])
+
+    threshold = float(params["pricing_low_price_threshold"])
+    if move < 0 and price < threshold:
+        move *= price / threshold
 
     new_price = max(price + move, PRICE_FLOOR)
     return new_price, eff_lp, streak_mult, new_price - price

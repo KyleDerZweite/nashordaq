@@ -70,6 +70,12 @@ Implemented. Negative streaks now amplify loss-side price movement using a separ
 
 ---
 
+## ~~5b. Low-Price Loss Dampening~~ DONE
+
+Implemented. When a stock's price is below `pricing_low_price_threshold` (default `15.0 P`), negative price moves are scaled by `price / threshold`. This caps the percentage loss at the threshold-level rate, preventing low-priced stocks from spiraling into the 1.0 P floor. Gains are unaffected so recovery remains full-speed. See `docs/ECONOMY_MECHANICS.md` section 3 for details.
+
+---
+
 ## ~~6. Gamba: Scale Multiplier with Hold Duration~~ DONE
 
 Implemented. Settlement multiplier scales linearly with the random hold duration: 2.0x at 24h to 4.0x at 168h. Both player and duration remain fully random. See `docs/ECONOMY_MECHANICS.md` section 7 for details.

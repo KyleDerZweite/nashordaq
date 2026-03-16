@@ -404,6 +404,8 @@ class SimulationParameterSet(BaseModel):
     label: str = "Default"
     pricing_alpha: float | None = None
     pricing_loss_move_multiplier: float | None = None
+    pricing_low_price_threshold: float | None = None
+    pricing_beta_negative: float | None = None
     pricing_max_effective_streak: int | None = None
     pricing_positive_lp_soft_cap: int | None = None
     pricing_negative_lp_soft_cap: int | None = None
@@ -448,6 +450,8 @@ class SimulationResponse(BaseModel):
 class SimulationDefaultsResponse(BaseModel):
     pricing_alpha: float
     pricing_loss_move_multiplier: float
+    pricing_low_price_threshold: float
+    pricing_beta_negative: float
     pricing_max_effective_streak: int
     pricing_positive_lp_soft_cap: int
     pricing_negative_lp_soft_cap: int

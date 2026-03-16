@@ -127,6 +127,9 @@ def calculate_new_price(
     if effective_delta_lp < 0:
         lp_move *= settings.pricing_loss_move_multiplier
 
+    if lp_move < 0 and old_price < settings.pricing_low_price_threshold:
+        lp_move *= old_price / settings.pricing_low_price_threshold
+
     new_price = old_price + lp_move
 
     return max(new_price, PRICE_FLOOR)
