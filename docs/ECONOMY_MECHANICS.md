@@ -144,20 +144,18 @@ Orders execute immediately at the currently visible market price.
 4. **SELL:** Shares are removed instantly and proceeds are calculated with a holding-duration multiplier per consumed lot (FIFO lots).
 5. Every execution writes a `Transaction` row.
 
+### Minimum Holding Period
+
+After buying shares, those shares cannot be sold for a configurable period (default: 4 hours). The lock is per-lot (FIFO): buying 10 shares at 09:00 and 10 more at 11:00 means the first batch unlocks at 13:00, the second at 15:00. Sells execute at the current market price with no fee or bonus adjustment.
+
 ### Buy Revert Grace Period
 
-- Executed BUY orders can be reverted via order cancellation during a short grace window (default: 60 seconds).
+- Executed BUY orders can be reverted via order cancellation during a short grace window (default: 120 seconds).
 - Revert refunds exactly `execution_price * quantity`.
 - Revert is only allowed if shares from that BUY lot were not sold yet.
 - Reverted orders are marked with status `REVERTED`.
 
-Sell multiplier defaults:
-
-- Hold `< 6h`: short-hold fee ramps from `-2%` (at 0h) to `0%` (at 6h).
-- Hold `6h` to `< 12h`: no adjustment.
-- Hold `>= 12h`: `+2%` long-hold bonus.
-
-Implementation: `app/routers/orders.py::place_order()`, `app/pricing.py::calculate_sell_multiplier()`
+Implementation: `app/routers/orders.py::place_order()`
 
 ## 5. Order Validation at Placement
 

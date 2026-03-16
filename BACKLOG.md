@@ -16,24 +16,9 @@ Implemented. When a tracked player has no LP change for 48+ hours, the price dec
 
 ---
 
-## 3. Minimum Holding Period (Replace Sell Multiplier)
+## ~~3. Minimum Holding Period (Replace Sell Multiplier)~~ DONE
 
-**Problem:** The current hold bonus/penalty (+/-2%) is too small to matter. On a 40 P stock with 10 shares, that's +/-8 P -- noise on a 1000 P balance. It doesn't influence sell timing decisions.
-
-**Proposed approach: replace the sliding fee/bonus with a hard 3-hour sell lock.**
-
-After buying shares, those shares cannot be sold for 3 hours. No fee, no bonus -- just a gate. This makes buy decisions more consequential and prevents flip-trading.
-
-- The lock is per-lot (FIFO): buying 10 shares at 9:00 and 10 more at 11:00 means the first batch unlocks at 12:00, the second at 14:00.
-- The 60-second buy-revert grace period stays (that's a cancel, not a sell).
-- `calculate_sell_multiplier` and the hold-duration fee/bonus logic can be removed. The `HoldingLot` model stays (needed for per-lot lock tracking), but its role simplifies to just tracking `acquired_at` for the lock check.
-
-**Interaction with Gamba:** Regular trades lock for 3h; Gamba locks for 24-168h but with 2-4x leverage. The contrast makes both systems feel distinct -- regular trading is "safe but patient," Gamba is "high risk, high reward, longer lock."
-
-**Config knobs:**
-- `min_hold_period_hours: float = 3.0`
-
-**Complexity:** Low. Remove sell multiplier logic, add a sell-time check against `acquired_at + min_hold_period`.
+Implemented. After buying shares, those shares cannot be sold for 4 hours (configurable via `min_hold_period_hours`). The lock is per-lot (FIFO). Sells execute at the current market price with no fee or bonus. The old sell multiplier (`calculate_sell_multiplier`, short-hold fee, long-hold bonus) has been removed. Buy-revert grace period is 120 seconds. See `docs/ECONOMY_MECHANICS.md` section 4 for details.
 
 ---
 
@@ -137,8 +122,8 @@ Implemented. Settlement multiplier scales linearly with the random hold duration
 
 **Problem:** `auth.py:70` does `WHERE username == <Remote-User header>`. If someone renames their username in Pangolin, a new user row gets created and their portfolio/balance is lost. The Remote-User header is mutable and not a stable identity key.
 
-**Current users in the DB** (mapped by Remote-User header):
-`admin@kylehub.dev`, `an.leklep`, `elinnerz`, `emil`, `fabialwe`, `firefreez3r`, `hanswarmbier`, `kate.jung`, `kolb.lukas`, `kyle`, `meru.buwumet`, `redpandaprincess`, `test@kylehub.dev`, `tobias.allgayer`
+**Current users in the DB** (mapped by Remote-User header, examples):
+`admin@kylehub.dev`, `kyle`, `redpandaprincess`, `test@kylehub.dev`
 
 **Pangolin injects these headers** (standard behavior):
 - `Remote-User` — username (mutable)

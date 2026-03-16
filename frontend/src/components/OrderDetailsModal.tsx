@@ -13,9 +13,6 @@ interface Props {
 }
 
 function adjustmentLabel(reason: string | null): string {
-  if (reason === "HOLD_DURATION") {
-    return "Hold Penalty / Benefit";
-  }
   if (reason === "GAMBA_MULTIPLIER") {
     return "Gamba Adjustment";
   }

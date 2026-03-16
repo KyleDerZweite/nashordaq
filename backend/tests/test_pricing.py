@@ -4,7 +4,6 @@ from app.pricing import (
     calculate_ipo_price,
     calculate_lp_abs,
     calculate_new_price,
-    calculate_sell_multiplier,
     calculate_win_rate,
     update_streak,
 )
@@ -189,36 +188,3 @@ def test_new_price_bootstrap_loss_only():
     # Bootstrapped gain = 15 + 5 = 20. Ratio = 15/20 = 0.75.
     # 20 * 0.75 = 15. 15 * 0.12 = 1.8
     assert price == pytest.approx(21.8)
-
-
-def test_sell_multiplier_short_hold_penalty():
-    multiplier = calculate_sell_multiplier(
-        held_hours=0,
-        short_hold_fee_rate=0.02,
-        short_hold_fee_window_hours=6,
-        long_hold_bonus_rate=0.02,
-        long_hold_bonus_start_hours=12,
-    )
-    assert multiplier == 0.98
-
-
-def test_sell_multiplier_no_adjustment_mid_window():
-    multiplier = calculate_sell_multiplier(
-        held_hours=8,
-        short_hold_fee_rate=0.02,
-        short_hold_fee_window_hours=6,
-        long_hold_bonus_rate=0.02,
-        long_hold_bonus_start_hours=12,
-    )
-    assert multiplier == 1.0
-
-
-def test_sell_multiplier_long_hold_bonus():
-    multiplier = calculate_sell_multiplier(
-        held_hours=12,
-        short_hold_fee_rate=0.02,
-        short_hold_fee_window_hours=6,
-        long_hold_bonus_rate=0.02,
-        long_hold_bonus_start_hours=12,
-    )
-    assert multiplier == 1.02

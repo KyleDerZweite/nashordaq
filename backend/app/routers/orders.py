@@ -19,7 +19,6 @@ from app.models import (
     Transaction,
     User,
 )
-from app.pricing import calculate_sell_multiplier
 from app.schemas import OrderCreate, OrderDetailResponse, OrderResponse
 
 router = APIRouter(tags=["orders"])
@@ -294,10 +293,10 @@ async def place_order(
         )
         lots = lots_result.scalars().all()
 
+        min_hold_deadline = now - timedelta(hours=settings.min_hold_period_hours)
         remaining = body.quantity
-        gross_price = player.current_price
-        gross_total = gross_price * body.quantity
-        adjusted_total = 0.0
+        execution_price = player.current_price
+        total_value = execution_price * body.quantity
         entry_total_value = 0.0
 
         buy_order_ids = [
@@ -317,23 +316,15 @@ async def place_order(
             if remaining <= 0:
                 break
 
-            consumed = min(remaining, lot.quantity)
             acquired_at = (
                 lot.acquired_at
                 if lot.acquired_at.tzinfo is not None
                 else lot.acquired_at.replace(tzinfo=UTC)
             )
-            held_duration = now - acquired_at
-            held_hours = held_duration.total_seconds() / 3600
-            multiplier = calculate_sell_multiplier(
-                held_hours=held_hours,
-                short_hold_fee_rate=settings.short_hold_fee_rate,
-                short_hold_fee_window_hours=settings.short_hold_fee_window_hours,
-                long_hold_bonus_rate=settings.long_hold_bonus_rate,
-                long_hold_bonus_start_hours=settings.long_hold_bonus_start_hours,
-            )
+            if acquired_at > min_hold_deadline:
+                continue
 
-            adjusted_total += consumed * gross_price * multiplier
+            consumed = min(remaining, lot.quantity)
             if lot.buy_order_id is not None:
                 entry_total_value += consumed * buy_order_price_map.get(
                     lot.buy_order_id,
@@ -343,11 +334,13 @@ async def place_order(
             remaining -= consumed
 
         if remaining > 0:
-            raise HTTPException(status_code=400, detail="Insufficient shares")
+            raise HTTPException(
+                status_code=400,
+                detail="Shares are still within the minimum holding period",
+            )
 
-        effective_execution_price = adjusted_total / body.quantity
         holding.quantity -= body.quantity
-        user.balance += adjusted_total
+        user.balance += total_value
 
         order = Order(
             user_id=user.id,
@@ -357,12 +350,12 @@ async def place_order(
             quantity_value=float(body.quantity),
             status=OrderStatus.EXECUTED,
             source=OrderSource.MANUAL,
-            execution_price=effective_execution_price,
-            gross_execution_price=gross_price,
-            gross_total_value=gross_total,
+            execution_price=execution_price,
+            gross_execution_price=execution_price,
+            gross_total_value=total_value,
             entry_total_value=entry_total_value,
-            adjustment_value=adjusted_total - gross_total,
-            adjustment_reason="HOLD_DURATION",
+            adjustment_value=0.0,
+            adjustment_reason=None,
             executed_at=now,
         )
         session.add(order)
@@ -375,8 +368,8 @@ async def place_order(
                 order_id=order.id,
                 side=body.side,
                 quantity=body.quantity,
-                price=effective_execution_price,
-                total=adjusted_total,
+                price=execution_price,
+                total=total_value,
             )
         )
 

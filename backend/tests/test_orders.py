@@ -204,6 +204,19 @@ async def test_cancel_order_after_partial_sell(
     assert buy_resp.status_code == 201
     order_id = buy_resp.json()["id"]
 
+    me_resp = await auth_client.get("/api/user/me")
+    user_id = me_resp.json()["id"]
+
+    lots_result = await db_session.execute(
+        select(HoldingLot).where(
+            HoldingLot.user_id == user_id,
+            HoldingLot.player_id == tradable_player.id,
+        )
+    )
+    lot = lots_result.scalar_one()
+    lot.acquired_at = datetime.now(UTC) - timedelta(hours=5)
+    await db_session.commit()
+
     sell_resp = await auth_client.post(
         "/api/orders",
         json={"player_id": tradable_player.id, "side": "SELL", "quantity": 1},
@@ -355,7 +368,9 @@ async def test_admin_can_view_recent_orders(auth_client, tradable_player, monkey
     assert len(resp.json()) >= 1
 
 
-async def test_sell_applies_short_hold_fee(auth_client, tradable_player, db_session):
+async def test_sell_blocked_during_hold_period(
+    auth_client, tradable_player, db_session
+):
     buy_resp = await auth_client.post(
         "/api/orders",
         json={"player_id": tradable_player.id, "side": "BUY", "quantity": 10},
@@ -379,13 +394,11 @@ async def test_sell_applies_short_hold_fee(auth_client, tradable_player, db_sess
         "/api/orders",
         json={"player_id": tradable_player.id, "side": "SELL", "quantity": 10},
     )
-    assert sell_resp.status_code == 201
-
-    # Immediate sell gets max 2% reduction: 25.0 * 0.98
-    assert sell_resp.json()["execution_price"] == pytest.approx(24.5)
+    assert sell_resp.status_code == 400
+    assert "minimum holding period" in sell_resp.json()["detail"]
 
 
-async def test_sell_gets_long_hold_bonus(auth_client, tradable_player, db_session):
+async def test_sell_allowed_after_hold_period(auth_client, tradable_player, db_session):
     buy_resp = await auth_client.post(
         "/api/orders",
         json={"player_id": tradable_player.id, "side": "BUY", "quantity": 10},
@@ -402,7 +415,7 @@ async def test_sell_gets_long_hold_bonus(auth_client, tradable_player, db_sessio
         )
     )
     lot = lots_result.scalar_one()
-    lot.acquired_at = datetime.now(UTC) - timedelta(hours=13)
+    lot.acquired_at = datetime.now(UTC) - timedelta(hours=5)
     await db_session.commit()
 
     sell_resp = await auth_client.post(
@@ -410,19 +423,7 @@ async def test_sell_gets_long_hold_bonus(auth_client, tradable_player, db_sessio
         json={"player_id": tradable_player.id, "side": "SELL", "quantity": 10},
     )
     assert sell_resp.status_code == 201
-
-    # >=12h hold gets +2% bonus: 25.0 * 1.02
-    assert sell_resp.json()["execution_price"] == 25.5
-
-    order_result = await db_session.execute(
-        select(Order).where(Order.id == sell_resp.json()["id"])
-    )
-    order = order_result.scalar_one()
-    assert order.gross_execution_price == pytest.approx(25.0)
-    assert order.gross_total_value == pytest.approx(250.0)
-    assert order.entry_total_value == pytest.approx(250.0)
-    assert order.adjustment_value == pytest.approx(5.0)
-    assert order.adjustment_reason == "HOLD_DURATION"
+    assert sell_resp.json()["execution_price"] == 25.0
 
 
 async def test_buy_lot_links_to_order(auth_client, tradable_player, db_session):
@@ -462,7 +463,7 @@ async def test_revert_sets_order_status(auth_client, tradable_player, db_session
     assert order.status == OrderStatus.REVERTED
 
 
-async def test_get_order_detail_returns_hold_adjustment_value(
+async def test_get_order_detail_sell_no_adjustment(
     auth_client,
     tradable_player,
     db_session,
@@ -483,7 +484,7 @@ async def test_get_order_detail_returns_hold_adjustment_value(
         )
     )
     lot = lots_result.scalar_one()
-    lot.acquired_at = datetime.now(UTC)
+    lot.acquired_at = datetime.now(UTC) - timedelta(hours=5)
     await db_session.commit()
 
     sell_resp = await auth_client.post(
@@ -495,9 +496,10 @@ async def test_get_order_detail_returns_hold_adjustment_value(
     detail_resp = await auth_client.get(f"/api/orders/{sell_resp.json()['id']}")
     assert detail_resp.status_code == 200
     data = detail_resp.json()
+    assert data["execution_price"] == pytest.approx(25.0)
     assert data["gross_execution_price"] == pytest.approx(25.0)
     assert data["gross_total_value"] == pytest.approx(250.0)
     assert data["entry_total_value"] == pytest.approx(250.0)
-    assert data["adjustment_value"] == pytest.approx(-5.0)
-    assert data["adjustment_reason"] == "HOLD_DURATION"
-    assert data["total_value"] == pytest.approx(245.0)
+    assert data["adjustment_value"] == pytest.approx(0.0)
+    assert data["adjustment_reason"] is None
+    assert data["total_value"] == pytest.approx(250.0)

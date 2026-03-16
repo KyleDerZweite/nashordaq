@@ -139,25 +139,3 @@ def update_streak(old_streak: int, delta_lp: int) -> int:
             -max_effective_streak,
         )
     return 0
-
-
-def calculate_sell_multiplier(
-    held_hours: float,
-    short_hold_fee_rate: float,
-    short_hold_fee_window_hours: float,
-    long_hold_bonus_rate: float,
-    long_hold_bonus_start_hours: float,
-) -> float:
-    safe_held_hours = max(0.0, held_hours)
-
-    if (
-        short_hold_fee_window_hours > 0
-        and safe_held_hours < short_hold_fee_window_hours
-    ):
-        remaining_ratio = 1 - (safe_held_hours / short_hold_fee_window_hours)
-        return 1 - (short_hold_fee_rate * remaining_ratio)
-
-    if safe_held_hours >= long_hold_bonus_start_hours:
-        return 1 + long_hold_bonus_rate
-
-    return 1.0

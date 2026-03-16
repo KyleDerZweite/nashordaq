@@ -37,11 +37,8 @@ class Settings(BaseSettings):
 
     # Economy
     starting_balance: float = 1000.0
-    short_hold_fee_rate: float = 0.02
-    short_hold_fee_window_hours: float = 6.0
-    long_hold_bonus_rate: float = 0.02
-    long_hold_bonus_start_hours: float = 12.0
-    buy_revert_grace_seconds: int = 60
+    min_hold_period_hours: float = 4.0
+    buy_revert_grace_seconds: int = 120
     gamba_min_hold_hours: float = 24.0
     gamba_max_hold_hours: float = 168.0
     gamba_settlement_multiplier_min: float = 2.0

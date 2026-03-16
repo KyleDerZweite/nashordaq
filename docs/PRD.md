@@ -14,7 +14,7 @@ A closed, trusted friend group. Public registration and email verification are o
 
 2. **Market Overview:** Users can view a dashboard listing all tracked LoL accounts with their current share price and last update time.
 
-3. **Trading:** Users can place buy or sell market orders for whole shares of tracked players. Orders execute immediately at the currently visible market price. Sell proceeds are adjusted by holding time (short-hold reduction and long-hold bonus). Executed buy orders can be reverted for full refund within a short grace period (configurable, default 60 seconds), as long as none of those shares were sold.
+3. **Trading:** Users can place buy or sell market orders for whole shares of tracked players. Orders execute immediately at the currently visible market price. Shares are locked for a minimum holding period (default 4 hours) after purchase before they can be sold. Executed buy orders can be reverted for full refund within a short grace period (configurable, default 120 seconds), as long as none of those shares were sold.
 
 4. **Portfolio Management:** Users can view their cash balance, owned shares with current market values, active Gamba exposure, outstanding bank debt, and total net worth.
 
