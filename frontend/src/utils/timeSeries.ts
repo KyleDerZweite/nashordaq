@@ -1,9 +1,10 @@
-export type ChartRange = 30 | 90 | "all";
+export type ChartRange = 1 | 7 | 30 | "all";
 
 export const CHART_RANGE_OPTIONS: Array<{ label: string; value: ChartRange }> =
   [
+    { label: "1D", value: 1 },
+    { label: "7D", value: 7 },
     { label: "30D", value: 30 },
-    { label: "90D", value: 90 },
     { label: "All", value: "all" },
   ];
 
