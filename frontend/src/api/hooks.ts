@@ -349,6 +349,7 @@ export function usePlaceOrder() {
       void qc.invalidateQueries({ queryKey: queryKeys.portfolio });
       void qc.invalidateQueries({ queryKey: queryKeys.user });
       void qc.invalidateQueries({ queryKey: queryKeys.balanceInsights });
+      void qc.invalidateQueries({ queryKey: queryKeys.players });
     },
   });
 }

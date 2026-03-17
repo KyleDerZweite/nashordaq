@@ -11,7 +11,6 @@ async def _onboard_bank_user(auth_client):
         json={
             "game_name": "bank-user",
             "tag_line": "EUW",
-            "display_name": "Bank User",
         },
     )
     assert onboard_resp.status_code == 200

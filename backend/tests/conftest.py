@@ -73,7 +73,11 @@ async def auth_client(db_engine):
     async with AsyncClient(
         transport=transport,
         base_url="http://test",
-        headers={"Remote-User": "testuser"},
+        headers={
+            "Remote-User": "testuser",
+            "Remote-Email": "testuser@test.dev",
+            "Remote-Name": "Test User",
+        },
     ) as ac:
         yield ac
     await app.state.http_client.aclose()
@@ -102,6 +106,8 @@ async def seeded_player(db_session):
     if user is None:
         user = User(
             username="testuser",
+            email="testuser@test.dev",
+            display_name="Test User",
             balance=settings.starting_balance,
             linked_player_id=player.id,
         )

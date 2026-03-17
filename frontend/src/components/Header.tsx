@@ -6,7 +6,7 @@ import { getStreamerSafeName } from "../utils/streamerMode";
 export default function Header({
   balance,
   netWorth = 0,
-  username,
+  displayName,
   playerDisplayName,
   playerGameName,
   canEditProfile = false,
@@ -20,7 +20,7 @@ export default function Header({
 }: {
   balance: number;
   netWorth?: number;
-  username?: string;
+  displayName?: string;
   playerDisplayName?: string;
   playerGameName?: string;
   canEditProfile?: boolean;
@@ -33,7 +33,7 @@ export default function Header({
   onToggleAdminView?: () => void;
 }) {
   const { isStreamerMode, toggleStreamerMode } = useStreamerMode();
-  const initial = username ? username[0].toUpperCase() : "?";
+  const initial = displayName ? displayName[0].toUpperCase() : "?";
   const [menuOpen, setMenuOpen] = useState(false);
 
   function handleEditProfile() {
@@ -90,7 +90,7 @@ export default function Header({
                     Signed in as
                   </p>
                   <p className="mt-1 break-all font-mono text-sm font-bold text-hex-white">
-                    {username ?? "Unknown User"}
+                    {displayName ?? "Unknown User"}
                   </p>
                   {(playerDisplayName || playerGameName) && (
                     <p className="mt-2 font-mono text-xs text-hex-bronze">

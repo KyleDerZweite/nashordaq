@@ -18,7 +18,7 @@ This is the primary instruction file for contributors and coding agents. Follow 
 ### Authentication / Security Model
 - Authentication is external (IAP + reverse proxy).
 - Never implement JWT issuance, password hashing, sessions, or login forms.
-- Backend identity source is the configured proxy header (`Remote-User` by default, matching Pangolin's forwarded headers).
+- Backend identity source is `Remote-Email` (stable key), with `Remote-Name` for display name and `Remote-User` as fallback (matching Pangolin's forwarded headers).
 - Keep security assumptions aligned with `docs/ARCHITECTURE.md` (trust boundary and hardening settings).
 
 ## 2) Canonical References

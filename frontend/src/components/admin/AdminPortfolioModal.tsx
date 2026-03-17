@@ -37,8 +37,8 @@ export default function AdminPortfolioModal({ userId, onClose }: Props) {
                       )
                     : data.linked_player_name
                   : isStreamerMode
-                    ? data.username
-                    : `${data.username} · No linked player`}
+                    ? data.display_name
+                    : `${data.display_name} · No linked player`}
               </p>
             )}
           </div>

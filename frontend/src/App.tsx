@@ -178,7 +178,7 @@ export default function App() {
           bankSummary?.debt_adjusted_net_worth ??
           balance
         }
-        username={user?.username}
+        displayName={user?.display_name}
         playerDisplayName={linkedPlayer?.display_name}
         playerGameName={linkedPlayer?.game_name}
         canEditProfile={Boolean(linkedPlayer) && !isAdmin}
@@ -470,14 +470,13 @@ export default function App() {
 
       {isProfileEditorOpen && linkedPlayer && (
         <PlayerProfileModal
-          key={`${linkedPlayer.id}-${linkedPlayer.game_name}-${linkedPlayer.tag_line}-${linkedPlayer.display_name}`}
+          key={`${linkedPlayer.id}-${linkedPlayer.game_name}-${linkedPlayer.tag_line}`}
           title="Update Your Summoner Profile"
-          description="Change your Riot game name, tag line, or display name."
+          description="Change your Riot game name or tag line."
           submitLabel="Save Changes"
           initialValues={{
             game_name: linkedPlayer.game_name,
             tag_line: linkedPlayer.tag_line,
-            display_name: linkedPlayer.display_name,
           }}
           isPending={updateUserProfile.isPending}
           errorMessage={

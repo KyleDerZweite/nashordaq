@@ -21,11 +21,14 @@ async def test_place_buy_order(auth_client, tradable_player):
     assert data["status"] == "EXECUTED"
     assert data["player_name"] == "Tradable Player"
     assert data["player_game_name"] == "TradablePlayer"
-    assert data["execution_price"] == 25.0
+    # Market impact: avg_fill = 25 * (1 + 2/(2*1000)) = 25.025
+    assert data["execution_price"] == pytest.approx(25.025)
 
     me_resp = await auth_client.get("/api/user/me")
     assert me_resp.status_code == 200
-    assert me_resp.json()["balance"] == settings.starting_balance - 50.0
+    assert me_resp.json()["balance"] == pytest.approx(
+        settings.starting_balance - 25.025 * 2
+    )
 
 
 async def test_place_buy_insufficient_balance(auth_client, tradable_player):
@@ -105,7 +108,6 @@ async def test_place_order_invalid_player(auth_client):
         json={
             "game_name": "invalid-user",
             "tag_line": "EUW",
-            "display_name": "Invalid User",
         },
     )
     assert onboard.status_code == 200
@@ -148,7 +150,6 @@ async def test_cancel_nonexistent_order(auth_client):
         json={
             "game_name": "cancel-user",
             "tag_line": "EUW",
-            "display_name": "Cancel User",
         },
     )
     assert onboard.status_code == 200
@@ -290,14 +291,17 @@ async def test_list_recent_orders_includes_all_players(
     async with AsyncClient(
         transport=transport,
         base_url="http://test",
-        headers={"Remote-User": "seconduser"},
+        headers={
+            "Remote-User": "seconduser",
+            "Remote-Email": "seconduser@test.dev",
+            "Remote-Name": "Second User",
+        },
     ) as second_user_client:
         second_onboarding = await second_user_client.post(
             "/api/user/onboarding",
             json={
                 "game_name": "secondrecent",
                 "tag_line": "EUW",
-                "display_name": "Second Recent",
             },
         )
         assert second_onboarding.status_code == 200
@@ -322,7 +326,7 @@ async def test_list_recent_orders_includes_all_players(
     assert len(data) >= 2
     assert {entry["user_name"] for entry in data[:2]} == {
         "Test Player",
-        "Second Recent",
+        "secondrecent",
     }
 
 
@@ -423,7 +427,9 @@ async def test_sell_allowed_after_hold_period(auth_client, tradable_player, db_s
         json={"player_id": tradable_player.id, "side": "SELL", "quantity": 10},
     )
     assert sell_resp.status_code == 201
-    assert sell_resp.json()["execution_price"] == 25.0
+    # After buy of 10, price moved to 25 * 1.01 = 25.25
+    # Sell avg_fill = 25.25 * (1 - 10/(2*1000)) = 25.25 * 0.995
+    assert sell_resp.json()["execution_price"] == pytest.approx(25.25 * 0.995)
 
 
 async def test_buy_lot_links_to_order(auth_client, tradable_player, db_session):
@@ -496,10 +502,14 @@ async def test_get_order_detail_sell_no_adjustment(
     detail_resp = await auth_client.get(f"/api/orders/{sell_resp.json()['id']}")
     assert detail_resp.status_code == 200
     data = detail_resp.json()
-    assert data["execution_price"] == pytest.approx(25.0)
-    assert data["gross_execution_price"] == pytest.approx(25.0)
-    assert data["gross_total_value"] == pytest.approx(250.0)
-    assert data["entry_total_value"] == pytest.approx(250.0)
-    assert data["adjustment_value"] == pytest.approx(0.0)
-    assert data["adjustment_reason"] is None
-    assert data["total_value"] == pytest.approx(250.0)
+    # After buy of 10, price = 25 * 1.01 = 25.25
+    # Sell avg_fill = 25.25 * (1 - 0.005) = 25.12375
+    sell_avg = 25.25 * 0.995
+    buy_avg = 25.0 * 1.005
+    assert data["execution_price"] == pytest.approx(sell_avg)
+    assert data["gross_execution_price"] == pytest.approx(25.25)
+    assert data["gross_total_value"] == pytest.approx(25.25 * 10)
+    assert data["entry_total_value"] == pytest.approx(buy_avg * 10)
+    assert data["adjustment_value"] == pytest.approx(sell_avg * 10 - 25.25 * 10)
+    assert data["adjustment_reason"] == "Market Impact"
+    assert data["total_value"] == pytest.approx(sell_avg * 10)

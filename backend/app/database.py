@@ -31,6 +31,18 @@ async def init_db() -> None:
 
         user_cols_result = await conn.execute(text("PRAGMA table_info(users)"))
         user_columns = {row[1] for row in user_cols_result.fetchall()}
+        if "email" not in user_columns:
+            await conn.execute(text("ALTER TABLE users ADD COLUMN email VARCHAR(255)"))
+            # Backfill email from username for existing rows
+            await conn.execute(text("UPDATE users SET email = username"))
+        if "display_name" not in user_columns:
+            await conn.execute(
+                text(
+                    "ALTER TABLE users ADD COLUMN display_name VARCHAR(255) DEFAULT ''"
+                )
+            )
+            # Backfill display_name from username for existing rows
+            await conn.execute(text("UPDATE users SET display_name = username"))
         if "linked_player_id" not in user_columns:
             await conn.execute(
                 text("ALTER TABLE users ADD COLUMN linked_player_id INTEGER")

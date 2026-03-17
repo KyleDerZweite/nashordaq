@@ -15,10 +15,12 @@ from app.models import (
     OrderSide,
     OrderSource,
     OrderStatus,
+    PriceHistory,
     TrackedPlayer,
     Transaction,
     User,
 )
+from app.pricing import calculate_market_impact
 from app.schemas import OrderCreate, OrderDetailResponse, OrderResponse
 
 router = APIRouter(tags=["orders"])
@@ -61,6 +63,27 @@ def _order_response(
     user_name: str | None = None,
     user_game_name: str | None = None,
 ) -> OrderResponse:
+    market_impact_pct: float | None = None
+    price_after_impact: float | None = None
+    if (
+        order.source == OrderSource.MANUAL
+        and order.gross_execution_price is not None
+        and order.execution_price is not None
+        and order.gross_execution_price > 0
+    ):
+        market_impact_pct = (
+            order.execution_price - order.gross_execution_price
+        ) / order.gross_execution_price
+        # Reconstruct post-trade price: impact_pct = Q/D, we stored avg = P*(1±i/2),
+        # so full impact is 2x the slippage direction.
+        impact_pct_full = abs(market_impact_pct) * 2
+        if order.side == OrderSide.BUY:
+            price_after_impact = order.gross_execution_price * (1 + impact_pct_full)
+        else:
+            price_after_impact = max(
+                order.gross_execution_price * (1 - impact_pct_full), 1.0
+            )
+
     return OrderResponse(
         id=order.id,
         player_id=order.player_id,
@@ -77,6 +100,8 @@ def _order_response(
         status=order.status,
         source=order.source,
         execution_price=order.execution_price,
+        market_impact_pct=market_impact_pct,
+        price_after_impact=price_after_impact,
         created_at=order.created_at,
         executed_at=order.executed_at,
     )
@@ -155,10 +180,13 @@ async def build_order_responses(
         user.id: (
             linked_player_identity_map.get(
                 user.linked_player_id,
-                (user.username, user.username),
+                (
+                    user.display_name or user.email or user.username,
+                    user.display_name or user.email or user.username,
+                ),
             )[0]
             if user.linked_player_id is not None
-            else user.username
+            else user.display_name or user.email or user.username
         )
         for user in users
     }
@@ -166,10 +194,13 @@ async def build_order_responses(
         user.id: (
             linked_player_identity_map.get(
                 user.linked_player_id,
-                (user.username, user.username),
+                (
+                    user.display_name or user.email or user.username,
+                    user.display_name or user.email or user.username,
+                ),
             )[1]
             if user.linked_player_id is not None
-            else user.username
+            else user.display_name or user.email or user.username
         )
         for user in users
     }
@@ -214,11 +245,16 @@ async def place_order(
                 detail="Player has not received a first market update yet",
             )
 
-        execution_price = player.current_price
+        market_price = player.current_price
+        avg_fill, new_market_price = calculate_market_impact(
+            market_price, body.quantity, "BUY"
+        )
+        execution_price = avg_fill
         total_cost = execution_price * body.quantity
         if user.balance < total_cost:
             raise HTTPException(status_code=400, detail="Insufficient balance")
         user.balance -= total_cost
+        player.current_price = new_market_price
 
         holding = await _get_or_create_holding(session, user.id, body.player_id)
         holding.quantity += body.quantity
@@ -232,11 +268,11 @@ async def place_order(
             status=OrderStatus.EXECUTED,
             source=OrderSource.MANUAL,
             execution_price=execution_price,
-            gross_execution_price=execution_price,
-            gross_total_value=total_cost,
+            gross_execution_price=market_price,
+            gross_total_value=market_price * body.quantity,
             entry_total_value=total_cost,
-            adjustment_value=0.0,
-            adjustment_reason=None,
+            adjustment_value=total_cost - (market_price * body.quantity),
+            adjustment_reason="Market Impact",
             executed_at=now,
         )
         session.add(order)
@@ -261,6 +297,14 @@ async def place_order(
                 quantity=body.quantity,
                 price=execution_price,
                 total=total_cost,
+            )
+        )
+
+        session.add(
+            PriceHistory(
+                player_id=body.player_id,
+                price=new_market_price,
+                lp_abs=player.lp_abs,
             )
         )
     else:
@@ -295,7 +339,11 @@ async def place_order(
 
         min_hold_deadline = now - timedelta(hours=settings.min_hold_period_hours)
         remaining = body.quantity
-        execution_price = player.current_price
+        market_price = player.current_price
+        avg_fill, new_market_price = calculate_market_impact(
+            market_price, body.quantity, "SELL"
+        )
+        execution_price = avg_fill
         total_value = execution_price * body.quantity
         entry_total_value = 0.0
 
@@ -341,6 +389,7 @@ async def place_order(
 
         holding.quantity -= body.quantity
         user.balance += total_value
+        player.current_price = new_market_price
 
         order = Order(
             user_id=user.id,
@@ -351,11 +400,11 @@ async def place_order(
             status=OrderStatus.EXECUTED,
             source=OrderSource.MANUAL,
             execution_price=execution_price,
-            gross_execution_price=execution_price,
-            gross_total_value=total_value,
+            gross_execution_price=market_price,
+            gross_total_value=market_price * body.quantity,
             entry_total_value=entry_total_value,
-            adjustment_value=0.0,
-            adjustment_reason=None,
+            adjustment_value=total_value - (market_price * body.quantity),
+            adjustment_reason="Market Impact",
             executed_at=now,
         )
         session.add(order)
@@ -370,6 +419,14 @@ async def place_order(
                 quantity=body.quantity,
                 price=execution_price,
                 total=total_value,
+            )
+        )
+
+        session.add(
+            PriceHistory(
+                player_id=body.player_id,
+                price=new_market_price,
+                lp_abs=player.lp_abs,
             )
         )
 
@@ -440,8 +497,8 @@ async def get_order_detail(
     if player is None or order_user is None:
         raise HTTPException(status_code=404, detail="Order not found")
 
-    user_name = order_user.username
-    user_game_name = order_user.username
+    user_name = order_user.display_name or order_user.email or order_user.username
+    user_game_name = user_name
     if order_user.linked_player_id is not None:
         linked_player_result = await session.execute(
             select(TrackedPlayer).where(TrackedPlayer.id == order_user.linked_player_id)
@@ -534,6 +591,21 @@ async def cancel_order(
     holding.quantity -= order.quantity
     user.balance += refund_total
     order.status = OrderStatus.REVERTED
+
+    # Reverse the market impact: the original BUY pushed price up, so we
+    # apply a reverse SELL impact of the same size to undo it.
+    _, reverted_price = calculate_market_impact(
+        player.current_price, order.quantity, "SELL"
+    )
+    player.current_price = reverted_price
+
+    session.add(
+        PriceHistory(
+            player_id=order.player_id,
+            price=reverted_price,
+            lp_abs=player.lp_abs,
+        )
+    )
 
     await session.commit()
     await session.refresh(order)

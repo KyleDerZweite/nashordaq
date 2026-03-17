@@ -9,7 +9,8 @@ async def test_auto_provision_new_user(auth_client):
     resp = await auth_client.get("/api/user/me")
     assert resp.status_code == 200
     data = resp.json()
-    assert data["username"] == "testuser"
+    assert data["email"] == "testuser@test.dev"
+    assert data["display_name"] == "Test User"
     assert data["role"] == "player"
     assert data["balance"] == settings.starting_balance
     assert data["linked_player_id"] is None
@@ -41,7 +42,6 @@ async def test_complete_onboarding(auth_client):
         json={
             "game_name": "mySummoner",
             "tag_line": "EUW",
-            "display_name": "My Summoner",
         },
     )
     assert resp.status_code == 200
@@ -56,7 +56,6 @@ async def test_complete_onboarding_duplicate_player(auth_client):
         json={
             "game_name": "dupeName",
             "tag_line": "EUW",
-            "display_name": "Dupe",
         },
     )
     assert first.status_code == 200
@@ -65,14 +64,17 @@ async def test_complete_onboarding_duplicate_player(auth_client):
     async with AsyncClient(
         transport=transport,
         base_url="http://test",
-        headers={"Remote-User": "seconduser"},
+        headers={
+            "Remote-User": "seconduser",
+            "Remote-Email": "seconduser@test.dev",
+            "Remote-Name": "Second User",
+        },
     ) as second_user_client:
         second = await second_user_client.post(
             "/api/user/onboarding",
             json={
                 "game_name": "dupeName",
                 "tag_line": "EUW",
-                "display_name": "Dupe 2",
             },
         )
     assert second.status_code == 409
@@ -84,7 +86,6 @@ async def test_onboarding_twice_rejected(auth_client):
         json={
             "game_name": "onceonly",
             "tag_line": "EUW",
-            "display_name": "Once",
         },
     )
     assert first.status_code == 200
@@ -94,7 +95,6 @@ async def test_onboarding_twice_rejected(auth_client):
         json={
             "game_name": "another",
             "tag_line": "EUW",
-            "display_name": "Another",
         },
     )
     assert second.status_code == 409
@@ -106,7 +106,6 @@ async def test_onboarding_tagline_with_hash_is_accepted(auth_client):
         json={
             "game_name": "hashuser",
             "tag_line": "#EUW",
-            "display_name": "Hash User",
         },
     )
     assert resp.status_code == 200
@@ -115,7 +114,7 @@ async def test_onboarding_tagline_with_hash_is_accepted(auth_client):
 
 
 async def test_admin_user_role_and_onboarding_blocked(auth_client, monkeypatch):
-    monkeypatch.setattr(settings, "admin_remote_users", "testuser")
+    monkeypatch.setattr(settings, "admin_remote_users", "testuser@test.dev")
 
     me_resp = await auth_client.get("/api/user/me")
     assert me_resp.status_code == 200
@@ -126,7 +125,6 @@ async def test_admin_user_role_and_onboarding_blocked(auth_client, monkeypatch):
         json={
             "game_name": "viewer",
             "tag_line": "EUW",
-            "display_name": "Viewer",
         },
     )
     assert onboarding_resp.status_code == 403
@@ -150,7 +148,6 @@ async def test_onboarding_initializes_market_price(auth_client, monkeypatch):
         json={
             "game_name": "priceduser",
             "tag_line": "EUW",
-            "display_name": "Priced User",
         },
     )
 
@@ -175,7 +172,6 @@ async def test_update_profile(auth_client):
         json={
             "game_name": "beforeupdate",
             "tag_line": "EUW",
-            "display_name": "Before Update",
         },
     )
     assert onboard_resp.status_code == 200
@@ -185,7 +181,6 @@ async def test_update_profile(auth_client):
         json={
             "game_name": "afterupdate",
             "tag_line": "EUW",
-            "display_name": "After Update",
         },
     )
     assert update_resp.status_code == 200
@@ -194,7 +189,7 @@ async def test_update_profile(auth_client):
     assert players_resp.status_code == 200
     players = players_resp.json()
     assert players[0]["game_name"] == "afterupdate"
-    assert players[0]["display_name"] == "After Update"
+    assert players[0]["display_name"] == "afterupdate"
 
 
 async def test_update_profile_duplicate_player_rejected(auth_client):
@@ -203,7 +198,6 @@ async def test_update_profile_duplicate_player_rejected(auth_client):
         json={
             "game_name": "firstplayer",
             "tag_line": "EUW",
-            "display_name": "First Player",
         },
     )
     assert first.status_code == 200
@@ -212,14 +206,17 @@ async def test_update_profile_duplicate_player_rejected(auth_client):
     async with AsyncClient(
         transport=transport,
         base_url="http://test",
-        headers={"Remote-User": "seconduser"},
+        headers={
+            "Remote-User": "seconduser",
+            "Remote-Email": "seconduser@test.dev",
+            "Remote-Name": "Second User",
+        },
     ) as second_user_client:
         second = await second_user_client.post(
             "/api/user/onboarding",
             json={
                 "game_name": "secondplayer",
                 "tag_line": "EUW",
-                "display_name": "Second Player",
             },
         )
         assert second.status_code == 200
@@ -229,7 +226,6 @@ async def test_update_profile_duplicate_player_rejected(auth_client):
             json={
                 "game_name": "firstplayer",
                 "tag_line": "EUW",
-                "display_name": "Collision",
             },
         )
 
@@ -237,14 +233,13 @@ async def test_update_profile_duplicate_player_rejected(auth_client):
 
 
 async def test_admin_user_profile_update_blocked(auth_client, monkeypatch):
-    monkeypatch.setattr(settings, "admin_remote_users", "testuser")
+    monkeypatch.setattr(settings, "admin_remote_users", "testuser@test.dev")
 
     update_resp = await auth_client.put(
         "/api/user/profile",
         json={
             "game_name": "viewer",
             "tag_line": "EUW",
-            "display_name": "Viewer",
         },
     )
     assert update_resp.status_code == 403

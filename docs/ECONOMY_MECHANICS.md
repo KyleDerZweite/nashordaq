@@ -138,34 +138,64 @@ Implementation: `app/scheduler.py::market_update_job()` (inactivity branch)
 
 Implementation: `app/pricing.py::calculate_new_price()`, `calculate_win_rate()`, `update_streak()`, `app/scheduler.py::_learn_player_lp_averages()`, `_attribute_lp_to_matches()`, `_apply_per_match_price_updates()`
 
-## 4. Immediate Execution + Holding Adjustment
+## 4. Immediate Execution + Market Impact
 
-Orders execute immediately at the currently visible market price.
+Orders execute immediately with market impact: buying pushes the price up, selling pushes it down. The impact is proportional to order size.
 
-1. User submits a buy or sell order via the API.
-2. Order is executed immediately and stored with status `EXECUTED`.
-3. **BUY:** User balance is deducted at execution and shares are added instantly.
-4. **SELL:** Shares are removed instantly and proceeds are calculated with a holding-duration multiplier per consumed lot (FIFO lots).
-5. Every execution writes a `Transaction` row.
+### Market Impact
+
+Each trade moves the market price based on a configurable liquidity depth parameter:
+
+```
+impact_pct = quantity / liquidity_depth
+
+BUY:
+  avg_execution_price = P * (1 + impact_pct / 2)
+  new_market_price    = P * (1 + impact_pct)
+
+SELL:
+  avg_execution_price = P * (1 - impact_pct / 2)
+  new_market_price    = max(P * (1 - impact_pct), 1.0)
+```
+
+The buyer/seller pays/receives the average price across the impact ramp (the `/ 2` midpoint), not the pre-trade or post-trade price. The market price updates to the post-trade level for all subsequent viewers.
+
+Current default: `market_impact_liquidity_depth = 1000`
+
+| Order Size | Impact % | Avg Slippage |
+|---|---|---|
+| 5 shares | 0.5% | 0.25% |
+| 10 shares | 1% | 0.5% |
+| 50 shares | 5% | 2.5% |
+| 100 shares | 10% | 5% |
+| 300 shares | 30% | 15% |
+
+A round-trip (buy then sell the same quantity) always loses money to slippage. The only way to profit is if LP-driven price movement exceeds the round-trip cost.
+
+Order splitting does not help: each sub-order moves the price, and subsequent sub-orders face the moved price. Due to compounding, splitting is slightly more expensive than a single large order.
+
+**Exemptions:** Gamba (system-generated) orders do not apply market impact. Only `MANUAL` source orders move the market.
+
+Each trade records a `PriceHistory` row so the price chart reflects trade-driven movements.
 
 ### Minimum Holding Period
 
-After buying shares, those shares cannot be sold for a configurable period (default: 4 hours). The lock is per-lot (FIFO): buying 10 shares at 09:00 and 10 more at 11:00 means the first batch unlocks at 13:00, the second at 15:00. Sells execute at the current market price with no fee or bonus adjustment.
+After buying shares, those shares cannot be sold for a configurable period (default: 4 hours). The lock is per-lot (FIFO): buying 10 shares at 09:00 and 10 more at 11:00 means the first batch unlocks at 13:00, the second at 15:00.
 
 ### Buy Revert Grace Period
 
 - Executed BUY orders can be reverted via order cancellation during a short grace window (default: 120 seconds).
-- Revert refunds exactly `execution_price * quantity`.
+- Revert refunds exactly `execution_price * quantity` and reverses the market impact (price is pushed back down).
 - Revert is only allowed if shares from that BUY lot were not sold yet.
 - Reverted orders are marked with status `REVERTED`.
 
-Implementation: `app/routers/orders.py::place_order()`
+Implementation: `app/pricing.py::calculate_market_impact()`, `app/routers/orders.py::place_order()`
 
 ## 5. Order Validation at Placement
 
 Orders are validated and executed in the same request.
 
-- **BUY:** `current_price * quantity` must not exceed user balance.
+- **BUY:** `avg_execution_price * quantity` (including market impact) must not exceed user balance.
 - **SELL:** Available shares must be sufficient.
 
 ## 6. Bank Failsafe

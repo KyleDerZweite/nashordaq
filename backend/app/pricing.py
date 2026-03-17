@@ -135,6 +135,38 @@ def calculate_new_price(
     return max(new_price, PRICE_FLOOR)
 
 
+def calculate_market_impact(
+    price: float,
+    quantity: int,
+    side: str,
+    liquidity_depth: int | None = None,
+) -> tuple[float, float]:
+    """Calculate market impact for a trade.
+
+    Returns (avg_execution_price, new_market_price).
+    """
+    if liquidity_depth is not None:
+        depth = liquidity_depth
+    else:
+        depth = settings.market_impact_liquidity_depth
+    if depth <= 0 or quantity <= 0:
+        return price, price
+
+    impact_pct = quantity / depth
+
+    if side == "BUY":
+        avg_price = price * (1 + impact_pct / 2)
+        new_price = price * (1 + impact_pct)
+    else:
+        avg_price = price * (1 - impact_pct / 2)
+        new_price = price * (1 - impact_pct)
+
+    new_price = max(new_price, PRICE_FLOOR)
+    avg_price = max(avg_price, PRICE_FLOOR)
+
+    return avg_price, new_price
+
+
 def update_streak(old_streak: int, delta_lp: int) -> int:
     max_effective_streak = _max_effective_streak()
 

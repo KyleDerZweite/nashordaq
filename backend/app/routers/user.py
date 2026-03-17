@@ -34,20 +34,14 @@ logger = logging.getLogger(__name__)
 def _normalize_player_identity(
     game_name: str,
     tag_line: str,
-    display_name: str,
-) -> tuple[str, str, str]:
+) -> tuple[str, str]:
     normalized_game_name = game_name.strip()
     normalized_tag_line = tag_line.strip().lstrip("#")
-    normalized_display_name = display_name.strip()
 
-    if (
-        not normalized_game_name
-        or not normalized_tag_line
-        or not normalized_display_name
-    ):
+    if not normalized_game_name or not normalized_tag_line:
         raise HTTPException(status_code=400, detail="All fields are required")
 
-    return normalized_game_name, normalized_tag_line, normalized_display_name
+    return normalized_game_name, normalized_tag_line
 
 
 async def _initialize_player_market_state(
@@ -122,10 +116,12 @@ async def _initialize_player_market_state(
 
 
 def _to_user_response(user: User) -> UserResponse:
+    identity = user.email or user.username
     return UserResponse(
         id=user.id,
-        username=user.username,
-        role=get_user_role(user.username),
+        email=identity,
+        display_name=user.display_name or identity,
+        role=get_user_role(identity),
         balance=user.balance,
         linked_player_id=user.linked_player_id,
         onboarding_complete=user.linked_player_id is not None,
@@ -184,10 +180,9 @@ async def complete_onboarding(
     if user.linked_player_id is not None:
         raise HTTPException(status_code=409, detail="Onboarding already completed")
 
-    game_name, tag_line, display_name = _normalize_player_identity(
+    game_name, tag_line = _normalize_player_identity(
         body.game_name,
         body.tag_line,
-        body.display_name,
     )
 
     existing_result = await session.execute(
@@ -203,7 +198,7 @@ async def complete_onboarding(
     player = TrackedPlayer(
         game_name=game_name,
         tag_line=tag_line,
-        display_name=display_name,
+        display_name=game_name,
     )
     session.add(player)
     await session.flush()
@@ -248,10 +243,9 @@ async def update_profile(
     if player is None:
         raise HTTPException(status_code=404, detail="Linked player not found")
 
-    game_name, tag_line, display_name = _normalize_player_identity(
+    game_name, tag_line = _normalize_player_identity(
         body.game_name,
         body.tag_line,
-        body.display_name,
     )
 
     existing_result = await session.execute(
@@ -267,7 +261,7 @@ async def update_profile(
 
     player.game_name = game_name
     player.tag_line = tag_line
-    player.display_name = display_name
+    player.display_name = game_name
 
     await _initialize_player_market_state(request, session, player)
     await record_user_wealth_snapshot(

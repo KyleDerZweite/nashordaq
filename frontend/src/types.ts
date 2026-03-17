@@ -19,7 +19,8 @@ export type UserWealthSnapshotSource =
 
 export interface UserResponse {
   id: number;
-  username: string;
+  email: string;
+  display_name: string;
   role: "player" | "admin";
   balance: number;
   linked_player_id: number | null;
@@ -106,13 +107,11 @@ export interface BalanceInsightsResponse {
 export interface UserOnboardingCreate {
   game_name: string;
   tag_line: string;
-  display_name: string;
 }
 
 export interface UserProfileUpdate {
   game_name: string;
   tag_line: string;
-  display_name: string;
 }
 
 export interface PriceHistoryEntry {
@@ -156,6 +155,8 @@ export interface OrderResponse {
   status: OrderStatus;
   source: OrderSource;
   execution_price: number | null;
+  market_impact_pct: number | null;
+  price_after_impact: number | null;
   created_at: string;
   executed_at: string | null;
 }
@@ -229,7 +230,8 @@ export interface AdminOverviewResponse {
 
 export interface AdminUserSummaryResponse {
   id: number;
-  username: string;
+  email: string;
+  display_name: string;
   role: "player" | "admin";
   linked_player_id: number | null;
   linked_player_name: string | null;
@@ -245,7 +247,8 @@ export interface AdminUserSummaryResponse {
 
 export interface AdminUserPortfolioResponse {
   user_id: number;
-  username: string;
+  email: string;
+  display_name: string;
   role: "player" | "admin";
   linked_player_id: number | null;
   linked_player_name: string | null;
@@ -294,7 +297,7 @@ export interface AdminPlayerInsightResponse {
   game_name: string;
   tag_line: string;
   linked_user_id: number | null;
-  linked_username: string | null;
+  linked_user_display_name: string | null;
   linked_user_balance: number | null;
   linked_user_holdings_value: number | null;
   linked_user_active_gamba_value: number | null;

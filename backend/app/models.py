@@ -68,6 +68,10 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     username: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    email: Mapped[str | None] = mapped_column(
+        String(255), unique=True, index=True, default=None
+    )
+    display_name: Mapped[str] = mapped_column(String(255), default="")
     balance: Mapped[float] = mapped_column(Float, default=1000.0)
     debt_principal: Mapped[float] = mapped_column(Float, default=0.0)
     debt_accrued_interest: Mapped[float] = mapped_column(Float, default=0.0)

@@ -28,13 +28,33 @@ export default function TradeTerminal({
 
   const isBuy = side === "BUY";
   const hasInitialUpdate = player.last_updated !== null;
+
+  const LIQUIDITY_DEPTH = 1000;
+  const impactPct = quantity / LIQUIDITY_DEPTH;
+  const avgFillPrice = isBuy
+    ? player.current_price * (1 + impactPct / 2)
+    : player.current_price * (1 - impactPct / 2);
+  const priceAfterTrade = isBuy
+    ? player.current_price * (1 + impactPct)
+    : Math.max(player.current_price * (1 - impactPct), 1);
+
+  // Solve P*Q*(1 + Q/(2D)) = B for Q using the quadratic formula.
   const maxBuyQuantity =
-    player.current_price > 0 ? Math.floor(balance / player.current_price) : 0;
+    player.current_price > 0
+      ? Math.floor(
+          LIQUIDITY_DEPTH *
+            (-1 +
+              Math.sqrt(
+                1 + (2 * balance) / (player.current_price * LIQUIDITY_DEPTH),
+              )),
+        )
+      : 0;
   const maxSellQuantity = ownedQuantity;
   const effectiveMaxBuyQuantity = isOwnStock ? 0 : maxBuyQuantity;
   const maxQuantity = isBuy ? effectiveMaxBuyQuantity : maxSellQuantity;
-  const estimatedTotal = player.current_price * quantity;
+  const estimatedTotal = avgFillPrice * quantity;
   const canAfford = balance >= estimatedTotal;
+  const showImpact = impactPct >= 0.005;
   const exceedsHoldings = !isBuy && quantity > maxSellQuantity;
   const canSubmit =
     quantity >= 1 &&
@@ -152,16 +172,51 @@ export default function TradeTerminal({
           </div>
 
           {/* Estimate */}
-          <div className="flex items-baseline justify-between border-t-2 border-hex-border pt-3">
-            <span className="font-mono text-xs uppercase tracking-wider text-hex-bronze">
-              Est. Total
-            </span>
-            <span
-              className={`font-mono text-lg font-bold ${canAfford ? "text-hex-gold" : "text-hex-zaun"}`}
-            >
-              {formatAmount(estimatedTotal)}
-              <span className="ml-1 text-xs text-hex-bronze">P</span>
-            </span>
+          <div className="space-y-2 border-t-2 border-hex-border pt-3">
+            <div className="flex items-baseline justify-between">
+              <span className="font-mono text-xs uppercase tracking-wider text-hex-bronze">
+                Avg Fill Price
+              </span>
+              <span className="font-mono text-sm text-hex-white">
+                {formatAmount(avgFillPrice)}
+                <span className="ml-1 text-xs text-hex-bronze">P</span>
+              </span>
+            </div>
+            {showImpact && (
+              <>
+                <div className="flex items-baseline justify-between">
+                  <span className="font-mono text-xs uppercase tracking-wider text-hex-bronze">
+                    Market Impact
+                  </span>
+                  <span
+                    className={`font-mono text-xs font-bold ${isBuy ? "text-hex-magic" : "text-hex-zaun"}`}
+                  >
+                    {isBuy ? "+" : "-"}
+                    {(impactPct * 100).toFixed(1)}%
+                  </span>
+                </div>
+                <div className="flex items-baseline justify-between">
+                  <span className="font-mono text-xs uppercase tracking-wider text-hex-bronze">
+                    Price After
+                  </span>
+                  <span className="font-mono text-xs text-hex-bronze">
+                    {formatAmount(priceAfterTrade)}
+                    <span className="ml-1">P</span>
+                  </span>
+                </div>
+              </>
+            )}
+            <div className="flex items-baseline justify-between">
+              <span className="font-mono text-xs uppercase tracking-wider text-hex-bronze">
+                Est. Total
+              </span>
+              <span
+                className={`font-mono text-lg font-bold ${canAfford ? "text-hex-gold" : "text-hex-zaun"}`}
+              >
+                {formatAmount(estimatedTotal)}
+                <span className="ml-1 text-xs text-hex-bronze">P</span>
+              </span>
+            </div>
           </div>
 
           {/* Error */}

@@ -22,7 +22,8 @@ MarketStatus = Literal["healthy", "degraded", "idle"]
 
 class UserResponse(BaseModel):
     id: int
-    username: str
+    email: str
+    display_name: str
     role: UserRole
     balance: float
     linked_player_id: int | None
@@ -109,13 +110,11 @@ class BalanceInsightsResponse(BaseModel):
 class UserOnboardingCreate(BaseModel):
     game_name: str = Field(min_length=1, max_length=255)
     tag_line: str = Field(min_length=1, max_length=10)
-    display_name: str = Field(min_length=1, max_length=255)
 
 
 class UserProfileUpdate(BaseModel):
     game_name: str = Field(min_length=1, max_length=255)
     tag_line: str = Field(min_length=1, max_length=10)
-    display_name: str = Field(min_length=1, max_length=255)
 
 
 class PriceHistoryEntry(BaseModel):
@@ -159,6 +158,8 @@ class OrderResponse(BaseModel):
     status: OrderStatus
     source: OrderSource
     execution_price: float | None
+    market_impact_pct: float | None = None
+    price_after_impact: float | None = None
     created_at: datetime
     executed_at: datetime | None
 
@@ -232,7 +233,8 @@ class AdminOverviewResponse(BaseModel):
 
 class AdminUserSummaryResponse(BaseModel):
     id: int
-    username: str
+    email: str
+    display_name: str
     role: UserRole
     linked_player_id: int | None
     linked_player_name: str | None
@@ -248,7 +250,8 @@ class AdminUserSummaryResponse(BaseModel):
 
 class AdminUserPortfolioResponse(BaseModel):
     user_id: int
-    username: str
+    email: str
+    display_name: str
     role: UserRole
     linked_player_id: int | None
     linked_player_name: str | None
@@ -295,7 +298,7 @@ class AdminPlayerInsightResponse(BaseModel):
     game_name: str
     tag_line: str
     linked_user_id: int | None
-    linked_username: str | None
+    linked_user_display_name: str | None
     linked_user_balance: float | None
     linked_user_holdings_value: float | None
     linked_user_active_gamba_value: float | None

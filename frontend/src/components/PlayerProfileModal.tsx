@@ -26,9 +26,6 @@ export default function PlayerProfileModal({
 }: Props) {
   const [gameName, setGameName] = useState(initialValues?.game_name ?? "");
   const [tagLine, setTagLine] = useState(initialValues?.tag_line ?? "");
-  const [displayName, setDisplayName] = useState(
-    initialValues?.display_name ?? "",
-  );
   const [isCheckingProfile, setIsCheckingProfile] = useState(false);
   const [lookupErrorMessage, setLookupErrorMessage] = useState<string>();
 
@@ -37,7 +34,6 @@ export default function PlayerProfileModal({
     const payload = {
       game_name: gameName.trim(),
       tag_line: tagLine.trim().replace(/^#/, ""),
-      display_name: displayName.trim(),
     };
 
     setLookupErrorMessage(undefined);
@@ -72,10 +68,7 @@ export default function PlayerProfileModal({
     }
   }
 
-  const canSubmit =
-    gameName.trim().length > 0 &&
-    tagLine.trim().length > 0 &&
-    displayName.trim().length > 0;
+  const canSubmit = gameName.trim().length > 0 && tagLine.trim().length > 0;
   const isBusy = isPending || isCheckingProfile;
 
   return (
@@ -136,21 +129,6 @@ export default function PlayerProfileModal({
                 setLookupErrorMessage(undefined);
               }}
               placeholder="EUW"
-              className="w-full border-2 border-hex-border bg-hex-bg px-3 py-2 font-mono text-sm text-hex-white outline-none focus:border-hex-gold"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block font-mono text-xs uppercase tracking-wider text-hex-bronze">
-              Display Name
-            </label>
-            <input
-              type="text"
-              value={displayName}
-              onChange={(e) => {
-                setDisplayName(e.target.value);
-                setLookupErrorMessage(undefined);
-              }}
               className="w-full border-2 border-hex-border bg-hex-bg px-3 py-2 font-mono text-sm text-hex-white outline-none focus:border-hex-gold"
             />
           </div>

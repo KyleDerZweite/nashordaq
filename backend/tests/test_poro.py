@@ -21,7 +21,6 @@ async def _onboard_poro_user(auth_client):
         json={
             "game_name": "poro-user",
             "tag_line": "EUW",
-            "display_name": "Poro User",
         },
     )
     assert onboard_resp.status_code == 200

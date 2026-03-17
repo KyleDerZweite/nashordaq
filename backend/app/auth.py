@@ -40,48 +40,78 @@ def _is_trusted_proxy_request(request: Request) -> bool:
     )
 
 
-def get_user_role(username: str) -> UserRole:
+def get_user_role(email: str) -> UserRole:
     configured_admin_users = tuple(
         candidate.strip().casefold()
         for candidate in settings.admin_remote_users.split(",")
         if candidate.strip()
     )
-    if username.casefold() in configured_admin_users:
+    if email.casefold() in configured_admin_users:
         return "admin"
     return "player"
 
 
-def is_admin_username(username: str) -> bool:
-    return get_user_role(username) == "admin"
+def is_admin_email(email: str) -> bool:
+    return get_user_role(email) == "admin"
 
 
 def is_admin_user(user: User) -> bool:
-    return is_admin_username(user.username)
+    return is_admin_email(user.email or user.username)
 
 
 async def _get_current_user(request: Request, session: SessionDep) -> User:
     if not _is_trusted_proxy_request(request):
         raise HTTPException(status_code=403, detail="Untrusted proxy source")
 
-    username = request.headers.get(settings.auth_header)
-    if not username:
+    email = request.headers.get(settings.remote_email_header)
+    display_name = request.headers.get(settings.remote_name_header, "")
+    # Fallback: legacy setups that only have Remote-User
+    username = request.headers.get(settings.auth_header, "")
+
+    if not email and not username:
         raise HTTPException(status_code=401, detail="Missing authentication header")
 
-    result = await session.execute(select(User).where(User.username == username))
-    user = result.scalar_one_or_none()
+    user: User | None = None
+
+    if email:
+        result = await session.execute(select(User).where(User.email == email))
+        user = result.scalar_one_or_none()
+
+    # Fallback: try username lookup for pre-migration users without email
+    if user is None and username:
+        result = await session.execute(select(User).where(User.username == username))
+        user = result.scalar_one_or_none()
+        # Backfill email on first login with the new header
+        if user is not None and email and user.email is None:
+            user.email = email
 
     if user is None:
-        user = User(username=username, balance=settings.starting_balance)
+        identity = email or username
+        user = User(
+            username=username or email,
+            email=email,
+            display_name=display_name or email or username,
+            balance=settings.starting_balance,
+        )
         session.add(user)
         try:
             await session.commit()
             await session.refresh(user)
         except IntegrityError:
             await session.rollback()
-            result = await session.execute(
-                select(User).where(User.username == username)
-            )
+            if email:
+                result = await session.execute(select(User).where(User.email == email))
+            else:
+                result = await session.execute(
+                    select(User).where(User.username == identity)
+                )
             user = result.scalar_one()
+
+    # Update display name from Zitadel if it changed
+    if display_name and user.display_name != display_name:
+        user.display_name = display_name
+        await session.commit()
+        await session.refresh(user)
 
     return user
 

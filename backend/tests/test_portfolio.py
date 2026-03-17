@@ -1,3 +1,5 @@
+import pytest
+
 from app.config import settings
 from app.models import Holding
 
@@ -8,7 +10,6 @@ async def test_empty_portfolio(auth_client):
         json={
             "game_name": "portfolio-user",
             "tag_line": "EUW",
-            "display_name": "Portfolio User",
         },
     )
     assert onboard.status_code == 200
@@ -68,12 +69,18 @@ async def test_portfolio_shows_buy_price_vs_current(
     assert resp.status_code == 200
     data = resp.json()
 
+    # Market impact: buy 2 at 25 → avg_fill = 25 * (1 + 2/(2*1000)) = 25.025
+    avg_buy = 25.025
+    cost = avg_buy * 2
+
     assert len(data["holdings"]) == 1
     assert data["holdings"][0]["player_game_name"] == "TradablePlayer"
-    assert data["holdings"][0]["average_buy_price"] == 25.0
+    assert data["holdings"][0]["average_buy_price"] == pytest.approx(avg_buy)
     assert data["holdings"][0]["current_price"] == 30.0
-    assert data["holdings"][0]["cost_basis"] == 50.0
+    assert data["holdings"][0]["cost_basis"] == pytest.approx(cost)
     assert data["holdings"][0]["market_value"] == 60.0
-    assert data["holdings"][0]["unrealized_pnl"] == 10.0
-    assert data["holdings"][0]["unrealized_pnl_pct"] == 20.0
+    assert data["holdings"][0]["unrealized_pnl"] == pytest.approx(60.0 - cost)
+    assert data["holdings"][0]["unrealized_pnl_pct"] == pytest.approx(
+        (60.0 - cost) / cost * 100
+    )
     assert data["holdings_value"] == 60.0

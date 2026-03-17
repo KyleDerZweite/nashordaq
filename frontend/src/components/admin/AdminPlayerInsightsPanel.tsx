@@ -246,8 +246,10 @@ export default function AdminPlayerInsightsPanel({ insights }: Props) {
                 <div className="mt-4 grid gap-3 md:grid-cols-2">
                   {[
                     {
-                      label: "Linked Username",
-                      value: selectedInsight.linked_username ?? "Not linked",
+                      label: "Linked User",
+                      value:
+                        selectedInsight.linked_user_display_name ??
+                        "Not linked",
                     },
                     {
                       label: "Net Worth",

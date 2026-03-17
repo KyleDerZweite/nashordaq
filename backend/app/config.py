@@ -29,8 +29,10 @@ class Settings(BaseSettings):
     http_timeout_seconds: float = 10.0
     http_connect_timeout_seconds: float = 5.0
 
-    # Auth (header injected by reverse proxy / Pangolin)
+    # Auth (headers injected by reverse proxy / Pangolin)
     auth_header: str = "Remote-User"
+    remote_email_header: str = "Remote-Email"
+    remote_name_header: str = "Remote-Name"
     admin_remote_users: str = ""
     enforce_trusted_proxy: bool = False
     trusted_proxy_cidrs: str = "127.0.0.1/32,::1/128"
@@ -53,6 +55,7 @@ class Settings(BaseSettings):
     pricing_beta_negative: float = 0.06
     pricing_loss_move_multiplier: float = 1.10
     pricing_low_price_threshold: float = 15.0
+    market_impact_liquidity_depth: int = 1000
     pricing_win_streak_lp_ratio_default: float = 0.85
     pricing_win_streak_lp_ratio_min: float = 0.3
     pricing_win_streak_lp_ratio_max: float = 1.0

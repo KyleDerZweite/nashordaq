@@ -187,11 +187,11 @@ export default function AdminDashboard({
                                 user.linked_player_name,
                               )
                             : user.linked_player_name
-                          : user.username}
+                          : user.display_name}
                       </div>
                       {!isStreamerMode && (
                         <div className="text-[11px] text-hex-bronze">
-                          {user.username}
+                          {user.display_name}
                         </div>
                       )}
                     </td>

@@ -71,10 +71,12 @@ async def _build_admin_user_portfolio_response(
 
     snapshot = await build_account_snapshot(session, user)
 
+    identity = user.email or user.username
     return AdminUserPortfolioResponse(
         user_id=user.id,
-        username=user.username,
-        role=get_user_role(user.username),
+        email=identity,
+        display_name=user.display_name or identity,
+        role=get_user_role(identity),
         linked_player_id=user.linked_player_id,
         linked_player_name=linked_player_name,
         linked_player_game_name=linked_player_game_name,
@@ -171,7 +173,7 @@ async def get_admin_overview(
         total_debt_outstanding += snapshot.debt_outstanding
         if user.linked_player_id is not None:
             onboarded_users += 1
-        if get_user_role(user.username) == "admin":
+        if get_user_role(user.email or user.username) == "admin":
             admin_users += 1
 
     tracked_players = await session.scalar(
@@ -209,11 +211,13 @@ async def list_admin_users(
     summaries: list[AdminUserSummaryResponse] = []
     for user in users:
         snapshot = await build_account_snapshot(session, user)
+        identity = user.email or user.username
         summaries.append(
             AdminUserSummaryResponse(
                 id=user.id,
-                username=user.username,
-                role=get_user_role(user.username),
+                email=identity,
+                display_name=user.display_name or identity,
+                role=get_user_role(identity),
                 linked_player_id=user.linked_player_id,
                 linked_player_name=(
                     linked_player_identities.get(user.linked_player_id, (None, None))[0]
@@ -374,8 +378,8 @@ async def list_admin_player_insights(
                 game_name=player.game_name,
                 tag_line=player.tag_line,
                 linked_user_id=linked_user.id if linked_user is not None else None,
-                linked_username=(
-                    linked_user.username if linked_user is not None else None
+                linked_user_display_name=(
+                    linked_user.display_name if linked_user is not None else None
                 ),
                 linked_user_balance=(
                     linked_snapshot.cash_balance
