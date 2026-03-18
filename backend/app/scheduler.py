@@ -66,6 +66,7 @@ _last_market_update_at: datetime | None = None
 MARKET_UPDATE_JOB_INTERVAL_SECONDS = 30
 PORO_MAINTENANCE_JOB_INTERVAL_SECONDS = 5
 MARKET_STATUS_GRACE_SECONDS = 90
+MIN_UPDATE_INTERVAL_SECONDS = 30
 RANKED_SOLO_QUEUE_ID = 420
 
 
@@ -77,8 +78,33 @@ def is_scheduler_running() -> bool:
     return scheduler.running
 
 
-def get_required_market_update_interval(player_count: int) -> timedelta:
-    return timedelta(minutes=math.ceil(max(1, player_count) * 0.5))
+def get_required_market_update_interval(trackable_player_count: int) -> timedelta:
+    """Calculate the minimum update interval from rate limits and player count.
+
+    Uses the Riot API rate-limit budget (default 100 req / 2 min) and estimated
+    per-player API cost to compute the fastest safe polling interval.  Only
+    players with actual LP data (lp_abs > 0) should be counted.
+    """
+    if trackable_player_count <= 0:
+        return timedelta(seconds=MIN_UPDATE_INTERVAL_SECONDS)
+
+    est_requests = trackable_player_count * settings.riot_estimated_requests_per_player
+
+    # Rate-limit constraint: spread requests across the sliding window.
+    rate_limit_interval = (
+        est_requests / settings.riot_rate_limit_requests
+    ) * settings.riot_rate_limit_window_seconds
+
+    # Execution-time constraint: physical time to stagger all requests.
+    execution_time = est_requests * settings.riot_request_stagger_seconds
+
+    interval_seconds = max(
+        MIN_UPDATE_INTERVAL_SECONDS,
+        rate_limit_interval,
+        execution_time,
+    )
+
+    return timedelta(seconds=math.ceil(interval_seconds))
 
 
 def classify_market_status(
@@ -87,6 +113,7 @@ def classify_market_status(
     last_market_update_at: datetime | None,
     tracked_player_count: int,
     scheduler_running: bool,
+    expected_interval: timedelta | None = None,
 ) -> str:
     if tracked_player_count == 0 or last_market_update_at is None:
         return "idle"
@@ -94,9 +121,11 @@ def classify_market_status(
     if not scheduler_running:
         return "degraded"
 
-    freshness_window = get_required_market_update_interval(
-        tracked_player_count
-    ) + timedelta(seconds=MARKET_STATUS_GRACE_SECONDS)
+    if expected_interval is None:
+        expected_interval = get_required_market_update_interval(tracked_player_count)
+    freshness_window = expected_interval + timedelta(
+        seconds=MARKET_STATUS_GRACE_SECONDS
+    )
     if now - last_market_update_at <= freshness_window:
         return "healthy"
 
@@ -588,16 +617,23 @@ async def market_update_job() -> None:
             logger.info("Skipping market update; no tracked players exist yet")
             return
 
-        required_interval = get_required_market_update_interval(len(players))
+        trackable_count = sum(1 for p in players if p.lp_abs > 0)
+        required_interval = get_required_market_update_interval(trackable_count)
         now = datetime.now(UTC)
         if (
             _last_market_update_at is not None
             and now - _last_market_update_at < required_interval
         ):
+            remaining = (
+                required_interval - (now - _last_market_update_at)
+            ).total_seconds()
             logger.info(
-                "Skipping market update; next run in %.1f min",
-                (required_interval - (now - _last_market_update_at)).total_seconds()
-                / 60,
+                "Skipping market update; next run in %.0fs "
+                "(interval=%.0fs, trackable=%d/%d)",
+                remaining,
+                required_interval.total_seconds(),
+                trackable_count,
+                len(players),
             )
             return
 
@@ -863,7 +899,7 @@ async def market_update_job() -> None:
                     )
                 )
 
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(settings.riot_request_stagger_seconds)
 
         # Execute pending orders
         pending_result = await session.execute(
@@ -1038,7 +1074,14 @@ def start_scheduler(app: FastAPI) -> None:
         next_run_time=datetime.now(UTC),
     )
     scheduler.start()
-    logger.info("Scheduler started (dynamic interval: tracked_player_count minutes)")
+    logger.info(
+        "Scheduler started (dynamic interval based on rate limits: "
+        "%d req/%ds budget, %.0fms stagger, %.1f est req/player)",
+        settings.riot_rate_limit_requests,
+        settings.riot_rate_limit_window_seconds,
+        settings.riot_request_stagger_seconds * 1000,
+        settings.riot_estimated_requests_per_player,
+    )
 
 
 def stop_scheduler() -> None:

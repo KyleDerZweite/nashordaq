@@ -98,7 +98,7 @@ Authentication is handled by Pangolin, which acts as an Identity-Aware Proxy. Wh
 
 The market update job runs as a single atomic operation:
 
-1. **Fetch LP:** For each tracked player, call the Riot Games API (account lookup, summoner lookup, league entries). Rate limit delays of 100ms between players.
+1. **Fetch LP:** For each tracked player, call the Riot Games API (account lookup, summoner lookup, league entries). Rate-limit-aware stagger between requests (configurable via `NASHORDAQ_RIOT_REQUEST_STAGGER_SECONDS`, default 200ms). Update interval is dynamically computed from the number of trackable players and the API rate-limit budget (`NASHORDAQ_RIOT_RATE_LIMIT_REQUESTS` / `NASHORDAQ_RIOT_RATE_LIMIT_WINDOW_SECONDS`).
 2. **Update prices:** Compute new `LP_abs`, apply the pricing formula (IPO pricing on first fetch, dynamic pricing thereafter), record a `PriceHistory` entry.
 3. **Execute orders:** Process all PENDING orders in FIFO order. Validate balances/holdings at execution time. Create `Transaction` records for executed orders.
 4. **Commit:** All changes are committed in a single database transaction.

@@ -23,6 +23,12 @@ class Settings(BaseSettings):
     # Database (SQLite, stored relative to project root)
     database_url: str = "sqlite+aiosqlite:///data/nashordaq.db"
 
+    # Riot API rate limits
+    riot_rate_limit_requests: int = 100
+    riot_rate_limit_window_seconds: int = 120
+    riot_request_stagger_seconds: float = 0.2
+    riot_estimated_requests_per_player: float = 2.0
+
     # Networking
     cors_origins: str = "http://localhost:5173"
     domain: str = "localhost"

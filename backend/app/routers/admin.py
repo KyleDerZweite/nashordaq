@@ -512,13 +512,19 @@ async def get_admin_system_status(
 ) -> SystemStatusResponse:
     del admin_user
 
-    tracked_player_count = await session.scalar(
-        select(func.count()).select_from(TrackedPlayer)
+    total_player_count = (
+        await session.scalar(select(func.count()).select_from(TrackedPlayer)) or 0
     )
-    player_count = tracked_player_count or 0
-    expected_update_interval_minutes = int(
-        get_required_market_update_interval(player_count).total_seconds() // 60
+    trackable_player_count = (
+        await session.scalar(
+            select(func.count())
+            .select_from(TrackedPlayer)
+            .where(TrackedPlayer.lp_abs > 0)
+        )
+        or 0
     )
+    interval = get_required_market_update_interval(trackable_player_count)
+    expected_update_interval_minutes = int(interval.total_seconds() // 60)
     last_market_update_at = get_last_market_update_at()
     scheduler_running = is_scheduler_running()
 
@@ -528,10 +534,11 @@ async def get_admin_system_status(
         market_status=classify_market_status(
             now=datetime.now(UTC),
             last_market_update_at=last_market_update_at,
-            tracked_player_count=player_count,
+            tracked_player_count=total_player_count,
             scheduler_running=scheduler_running,
+            expected_interval=interval,
         ),
-        tracked_player_count=player_count,
+        tracked_player_count=total_player_count,
         expected_update_interval_minutes=max(1, expected_update_interval_minutes),
         last_market_update_at=last_market_update_at,
     )
