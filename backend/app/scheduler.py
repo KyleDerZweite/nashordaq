@@ -954,58 +954,59 @@ async def market_update_job() -> None:
                 )
             )
 
-        due_gamba_result = await session.execute(
-            select(GambaPosition)
-            .where(GambaPosition.status == GambaStatus.ACTIVE)
-            .where(GambaPosition.scheduled_settlement_at <= datetime.now(UTC))
-            .order_by(GambaPosition.scheduled_settlement_at.asc())
-        )
-        due_positions = due_gamba_result.scalars().all()
-
-        for position in due_positions:
-            player = await session.get(TrackedPlayer, position.player_id)
-            user = await session.get(User, position.user_id)
-            if player is None or user is None:
-                continue
-
-            now = datetime.now(UTC)
-            exit_price = player.current_price
-            gross_exit_value = position.quantity * exit_price
-            raw_pnl = gross_exit_value - position.cash_amount
-            payout_total = max(
-                0.0,
-                position.cash_amount + (raw_pnl * position.settlement_multiplier),
+        if settings.gamba_enabled:
+            due_gamba_result = await session.execute(
+                select(GambaPosition)
+                .where(GambaPosition.status == GambaStatus.ACTIVE)
+                .where(GambaPosition.scheduled_settlement_at <= datetime.now(UTC))
+                .order_by(GambaPosition.scheduled_settlement_at.asc())
             )
-            settled_pnl = payout_total - position.cash_amount
+            due_positions = due_gamba_result.scalars().all()
 
-            user.balance += payout_total
-            position.exit_price = exit_price
-            position.settled_at = now
-            position.raw_pnl = raw_pnl
-            position.settled_pnl = settled_pnl
-            position.status = GambaStatus.SETTLED
+            for position in due_positions:
+                player = await session.get(TrackedPlayer, position.player_id)
+                user = await session.get(User, position.user_id)
+                if player is None or user is None:
+                    continue
 
-            sell_order = Order(
-                user_id=user.id,
-                player_id=player.id,
-                side=OrderSide.SELL,
-                quantity=0,
-                quantity_value=position.quantity,
-                status=OrderStatus.EXECUTED,
-                source=OrderSource.GAMBA,
-                gross_execution_price=exit_price,
-                gross_total_value=gross_exit_value,
-                entry_total_value=position.cash_amount,
-                adjustment_value=payout_total - gross_exit_value,
-                adjustment_reason="GAMBA_MULTIPLIER",
-                execution_price=(payout_total / position.quantity)
-                if position.quantity > 0
-                else 0.0,
-                executed_at=now,
-            )
-            session.add(sell_order)
-            await session.flush()
-            position.sell_order_id = sell_order.id
+                now = datetime.now(UTC)
+                exit_price = player.current_price
+                gross_exit_value = position.quantity * exit_price
+                raw_pnl = gross_exit_value - position.cash_amount
+                payout_total = max(
+                    0.0,
+                    position.cash_amount + (raw_pnl * position.settlement_multiplier),
+                )
+                settled_pnl = payout_total - position.cash_amount
+
+                user.balance += payout_total
+                position.exit_price = exit_price
+                position.settled_at = now
+                position.raw_pnl = raw_pnl
+                position.settled_pnl = settled_pnl
+                position.status = GambaStatus.SETTLED
+
+                sell_order = Order(
+                    user_id=user.id,
+                    player_id=player.id,
+                    side=OrderSide.SELL,
+                    quantity=0,
+                    quantity_value=position.quantity,
+                    status=OrderStatus.EXECUTED,
+                    source=OrderSource.GAMBA,
+                    gross_execution_price=exit_price,
+                    gross_total_value=gross_exit_value,
+                    entry_total_value=position.cash_amount,
+                    adjustment_value=payout_total - gross_exit_value,
+                    adjustment_reason="GAMBA_MULTIPLIER",
+                    execution_price=(payout_total / position.quantity)
+                    if position.quantity > 0
+                    else 0.0,
+                    executed_at=now,
+                )
+                session.add(sell_order)
+                await session.flush()
+                position.sell_order_id = sell_order.id
 
         indebted_users_result = await session.execute(
             select(User).where(

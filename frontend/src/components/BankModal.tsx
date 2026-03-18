@@ -4,10 +4,15 @@ import { formatAmount, formatLocalDateTime } from "../utils/format";
 
 interface Props {
   canManageBank: boolean;
+  gambaEnabled?: boolean;
   onClose: () => void;
 }
 
-export default function BankModal({ canManageBank, onClose }: Props) {
+export default function BankModal({
+  canManageBank,
+  gambaEnabled = true,
+  onClose,
+}: Props) {
   const [repayAmount, setRepayAmount] = useState("");
   const { data, isLoading, isError, error } = useBankSummary(canManageBank);
   const borrowFromBank = useBorrowFromBank();
@@ -149,9 +154,12 @@ export default function BankModal({ canManageBank, onClose }: Props) {
                   <p className="font-mono text-xs text-hex-bronze">
                     Holdings mark: {formatAmount(data.holdings_value)} P
                   </p>
-                  <p className="font-mono text-xs text-hex-bronze">
-                    Active Gamba mark: {formatAmount(data.active_gamba_value)} P
-                  </p>
+                  {gambaEnabled && (
+                    <p className="font-mono text-xs text-hex-bronze">
+                      Active Gamba mark: {formatAmount(data.active_gamba_value)}{" "}
+                      P
+                    </p>
+                  )}
                   <p className="font-mono text-xs text-hex-bronze">
                     Cash available: {formatAmount(data.cash_balance)} P
                   </p>

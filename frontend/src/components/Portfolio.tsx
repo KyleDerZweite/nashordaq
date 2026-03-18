@@ -27,9 +27,14 @@ function getSummaryCellBorderClass(index: number, useTwoColumnLayout: boolean) {
 interface Props {
   portfolio?: PortfolioResponse | null;
   onOpenInsights?: () => void;
+  gambaEnabled?: boolean;
 }
 
-export default function Portfolio({ portfolio, onOpenInsights }: Props) {
+export default function Portfolio({
+  portfolio,
+  onOpenInsights,
+  gambaEnabled = true,
+}: Props) {
   const { isStreamerMode } = useStreamerMode();
   const holdings = portfolio?.holdings ?? [];
   const balance = portfolio?.balance ?? 0;
@@ -40,7 +45,7 @@ export default function Portfolio({ portfolio, onOpenInsights }: Props) {
   const summaryItems = [
     { label: "Poros", value: balance },
     { label: "Holdings", value: holdingsValue },
-    { label: "Gamba", value: gambaValue },
+    ...(gambaEnabled ? [{ label: "Gamba", value: gambaValue }] : []),
     { label: "Total", value: totalValue },
   ];
   const summaryGridRef = useRef<HTMLDivElement | null>(null);

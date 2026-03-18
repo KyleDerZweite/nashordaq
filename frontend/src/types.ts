@@ -354,6 +354,7 @@ export interface SystemStatusResponse {
   tracked_player_count: number;
   expected_update_interval_minutes: number;
   last_market_update_at: string | null;
+  gamba_enabled: boolean;
 }
 
 export interface MarketQuoteResponse {

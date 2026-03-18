@@ -8,6 +8,7 @@ import { formatAmount } from "../utils/format";
 interface Props {
   portfolio?: PortfolioResponse | null;
   canTrade?: boolean;
+  gambaEnabled?: boolean;
   onTrade?: (playerId: number, side: OrderSide) => void;
   onClose: () => void;
 }
@@ -111,6 +112,7 @@ function PortfolioInsightRow({
 export default function PortfolioInsightsModal({
   portfolio,
   canTrade = false,
+  gambaEnabled = true,
   onTrade,
   onClose,
 }: Props) {
@@ -123,12 +125,15 @@ export default function PortfolioInsightsModal({
     () => [
       { label: "Cash", value: portfolio?.balance ?? 0 },
       { label: "Holdings", value: portfolio?.holdings_value ?? 0 },
-      { label: "Gamba", value: portfolio?.active_gamba_value ?? 0 },
+      ...(gambaEnabled
+        ? [{ label: "Gamba", value: portfolio?.active_gamba_value ?? 0 }]
+        : []),
       { label: "Debt", value: portfolio?.debt_outstanding ?? 0 },
       { label: "Net Total", value: portfolio?.total_value ?? 0 },
       { label: "Positions", value: holdings.length, isCount: true },
     ],
     [
+      gambaEnabled,
       holdings.length,
       portfolio?.active_gamba_value,
       portfolio?.balance,

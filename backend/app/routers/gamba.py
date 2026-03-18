@@ -73,6 +73,8 @@ async def create_gamba_position(
     user: CurrentOnboardedUser,
     session: SessionDep,
 ) -> GambaPositionResponse:
+    if not settings.gamba_enabled:
+        raise HTTPException(status_code=404, detail="Gamba feature disabled")
     if body.cash_amount > user.balance:
         raise HTTPException(status_code=400, detail="Insufficient balance")
 
@@ -139,6 +141,8 @@ async def list_gamba_positions(
     user: CurrentUser,
     session: SessionDep,
 ) -> list[GambaPositionResponse]:
+    if not settings.gamba_enabled:
+        raise HTTPException(status_code=404, detail="Gamba feature disabled")
     if is_admin_user(user) or user.linked_player_id is None:
         return []
 

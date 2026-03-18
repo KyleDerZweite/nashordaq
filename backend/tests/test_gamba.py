@@ -19,6 +19,31 @@ from app.models import (
 from app.riot import RankData
 
 
+async def test_create_gamba_returns_404_when_disabled(
+    auth_client,
+    tradable_player,
+    monkeypatch,
+):
+    monkeypatch.setattr(settings, "gamba_enabled", False)
+
+    resp = await auth_client.post("/api/gamba", json={"cash_amount": 100})
+    assert resp.status_code == 404
+
+    me_resp = await auth_client.get("/api/user/me")
+    assert me_resp.json()["balance"] == pytest.approx(settings.starting_balance)
+
+
+async def test_list_gamba_returns_404_when_disabled(
+    auth_client,
+    tradable_player,
+    monkeypatch,
+):
+    monkeypatch.setattr(settings, "gamba_enabled", False)
+
+    resp = await auth_client.get("/api/gamba")
+    assert resp.status_code == 404
+
+
 async def test_create_gamba_position_creates_recent_order(
     auth_client,
     tradable_player,

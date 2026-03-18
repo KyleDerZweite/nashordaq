@@ -53,48 +53,107 @@ Market impact (4a) is live as the first step. Supply cap and P2P trading remain 
 
 ---
 
-## Future (v2)
+## Next Up
 
-The items below require significant architectural changes and are not on the v1 roadmap. They are documented here for future reference.
+### 8. Built-In Auth Mode
 
-### Multi-Room Public Access
+Add a self-contained authentication layer so the app can run standalone without any reverse proxy or external auth provider. This is the default for self-hosters who just want `docker compose up`.
 
-Make Nashordaq usable by multiple friend groups without requiring everyone to be behind the Pangolin IAP. The app becomes a public website with isolated "rooms" that each function as an independent market.
+**Two auth modes, auto-detected:**
 
-**Two-tier user model:**
+- `proxy` — current behavior. Reads `Remote-Email` / `Remote-Name` headers injected by a reverse proxy (Pangolin, Authelia, Caddy forward_auth, etc.). Unchanged.
+- `builtin` — the app handles registration, login, and sessions directly. No proxy required.
 
-- **IAP users** (Pangolin-authenticated) can create and join rooms.
-- **Guests** visit the public site, join a room via code (e.g. `NASH-7K2F`), and create a profile on join. Cannot create rooms.
+The mode is configured via `NASHORDAQ_AUTH_MODE` (default: `builtin`). When both are available (proxy headers present AND a builtin session exists), proxy headers take precedence.
 
-**Room model:**
+**Registration flow (builtin mode):**
 
-- Each room is an independent market with its own tracked players, orders, holdings, and leaderboard.
-- Room creator is the admin.
-- Player mode per room: *self-link* (members link their own LoL account) or *admin-curated* (admin adds tracked profiles, members just trade).
+1. User visits the app, sees a registration/login page.
+2. Registration collects: email, display name, password, game name, tag line.
+3. Backend creates the `User`, hashes the password, resolves the Riot PUUID, creates the `TrackedPlayer`, and links them — combining current auto-provisioning and onboarding into one step.
+4. Login via email + password returns a signed session cookie.
 
-**Guest identity persistence (unsolved):**
+**Implementation notes:**
 
-- *Device token* — random bearer token in `localStorage`, admin recovery link if lost. Simplest, no auth stack.
-- *Username + passphrase* — works cross-device but requires password hashing.
-- *Recovery code* — shown once on profile creation, no user-chosen passwords but easy to lose.
-- External auth providers (Matrix, OAuth/OIDC) can be layered on later.
+- Password hashing: argon2id (via `argon2-cffi`).
+- Sessions: signed cookies using a `NASHORDAQ_SECRET_KEY` env var.
+- New columns on `User`: `password_hash` (nullable, only set in builtin mode).
+- The existing `_get_current_user` dependency in `auth.py` gains a second code path: check session cookie if no proxy headers are present.
+- Frontend: a login/register page that only renders when `auth_mode == builtin` (detected via a public `/api/auth/info` endpoint).
 
-**Data model impact:**
+**What this enables:**
 
-- New `rooms` and `room_members` tables.
-- Existing tables (`tracked_players`, `holdings`, `orders`, `price_history`, etc.) gain a `room_id` scope.
-- `users` table unifies IAP and guest users; both can be members of multiple rooms.
+- `docker compose up` with just `NASHORDAQ_RIOT_API_KEY` and `NASHORDAQ_SECRET_KEY` gives a working instance. No Zitadel, no Pangolin, no reverse proxy.
+- Self-hosters who prefer an IAP can set `NASHORDAQ_AUTH_MODE=proxy` and use their existing setup.
+- The maintainer's own deployment continues using Pangolin exactly as it does today.
 
-**Scheduler impact:**
+### 9. Gamba Feature Flag
 
-- LP fetching stays global, but price updates and order execution become per-room.
-- If two rooms track the same player (same puuid), LP is fetched once but prices computed independently (streak/gamma are per-room state).
+Gate all Gamba functionality behind `NASHORDAQ_GAMBA_ENABLED` (default: `true`).
 
-**Open questions:**
+- Backend: Gamba router returns 404 when disabled. Scheduler skips Gamba settlement.
+- Frontend: Gamba UI elements hidden when the flag is off (exposed via a public `/api/config` or similar endpoint).
+- No code removal. The feature stays in the codebase, just gated at runtime.
 
-- Public room listing vs invite-link only
-- Room member limits
-- Multi-room guest membership
-- Room admin disappearance (ownership transfer, auto-expire)
-- Riot API rate limits at scale with many rooms and players
+This is required for any future Riot-compliant public deployment (Riot's developer policies prohibit gambling mechanics), but is also good hygiene — operators should be able to disable features they don't want.
+
+---
+
+## Future (v2+)
+
+The items below are not on the current roadmap. They are documented for reference and should only be pursued after demand is proven.
+
+### Distribution Strategy
+
+**Primary model: self-hosted open source (single-tenant).**
+
+Each friend group runs their own instance with their own Riot Personal API key. One instance = one friend group = one market. This is the standard self-hosted software model (same as Jellyfin, Gitea, Uptime Kuma, etc.) and does not violate any Riot policies.
+
+- Personal API keys are free and instant to obtain at developer.riotgames.com.
+- Rate limit (100 req/2min) is sufficient for 5-50 tracked players.
+- Each instance is independent. This is NOT the "BYOK" violation Riot prohibits (that refers to one application pooling multiple keys).
+- Gamba is fine on private instances — Riot's developer policies apply to applications submitted for Production key review, not to private deployments.
+- The built-in auth mode (item 8) removes the need for any external auth stack, making deployment trivial.
+
+**Secondary model (only if demand proves it): centralized hosting.**
+
+A single public instance serving multiple groups. This requires a Riot Production API key (30,000 req/10min), multi-room architecture, and Riot policy compliance (no Gamba, no gambling terminology). Only pursue if self-hosted adoption demonstrates real demand and people explicitly ask for a hosted alternative.
+
+Production key application requires: working public demo, legal docs (Impressum, privacy policy, ToS), and a product that serves a broad community. Expected approval timeline: 2 weeks to 6 months.
+
+### Multi-Room Architecture (centralized only)
+
+Only relevant if a centralized instance is pursued.
+
+- New `rooms` and `room_members` tables. Most existing tables gain a `room_id` scope.
+- `TrackedPlayer` stays global (LP fetched once per unique PUUID). Streak, price, and economy state are per-room.
+- Room creator is admin. Joining requires an invite code. Economy parameters configurable per room.
+- Scheduler: LP fetching is global, price/order/settlement logic becomes per-room.
+- Poro, bank, playing income all become per-room-scoped.
+
+**Open questions:** room lifecycle, member limits, admin disappearance, migration of existing single-tenant data, economy parameter bounds.
+
+### Riot Sign-On (RSO)
+
+Only available with a Production API key. Provides verified PUUID via OAuth2 instead of manual Riot ID entry. Benefits: proof of account ownership, immutable identity, no manual verification. Only worth implementing after Production key approval.
+
+### Monetization (if centralized)
+
+Riot's developer ToS allows charging for hosting/compute and premium features unrelated to Riot data. It prohibits charging for access to Riot data itself, real-money gambling, and selling Riot data.
+
+Viable models for a centralized instance:
+- **Hosting fee** ($3-5/month per market) — paying for server resources, not data.
+- **Donations** (Patreon, GitHub Sponsors, Ko-fi) — simplest, covers small hosting costs.
+- **Cosmetic premium** — custom themes, profile badges, extended history. Engineering effort probably not worth the revenue at realistic scale.
+
+Realistic market: 50-500 active friend groups. This is a niche community tool, not a SaaS business. Optimize for sustainability, not growth.
+
+### Market Sizing Reality Check
+
+- LoL has ~150M monthly players. Fantasy esports exists (DraftKings, Fantasy LCS) but focuses on pro play.
+- Zero direct competitors do "ranked LP stock market for friend groups."
+- The niche is real but small: LoL friend groups who want a meta-game on top of ranked.
+- Conversion from "plays LoL" to "would use a fantasy LP market" is low.
+- The product's strength is personal and social — trading your friends' performance is fun because they're your friends. This doesn't scale to strangers.
+- Global markets, federation, and multi-exchange designs don't serve the core use case and should not be pursued.
 

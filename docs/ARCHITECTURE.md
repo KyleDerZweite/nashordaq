@@ -11,21 +11,21 @@ Nashordaq is a single-process Python application backed by SQLite. The FastAPI s
                    +-----+-----+
                          |  Remote-User header
                          v
-+--------------------------------------------------------+
-|  FastAPI Application                                   |
-|                                                        |
-|  Routers          Auth          Scheduler (APScheduler) |
-|  /api/user/*      X-Remote-     30-min interval job     |
-|  /api/market/*    User header   - Fetch LP from Riot    |
++----------------------------------------------------------+
+|  FastAPI Application                                     |
+|                                                          |
+|  Routers          Auth          Scheduler (APScheduler)  |
+|  /api/user/*      X-Remote-     30-min interval job      |
+|  /api/market/*    User header   - Fetch LP from Riot     |
 |  /api/orders/*    auto-provision- Update prices          |
 |  /api/portfolio   new users     - Execute pending orders |
-|  /api/leaderboard                                       |
-|                                                        |
-|  Pricing Engine   Riot Client   Self-onboarding         |
-|  LP_abs, IPO,     httpx async   Creates tracked players |
-|  dynamic price    3 API calls   at first user login     |
-|                   per player                            |
-+---------------------------+----------------------------+
+|  /api/leaderboard                                        |
+|                                                          |
+|  Pricing Engine   Riot Client   Self-onboarding          |
+|  LP_abs, IPO,     httpx async   Creates tracked players  |
+|  dynamic price    3 API calls   at first user login      |
+|                   per player                             |
++---------------------------+------------------------------+
                             |
                             v
                   +-------------------+

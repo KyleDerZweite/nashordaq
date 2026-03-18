@@ -14,6 +14,7 @@ interface Props {
   canOpenBank?: boolean;
   debtOutstanding?: number;
   rescueLoanAvailable?: boolean;
+  gambaEnabled?: boolean;
   onOpenBank?: () => void;
 }
 
@@ -36,6 +37,7 @@ export default function BalanceInsightsModal({
   canOpenBank = false,
   debtOutstanding = 0,
   rescueLoanAvailable = false,
+  gambaEnabled = true,
   onOpenBank,
 }: Props) {
   const [range, setRange] = useState<ChartRange>(30);
@@ -118,7 +120,9 @@ export default function BalanceInsightsModal({
 
           {data && (
             <div className="space-y-5">
-              <div className="grid gap-3 md:grid-cols-6">
+              <div
+                className={`grid gap-3 ${gambaEnabled ? "md:grid-cols-6" : "md:grid-cols-5"}`}
+              >
                 {[
                   {
                     label: "Balance",
@@ -132,10 +136,14 @@ export default function BalanceInsightsModal({
                     label: "Holdings",
                     value: `${formatAmount(data.holdings_value)} P`,
                   },
-                  {
-                    label: "Active Gamba",
-                    value: `${formatAmount(data.active_gamba_value)} P`,
-                  },
+                  ...(gambaEnabled
+                    ? [
+                        {
+                          label: "Active Gamba",
+                          value: `${formatAmount(data.active_gamba_value)} P`,
+                        },
+                      ]
+                    : []),
                   {
                     label: "Debt",
                     value: `${formatAmount(data.debt_outstanding)} P`,

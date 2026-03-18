@@ -141,6 +141,7 @@ export default function App() {
     });
   }, [players, tickerSortMode]);
 
+  const gambaEnabled = systemStatus?.gamba_enabled ?? true;
   const resolvedSystemStatus = isAdmin ? adminSystemStatus : systemStatus;
   const marketStatusTone = resolvedSystemStatus?.market_status ?? "idle";
   const marketStatusLabel =
@@ -373,9 +374,12 @@ export default function App() {
                     <Portfolio
                       portfolio={portfolio}
                       onOpenInsights={() => setIsPortfolioInsightsOpen(true)}
+                      gambaEnabled={gambaEnabled}
                     />
                     <Leaderboard entries={leaderboard ?? []} />
-                    <GambaWidget balance={balance} canTrade={canTrade} />
+                    {gambaEnabled && (
+                      <GambaWidget balance={balance} canTrade={canTrade} />
+                    )}
                   </div>
                 </div>
 
@@ -445,6 +449,7 @@ export default function App() {
           canOpenBank={canManageBank}
           debtOutstanding={bankSummary?.debt_outstanding ?? 0}
           rescueLoanAvailable={bankSummary?.rescue_loan_available ?? false}
+          gambaEnabled={gambaEnabled}
           onOpenBank={() => {
             setIsBalanceInsightsOpen(false);
             setIsBankModalOpen(true);
@@ -456,6 +461,7 @@ export default function App() {
         <PortfolioInsightsModal
           portfolio={portfolio}
           canTrade={canTrade}
+          gambaEnabled={gambaEnabled}
           onTrade={(playerId, side) => setTrade({ playerId, side })}
           onClose={() => setIsPortfolioInsightsOpen(false)}
         />
@@ -464,6 +470,7 @@ export default function App() {
       {isBankModalOpen && (
         <BankModal
           canManageBank={canManageBank}
+          gambaEnabled={gambaEnabled}
           onClose={() => setIsBankModalOpen(false)}
         />
       )}

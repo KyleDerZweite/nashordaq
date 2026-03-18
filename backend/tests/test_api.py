@@ -37,6 +37,7 @@ async def test_system_status_is_idle_without_tracked_players(auth_client, monkey
         "tracked_player_count": 0,
         "expected_update_interval_minutes": 1,
         "last_market_update_at": None,
+        "gamba_enabled": True,
     }
 
 
