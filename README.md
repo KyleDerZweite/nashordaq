@@ -7,6 +7,23 @@ A self-hosted fantasy stock market for a private League of Legends friend group.
 
 Users trade shares in League of Legends players using virtual currency. Share prices fluctuate automatically based on real-time Ranked LP changes fetched from the Riot Games API.
 
+## Try It
+
+A live demo is available at **[demo-nashordaq.kylehub.dev](https://demo-nashordaq.kylehub.dev/)**. No account or API key needed -- just open the link and start trading with simulated data.
+
+## What's Next? You Decide
+
+Nashordaq started as a personal project for my friend group, and it does what I set out to build. But I'm curious whether others would find it useful too.
+
+I'm considering turning this into a **hosted service with public rooms** -- one instance where any League friend group can create their own market without self-hosting anything. See the [Roadmap](docs/ROADMAP.md#future-v2) for more on this idea.
+
+**If that sounds interesting to you:**
+- Drop your thoughts in the [Discussions](https://github.com/KyleDerZweite/nashordaq/discussions) tab
+- Leave a star if you'd want a hosted version
+- Open an [Idea](https://github.com/KyleDerZweite/nashordaq/discussions/categories/ideas) for features you'd like to see
+
+I'll keep developing this if there's a community that wants it.
+
 ## Features
 
 - **Live Market** -- share prices update automatically from real Riot API data.
