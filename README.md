@@ -1,5 +1,8 @@
 # Nashordaq
 
+> **Early Development Notice**
+> This project is in early development and subject to breaking changes. It is intended for personal use only and is **not compliant with Riot Games Production API key requirements**. Self-hosting requires technical knowledge (Identity-Aware Proxy setup, environment configuration, containerized deployment). Use at your own risk.
+
 A self-hosted fantasy stock market for a private League of Legends friend group.
 
 Users trade shares in League of Legends players using virtual currency. Share prices fluctuate automatically based on real-time Ranked LP changes fetched from the Riot Games API.
