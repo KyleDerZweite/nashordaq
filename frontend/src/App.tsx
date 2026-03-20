@@ -400,7 +400,7 @@ export default function App() {
       <footer className="border-t border-hex-border bg-hex-bg-alt py-2 font-mono text-[10px] text-hex-bronze">
         <div className="mx-auto flex max-w-[88rem] flex-col gap-2 px-6 sm:flex-row sm:items-center sm:justify-between">
           <div className="uppercase tracking-[0.16em] text-hex-gold/85">
-            NASHORDAQ v0.1.0
+            NASHORDAQ v0.2.0
           </div>
 
           <div className="flex items-center gap-2 sm:max-w-2xl sm:justify-end sm:text-right">
