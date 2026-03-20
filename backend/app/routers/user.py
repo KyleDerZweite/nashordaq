@@ -118,10 +118,17 @@ async def _initialize_player_market_state(
 
 def _to_user_response(user: User) -> UserResponse:
     identity = user.email or user.username
+    if user.is_demo:
+        demo_fallback = "Demo Trader"
+        display = user.display_name or demo_fallback
+        shown_email = demo_fallback
+    else:
+        display = user.display_name or identity
+        shown_email = identity
     return UserResponse(
         id=user.id,
-        email=identity,
-        display_name=user.display_name or identity,
+        email=shown_email,
+        display_name=display,
         role=get_user_role(identity),
         balance=user.balance,
         linked_player_id=user.linked_player_id,
