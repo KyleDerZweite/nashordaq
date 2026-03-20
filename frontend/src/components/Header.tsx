@@ -12,6 +12,7 @@ export default function Header({
   canEditProfile = false,
   canToggleAdminView = false,
   adminViewMode = "spectator",
+  isDemo = false,
   showSimulation = false,
   onOpenBalanceInsights,
   onEditProfile,
@@ -26,6 +27,7 @@ export default function Header({
   canEditProfile?: boolean;
   canToggleAdminView?: boolean;
   adminViewMode?: "spectator" | "admin";
+  isDemo?: boolean;
   showSimulation?: boolean;
   onOpenBalanceInsights?: () => void;
   onEditProfile?: () => void;
@@ -52,6 +54,11 @@ export default function Header({
           <span className="hidden text-xs font-medium uppercase tracking-[0.3em] text-hex-bronze sm:inline">
             Fantasy Market
           </span>
+          {isDemo && (
+            <span className="border border-hex-gold bg-hex-gold/10 px-2 py-0.5 font-mono text-xs font-bold uppercase tracking-wider text-hex-gold">
+              DEMO
+            </span>
+          )}
         </div>
 
         {/* Account bar */}

@@ -11,6 +11,7 @@ interface Props {
   balance: number;
   ownedQuantity: number;
   isOwnStock?: boolean;
+  isDemo?: boolean;
   onClose: () => void;
 }
 
@@ -20,6 +21,7 @@ export default function TradeTerminal({
   balance,
   ownedQuantity,
   isOwnStock = false,
+  isDemo = false,
   onClose,
 }: Props) {
   const { isStreamerMode } = useStreamerMode();
@@ -274,6 +276,12 @@ export default function TradeTerminal({
           {!canAfford && isBuy && !isOwnStock && (
             <p className="font-mono text-xs text-hex-zaun">
               Insufficient balance
+            </p>
+          )}
+
+          {isDemo && (
+            <p className="mt-2 font-mono text-xs text-hex-bronze">
+              Demo trades do not affect market prices.
             </p>
           )}
         </form>

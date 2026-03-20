@@ -233,7 +233,7 @@ async def place_order(
     now = datetime.now(UTC)
 
     if body.side == OrderSide.BUY:
-        if user.linked_player_id == body.player_id:
+        if not user.is_demo and user.linked_player_id == body.player_id:
             raise HTTPException(
                 status_code=400,
                 detail="You cannot buy your own stock",
@@ -254,7 +254,8 @@ async def place_order(
         if user.balance < total_cost:
             raise HTTPException(status_code=400, detail="Insufficient balance")
         user.balance -= total_cost
-        player.current_price = new_market_price
+        if not user.is_demo:
+            player.current_price = new_market_price
 
         holding = await _get_or_create_holding(session, user.id, body.player_id)
         holding.quantity += body.quantity
@@ -300,13 +301,14 @@ async def place_order(
             )
         )
 
-        session.add(
-            PriceHistory(
-                player_id=body.player_id,
-                price=new_market_price,
-                lp_abs=player.lp_abs,
+        if not user.is_demo:
+            session.add(
+                PriceHistory(
+                    player_id=body.player_id,
+                    price=new_market_price,
+                    lp_abs=player.lp_abs,
+                )
             )
-        )
     else:
         result = await session.execute(
             select(Holding).where(
@@ -364,13 +366,14 @@ async def place_order(
             if remaining <= 0:
                 break
 
-            acquired_at = (
-                lot.acquired_at
-                if lot.acquired_at.tzinfo is not None
-                else lot.acquired_at.replace(tzinfo=UTC)
-            )
-            if acquired_at > min_hold_deadline:
-                continue
+            if not user.is_demo:
+                acquired_at = (
+                    lot.acquired_at
+                    if lot.acquired_at.tzinfo is not None
+                    else lot.acquired_at.replace(tzinfo=UTC)
+                )
+                if acquired_at > min_hold_deadline:
+                    continue
 
             consumed = min(remaining, lot.quantity)
             if lot.buy_order_id is not None:
@@ -389,7 +392,8 @@ async def place_order(
 
         holding.quantity -= body.quantity
         user.balance += total_value
-        player.current_price = new_market_price
+        if not user.is_demo:
+            player.current_price = new_market_price
 
         order = Order(
             user_id=user.id,
@@ -422,13 +426,14 @@ async def place_order(
             )
         )
 
-        session.add(
-            PriceHistory(
-                player_id=body.player_id,
-                price=new_market_price,
-                lp_abs=player.lp_abs,
+        if not user.is_demo:
+            session.add(
+                PriceHistory(
+                    player_id=body.player_id,
+                    price=new_market_price,
+                    lp_abs=player.lp_abs,
+                )
             )
-        )
 
     await session.commit()
     await session.refresh(order)
@@ -445,7 +450,7 @@ async def list_orders(
     if is_admin_user(user):
         return []
 
-    if user.linked_player_id is None:
+    if user.linked_player_id is None and not user.is_demo:
         return []
 
     stmt = select(Order).where(Order.user_id == user.id)
@@ -467,9 +472,12 @@ async def list_recent_orders(
 ) -> list[OrderResponse]:
     del user
 
-    result = await session.execute(
-        select(Order).order_by(Order.created_at.desc()).limit(limit)
-    )
+    stmt = select(Order)
+    if settings.demo_mode_enabled:
+        stmt = stmt.join(User, User.id == Order.user_id).where(
+            User.is_demo == False  # noqa: E712
+        )
+    result = await session.execute(stmt.order_by(Order.created_at.desc()).limit(limit))
     orders = result.scalars().all()
     return await build_order_responses(session, orders)
 

@@ -76,6 +76,11 @@ app.add_middleware(
     ],
 )
 
+if settings.demo_mode_enabled:
+    from app.middleware import DemoCookieMiddleware
+
+    app.add_middleware(DemoCookieMiddleware)
+
 app.include_router(user.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
 app.include_router(market.router, prefix="/api")
@@ -129,6 +134,7 @@ async def system_status(session: SessionDep) -> SystemStatusResponse:
         expected_update_interval_minutes=max(1, expected_update_interval_minutes),
         last_market_update_at=last_market_update_at,
         gamba_enabled=settings.gamba_enabled,
+        demo_mode_enabled=settings.demo_mode_enabled,
     )
 
 

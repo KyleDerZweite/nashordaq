@@ -1,4 +1,8 @@
+import json
+import logging
 from collections.abc import AsyncGenerator
+from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy import event, text
@@ -9,6 +13,9 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from app.config import settings
+
+logger = logging.getLogger(__name__)
+DEMO_SEED_PATH = Path(__file__).resolve().parent.parent.parent / "demo" / "demo_seed.json"
 
 engine = create_async_engine(settings.database_url, echo=False)
 
@@ -82,6 +89,10 @@ async def init_db() -> None:
                     "AND bank_ledger_entries.entry_type = 'BORROW'"
                     ") THEN 0 ELSE 1 END"
                 )
+            )
+        if "is_demo" not in user_columns:
+            await conn.execute(
+                text("ALTER TABLE users ADD COLUMN is_demo BOOLEAN DEFAULT 0")
             )
 
         tracked_player_cols_result = await conn.execute(
@@ -173,6 +184,59 @@ async def init_db() -> None:
             await conn.execute(
                 text("ALTER TABLE orders ADD COLUMN adjustment_reason VARCHAR(32)")
             )
+
+    if settings.demo_mode_enabled:
+        await _seed_demo_data()
+
+
+async def _seed_demo_data() -> None:
+    if not DEMO_SEED_PATH.exists():
+        logger.warning(
+            "Demo seed file not found at %s; skipping seed import",
+            DEMO_SEED_PATH,
+        )
+        return
+
+    async with SessionLocal() as session:
+        result = await session.execute(text("SELECT COUNT(*) FROM tracked_players"))
+        count = result.scalar()
+        if count and count > 0:
+            return
+
+        seed = json.loads(DEMO_SEED_PATH.read_text())
+        now = datetime.now(UTC).isoformat()
+
+        for player in seed.get("players", []):
+            await session.execute(
+                text(
+                    "INSERT INTO tracked_players "
+                    "(id, game_name, tag_line, display_name, puuid, summoner_id, "
+                    "current_price, lp_abs, previous_lp_abs, streak, "
+                    "ranked_wins_snapshot, ranked_losses_snapshot, "
+                    "avg_lp_gain_on_win, avg_lp_loss_on_loss, last_updated) "
+                    "VALUES (:id, :game_name, :tag_line, :display_name, :puuid, "
+                    ":summoner_id, :current_price, :lp_abs, :previous_lp_abs, "
+                    ":streak, :ranked_wins_snapshot, :ranked_losses_snapshot, "
+                    ":avg_lp_gain_on_win, :avg_lp_loss_on_loss, :last_updated)"
+                ),
+                {**player, "last_updated": now},
+            )
+
+        for ph in seed.get("price_history", []):
+            await session.execute(
+                text(
+                    "INSERT INTO price_history (player_id, price, lp_abs, recorded_at) "
+                    "VALUES (:player_id, :price, :lp_abs, :recorded_at)"
+                ),
+                ph,
+            )
+
+        await session.commit()
+        logger.info(
+            "Seeded demo data: %d players, %d price history entries",
+            len(seed.get("players", [])),
+            len(seed.get("price_history", [])),
+        )
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:

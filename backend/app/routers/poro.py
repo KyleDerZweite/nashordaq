@@ -80,6 +80,13 @@ async def get_poro_state(
     session: SessionDep,
 ) -> PoroStateResponse:
     now = datetime.now(UTC)
+    if user.is_demo:
+        return _serialize_state(
+            enabled=False,
+            server_time=now,
+            next_roll_at=None,
+            active_spawn=None,
+        )
     if not settings.poro_enabled:
         return _serialize_state(
             enabled=False,
@@ -104,6 +111,18 @@ async def stream_poro_state(
     user: CurrentOnboardedUser,
     session: SessionDep,
 ) -> StreamingResponse:
+    if user.is_demo:
+
+        async def _empty():
+            return
+            yield  # pragma: no cover
+
+        return StreamingResponse(
+            _empty(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
+        )
+
     async def event_stream():
         stream_user_id = user.id
         listener = await poro_state_notifier.subscribe(stream_user_id)
@@ -170,6 +189,8 @@ async def post_poro_claim(
     user: CurrentOnboardedUser,
     session: SessionDep,
 ) -> PoroClaimResponse:
+    if user.is_demo:
+        raise HTTPException(status_code=403, detail="Not available in demo mode")
     if not settings.poro_enabled:
         raise HTTPException(status_code=404, detail="Poro feature disabled")
 

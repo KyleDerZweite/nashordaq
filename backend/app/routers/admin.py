@@ -143,7 +143,9 @@ async def get_admin_overview(
 ) -> AdminOverviewResponse:
     del admin_user
 
-    user_result = await session.execute(select(User))
+    user_result = await session.execute(
+        select(User).where(User.is_demo == False)  # noqa: E712
+    )
     users = user_result.scalars().all()
 
     order_counts = await session.execute(
@@ -203,7 +205,9 @@ async def list_admin_users(
     del admin_user
 
     user_result = await session.execute(
-        select(User).order_by(User.created_at.asc(), User.id.asc())
+        select(User)
+        .where(User.is_demo == False)  # noqa: E712
+        .order_by(User.created_at.asc(), User.id.asc())
     )
     users = user_result.scalars().all()
     linked_player_identities = await _linked_player_identity_map(session)
@@ -257,7 +261,9 @@ async def list_admin_player_insights(
     )
     players = players_result.scalars().all()
 
-    users_result = await session.execute(select(User))
+    users_result = await session.execute(
+        select(User).where(User.is_demo == False)  # noqa: E712
+    )
     users = users_result.scalars().all()
     user_by_linked_player = {
         user.linked_player_id: user
@@ -542,4 +548,5 @@ async def get_admin_system_status(
         expected_update_interval_minutes=max(1, expected_update_interval_minutes),
         last_market_update_at=last_market_update_at,
         gamba_enabled=settings.gamba_enabled,
+        demo_mode_enabled=settings.demo_mode_enabled,
     )

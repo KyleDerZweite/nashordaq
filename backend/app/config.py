@@ -1,6 +1,7 @@
 from datetime import UTC, datetime
 from pathlib import Path
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
@@ -15,8 +16,22 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    # Demo mode
+    demo_mode_enabled: bool = False
+    demo_session_ttl_hours: float = 24.0
+    demo_sim_interval_seconds: int = 180
+
     # Riot API
-    riot_api_key: str
+    riot_api_key: str = ""
+
+    @model_validator(mode="after")
+    def _require_riot_key_in_production(self) -> "Settings":
+        if not self.demo_mode_enabled and not self.riot_api_key:
+            raise ValueError(
+                "NASHORDAQ_RIOT_API_KEY is required when demo mode is disabled"
+            )
+        return self
+
     riot_api_base_url: str = "https://europe.api.riotgames.com"
     riot_api_region_url: str = "https://euw1.api.riotgames.com"
 

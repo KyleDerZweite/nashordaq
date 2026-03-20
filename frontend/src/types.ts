@@ -26,6 +26,7 @@ export interface UserResponse {
   linked_player_id: number | null;
   onboarding_complete: boolean;
   created_at: string;
+  is_demo: boolean;
 }
 
 export interface BankActionRequest {
@@ -355,6 +356,7 @@ export interface SystemStatusResponse {
   expected_update_interval_minutes: number;
   last_market_update_at: string | null;
   gamba_enabled: boolean;
+  demo_mode_enabled: boolean;
 }
 
 export interface MarketQuoteResponse {

@@ -29,6 +29,7 @@ class UserResponse(BaseModel):
     linked_player_id: int | None
     onboarding_complete: bool
     created_at: datetime
+    is_demo: bool = False
 
 
 class BankLedgerEntryResponse(BaseModel):
@@ -105,6 +106,10 @@ class BalanceInsightsResponse(BaseModel):
     playing_income_last_24h: float
     playing_income_lifetime_total: float
     history: list[UserWealthSnapshotResponse]
+
+
+class DemoNicknameRequest(BaseModel):
+    display_name: str = Field(min_length=1, max_length=32)
 
 
 class UserOnboardingCreate(BaseModel):
@@ -356,6 +361,7 @@ class SystemStatusResponse(BaseModel):
     expected_update_interval_minutes: int
     last_market_update_at: datetime | None
     gamba_enabled: bool
+    demo_mode_enabled: bool = False
 
 
 class MarketAccountResponse(BaseModel):

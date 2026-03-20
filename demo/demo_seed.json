@@ -1,0 +1,1650 @@
+{
+  "players": [
+    {
+      "id": 1,
+      "game_name": "Aatrox",
+      "tag_line": "DEMO",
+      "display_name": "Aatrox",
+      "puuid": null,
+      "summoner_id": null,
+      "current_price": 29.84061148148148,
+      "lp_abs": 2210,
+      "previous_lp_abs": 2210,
+      "streak": 2,
+      "ranked_wins_snapshot": 29,
+      "ranked_losses_snapshot": 25,
+      "avg_lp_gain_on_win": null,
+      "avg_lp_loss_on_loss": null
+    },
+    {
+      "id": 2,
+      "game_name": "Ahri",
+      "tag_line": "DEMO",
+      "display_name": "Ahri",
+      "puuid": null,
+      "summoner_id": null,
+      "current_price": 13.972026338975247,
+      "lp_abs": 2130,
+      "previous_lp_abs": 2130,
+      "streak": 1,
+      "ranked_wins_snapshot": 285,
+      "ranked_losses_snapshot": 289,
+      "avg_lp_gain_on_win": null,
+      "avg_lp_loss_on_loss": null
+    },
+    {
+      "id": 3,
+      "game_name": "Akali",
+      "tag_line": "DEMO",
+      "display_name": "Akali",
+      "puuid": null,
+      "summoner_id": null,
+      "current_price": 48.763490000000004,
+      "lp_abs": 1471,
+      "previous_lp_abs": 1471,
+      "streak": -1,
+      "ranked_wins_snapshot": 29,
+      "ranked_losses_snapshot": 30,
+      "avg_lp_gain_on_win": null,
+      "avg_lp_loss_on_loss": null
+    },
+    {
+      "id": 4,
+      "game_name": "Akshan",
+      "tag_line": "DEMO",
+      "display_name": "Akshan",
+      "puuid": null,
+      "summoner_id": null,
+      "current_price": 10.0,
+      "lp_abs": 0,
+      "previous_lp_abs": 0,
+      "streak": 0,
+      "ranked_wins_snapshot": null,
+      "ranked_losses_snapshot": null,
+      "avg_lp_gain_on_win": null,
+      "avg_lp_loss_on_loss": null
+    },
+    {
+      "id": 5,
+      "game_name": "Alistar",
+      "tag_line": "DEMO",
+      "display_name": "Alistar",
+      "puuid": null,
+      "summoner_id": null,
+      "current_price": 32.32456695652174,
+      "lp_abs": 1362,
+      "previous_lp_abs": 1362,
+      "streak": 3,
+      "ranked_wins_snapshot": 25,
+      "ranked_losses_snapshot": 21,
+      "avg_lp_gain_on_win": null,
+      "avg_lp_loss_on_loss": null
+    },
+    {
+      "id": 6,
+      "game_name": "Amumu",
+      "tag_line": "DEMO",
+      "display_name": "Amumu",
+      "puuid": null,
+      "summoner_id": null,
+      "current_price": 34.22085,
+      "lp_abs": 2093,
+      "previous_lp_abs": 2093,
+      "streak": 1,
+      "ranked_wins_snapshot": 27,
+      "ranked_losses_snapshot": 18,
+      "avg_lp_gain_on_win": null,
+      "avg_lp_loss_on_loss": null
+    },
+    {
+      "id": 7,
+      "game_name": "Anivia",
+      "tag_line": "DEMO",
+      "display_name": "Anivia",
+      "puuid": null,
+      "summoner_id": null,
+      "current_price": 59.735097272727266,
+      "lp_abs": 2274,
+      "previous_lp_abs": 2274,
+      "streak": 4,
+      "ranked_wins_snapshot": 37,
+      "ranked_losses_snapshot": 18,
+      "avg_lp_gain_on_win": null,
+      "avg_lp_loss_on_loss": null
+    },
+    {
+      "id": 8,
+      "game_name": "Annie",
+      "tag_line": "DEMO",
+      "display_name": "Annie",
+      "puuid": null,
+      "summoner_id": null,
+      "current_price": 20.6263712195122,
+      "lp_abs": 2111,
+      "previous_lp_abs": 2111,
+      "streak": -5,
+      "ranked_wins_snapshot": 26,
+      "ranked_losses_snapshot": 15,
+      "avg_lp_gain_on_win": null,
+      "avg_lp_loss_on_loss": null
+    },
+    {
+      "id": 9,
+      "game_name": "Aphelios",
+      "tag_line": "DEMO",
+      "display_name": "Aphelios",
+      "puuid": null,
+      "summoner_id": null,
+      "current_price": 45.051006174496656,
+      "lp_abs": 3156,
+      "previous_lp_abs": 3156,
+      "streak": -2,
+      "ranked_wins_snapshot": 82,
+      "ranked_losses_snapshot": 67,
+      "avg_lp_gain_on_win": null,
+      "avg_lp_loss_on_loss": null
+    },
+    {
+      "id": 10,
+      "game_name": "Ashe",
+      "tag_line": "DEMO",
+      "display_name": "Ashe",
+      "puuid": null,
+      "summoner_id": null,
+      "current_price": 23.4810945474526,
+      "lp_abs": 1016,
+      "previous_lp_abs": 1016,
+      "streak": -1,
+      "ranked_wins_snapshot": 17,
+      "ranked_losses_snapshot": 19,
+      "avg_lp_gain_on_win": null,
+      "avg_lp_loss_on_loss": null
+    },
+    {
+      "id": 11,
+      "game_name": "Azir",
+      "tag_line": "DEMO",
+      "display_name": "Azir",
+      "puuid": null,
+      "summoner_id": null,
+      "current_price": 45.86576,
+      "lp_abs": 2000,
+      "previous_lp_abs": 2000,
+      "streak": -2,
+      "ranked_wins_snapshot": 65,
+      "ranked_losses_snapshot": 68,
+      "avg_lp_gain_on_win": null,
+      "avg_lp_loss_on_loss": null
+    },
+    {
+      "id": 12,
+      "game_name": "Bard",
+      "tag_line": "DEMO",
+      "display_name": "Bard",
+      "puuid": null,
+      "summoner_id": null,
+      "current_price": 31.64225,
+      "lp_abs": 1371,
+      "previous_lp_abs": 1371,
+      "streak": 3,
+      "ranked_wins_snapshot": 9,
+      "ranked_losses_snapshot": 7,
+      "avg_lp_gain_on_win": null,
+      "avg_lp_loss_on_loss": null
+    }
+  ],
+  "price_history": [
+    {
+      "player_id": 1,
+      "price": 32.433481481481486,
+      "lp_abs": 2196,
+      "recorded_at": "2026-03-10T09:20:11.786000+00:00"
+    },
+    {
+      "player_id": 1,
+      "price": 29.775001481481485,
+      "lp_abs": 2177,
+      "recorded_at": "2026-03-10T09:20:12.786000+00:00"
+    },
+    {
+      "player_id": 1,
+      "price": 32.04705148148148,
+      "lp_abs": 2198,
+      "recorded_at": "2026-03-10T10:50:13.208000+00:00"
+    },
+    {
+      "player_id": 1,
+      "price": 29.38857148148148,
+      "lp_abs": 2179,
+      "recorded_at": "2026-03-10T11:19:50.994000+00:00"
+    },
+    {
+      "player_id": 1,
+      "price": 31.66062148148148,
+      "lp_abs": 2200,
+      "recorded_at": "2026-03-10T12:15:33.789000+00:00"
+    },
+    {
+      "player_id": 1,
+      "price": 29.00214148148148,
+      "lp_abs": 2181,
+      "recorded_at": "2026-03-10T13:37:51.882000+00:00"
+    },
+    {
+      "player_id": 1,
+      "price": 26.19318148148148,
+      "lp_abs": 2162,
+      "recorded_at": "2026-03-10T18:42:17.234000+00:00"
+    },
+    {
+      "player_id": 1,
+      "price": 28.46523148148148,
+      "lp_abs": 2183,
+      "recorded_at": "2026-03-10T19:53:35.125000+00:00"
+    },
+    {
+      "player_id": 1,
+      "price": 30.94383148148148,
+      "lp_abs": 2204,
+      "recorded_at": "2026-03-10T21:18:32.717000+00:00"
+    },
+    {
+      "player_id": 1,
+      "price": 28.28535148148148,
+      "lp_abs": 2185,
+      "recorded_at": "2026-03-11T10:28:32.769000+00:00"
+    },
+    {
+      "player_id": 1,
+      "price": 25.476391481481482,
+      "lp_abs": 2166,
+      "recorded_at": "2026-03-11T11:09:37.015000+00:00"
+    },
+    {
+      "player_id": 1,
+      "price": 27.748441481481482,
+      "lp_abs": 2187,
+      "recorded_at": "2026-03-11T11:48:22.182000+00:00"
+    },
+    {
+      "player_id": 1,
+      "price": 25.08996148148148,
+      "lp_abs": 2168,
+      "recorded_at": "2026-03-11T12:24:53.943000+00:00"
+    },
+    {
+      "player_id": 1,
+      "price": 27.36201148148148,
+      "lp_abs": 2189,
+      "recorded_at": "2026-03-11T13:31:21.922000+00:00"
+    },
+    {
+      "player_id": 1,
+      "price": 29.84061148148148,
+      "lp_abs": 2210,
+      "recorded_at": "2026-03-11T14:10:54.593000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 31.94,
+      "lp_abs": 2194,
+      "recorded_at": "2026-03-10T14:24:07.459000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 34.184000000000005,
+      "lp_abs": 2214,
+      "recorded_at": "2026-03-10T14:24:08.459000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 36.632000000000005,
+      "lp_abs": 2234,
+      "recorded_at": "2026-03-10T14:58:42.722000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 33.833600000000004,
+      "lp_abs": 2214,
+      "recorded_at": "2026-03-11T21:13:18.999000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 30.876800000000003,
+      "lp_abs": 2194,
+      "recorded_at": "2026-03-11T21:55:46.189000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 33.1208,
+      "lp_abs": 2214,
+      "recorded_at": "2026-03-11T22:38:39.860000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 35.5688,
+      "lp_abs": 2234,
+      "recorded_at": "2026-03-11T23:16:00.818000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 38.220800000000004,
+      "lp_abs": 2254,
+      "recorded_at": "2026-03-12T21:06:38.367000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 35.4224,
+      "lp_abs": 2234,
+      "recorded_at": "2026-03-12T21:46:05.477000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 32.4656,
+      "lp_abs": 2214,
+      "recorded_at": "2026-03-12T22:20:38.085000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 29.3504,
+      "lp_abs": 2194,
+      "recorded_at": "2026-03-12T23:08:03.594000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 31.5944,
+      "lp_abs": 2214,
+      "recorded_at": "2026-03-12T23:35:18.978000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 34.0424,
+      "lp_abs": 2234,
+      "recorded_at": "2026-03-13T18:48:46.846000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 31.244,
+      "lp_abs": 2214,
+      "recorded_at": "2026-03-13T19:43:26.001000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 33.488,
+      "lp_abs": 2234,
+      "recorded_at": "2026-03-13T20:16:17.962000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 30.6896,
+      "lp_abs": 2214,
+      "recorded_at": "2026-03-13T21:00:53.705000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 32.9336,
+      "lp_abs": 2234,
+      "recorded_at": "2026-03-13T21:46:55.795000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 30.135199999999998,
+      "lp_abs": 2214,
+      "recorded_at": "2026-03-13T23:27:28.648000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 27.178399999999996,
+      "lp_abs": 2194,
+      "recorded_at": "2026-03-14T00:04:56.393000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 29.422399999999996,
+      "lp_abs": 2214,
+      "recorded_at": "2026-03-14T00:35:20.447000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 26.623999999999995,
+      "lp_abs": 2194,
+      "recorded_at": "2026-03-14T11:32:19.244000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 23.667199999999994,
+      "lp_abs": 2174,
+      "recorded_at": "2026-03-14T12:08:56.876000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 25.911199999999994,
+      "lp_abs": 2194,
+      "recorded_at": "2026-03-14T12:35:48.789000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 23.112799999999993,
+      "lp_abs": 2174,
+      "recorded_at": "2026-03-14T14:15:49.589000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 20.15599999999999,
+      "lp_abs": 2154,
+      "recorded_at": "2026-03-14T14:54:42.572000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 22.39999999999999,
+      "lp_abs": 2174,
+      "recorded_at": "2026-03-14T15:30:53.574000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 19.60159999999999,
+      "lp_abs": 2154,
+      "recorded_at": "2026-03-14T16:51:48.907000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 21.84559999999999,
+      "lp_abs": 2174,
+      "recorded_at": "2026-03-14T17:48:31.911000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 24.29359999999999,
+      "lp_abs": 2194,
+      "recorded_at": "2026-03-14T18:10:48.120000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 26.945599999999992,
+      "lp_abs": 2214,
+      "recorded_at": "2026-03-14T19:30:54.563000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 24.14719999999999,
+      "lp_abs": 2194,
+      "recorded_at": "2026-03-14T20:10:31.043000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 21.19039999999999,
+      "lp_abs": 2174,
+      "recorded_at": "2026-03-14T20:47:18.450000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 23.43439999999999,
+      "lp_abs": 2194,
+      "recorded_at": "2026-03-14T21:32:06.386000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 20.63599999999999,
+      "lp_abs": 2174,
+      "recorded_at": "2026-03-14T22:09:34.240000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 17.679199999999987,
+      "lp_abs": 2154,
+      "recorded_at": "2026-03-14T22:43:51.607000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 19.923199999999987,
+      "lp_abs": 2174,
+      "recorded_at": "2026-03-14T23:27:59.006000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 17.124799999999986,
+      "lp_abs": 2154,
+      "recorded_at": "2026-03-15T09:41:27.128000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 14.167999999999985,
+      "lp_abs": 2134,
+      "recorded_at": "2026-03-15T10:26:48.564000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 16.411999999999985,
+      "lp_abs": 2154,
+      "recorded_at": "2026-03-15T10:58:45.678000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 13.613599999999984,
+      "lp_abs": 2134,
+      "recorded_at": "2026-03-15T11:37:51.174000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 10.930087167999986,
+      "lp_abs": 2114,
+      "recorded_at": "2026-03-15T12:12:22.775000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 8.660126664949749,
+      "lp_abs": 2094,
+      "recorded_at": "2026-03-15T12:46:13.632000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 10.904126664949748,
+      "lp_abs": 2114,
+      "recorded_at": "2026-03-15T14:36:08.941000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 8.869852794336722,
+      "lp_abs": 2094,
+      "recorded_at": "2026-03-15T15:14:14.360000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 7.121427411517068,
+      "lp_abs": 2074,
+      "recorded_at": "2026-03-15T15:54:02.382000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 9.365427411517068,
+      "lp_abs": 2094,
+      "recorded_at": "2026-03-15T16:40:44.182000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 7.618213273624443,
+      "lp_abs": 2074,
+      "recorded_at": "2026-03-15T18:46:16.907000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 9.862213273624443,
+      "lp_abs": 2094,
+      "recorded_at": "2026-03-15T19:17:22.193000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 12.310213273624443,
+      "lp_abs": 2114,
+      "recorded_at": "2026-03-15T20:19:18.981000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 10.013619885297068,
+      "lp_abs": 2094,
+      "recorded_at": "2026-03-15T20:53:08.752000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 12.257619885297068,
+      "lp_abs": 2114,
+      "recorded_at": "2026-03-15T21:28:10.408000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 9.970838319496046,
+      "lp_abs": 2094,
+      "recorded_at": "2026-03-15T21:53:29.517000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 8.005386669956986,
+      "lp_abs": 2074,
+      "recorded_at": "2026-03-15T22:23:09.605000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 10.249386669956985,
+      "lp_abs": 2094,
+      "recorded_at": "2026-03-15T22:57:20.946000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 12.697386669956986,
+      "lp_abs": 2114,
+      "recorded_at": "2026-03-16T17:18:40.862000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 10.32856221280981,
+      "lp_abs": 2094,
+      "recorded_at": "2026-03-16T18:09:38.084000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 8.190797720251286,
+      "lp_abs": 2073,
+      "recorded_at": "2026-03-16T18:48:13.126000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 10.322597720251286,
+      "lp_abs": 2092,
+      "recorded_at": "2026-03-16T19:30:04.288000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 12.770597720251287,
+      "lp_abs": 2112,
+      "recorded_at": "2026-03-16T20:05:32.013000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 10.268990874026702,
+      "lp_abs": 2091,
+      "recorded_at": "2026-03-17T16:15:45.064000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 12.512990874026702,
+      "lp_abs": 2111,
+      "recorded_at": "2026-03-17T16:58:24.844000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 10.061846117695358,
+      "lp_abs": 2090,
+      "recorded_at": "2026-03-17T18:22:22.208000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 12.305846117695358,
+      "lp_abs": 2110,
+      "recorded_at": "2026-03-17T19:04:55.338000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 14.753846117695359,
+      "lp_abs": 2130,
+      "recorded_at": "2026-03-18T23:05:11.800000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 17.405846117695358,
+      "lp_abs": 2150,
+      "recorded_at": "2026-03-19T13:55:40.243000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 14.607446117695357,
+      "lp_abs": 2130,
+      "recorded_at": "2026-03-19T23:54:13.795000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 11.728026338975248,
+      "lp_abs": 2110,
+      "recorded_at": "2026-03-20T00:21:30.516000+00:00"
+    },
+    {
+      "player_id": 2,
+      "price": 13.972026338975247,
+      "lp_abs": 2130,
+      "recorded_at": "2026-03-20T01:17:47.356000+00:00"
+    },
+    {
+      "player_id": 3,
+      "price": 22.009999999999998,
+      "lp_abs": 1201,
+      "recorded_at": "2026-03-10T17:14:33.329000+00:00"
+    },
+    {
+      "player_id": 3,
+      "price": 24.534499999999998,
+      "lp_abs": 1231,
+      "recorded_at": "2026-03-10T17:14:34.329000+00:00"
+    },
+    {
+      "player_id": 3,
+      "price": 27.2885,
+      "lp_abs": 1261,
+      "recorded_at": "2026-03-10T18:10:03.342000+00:00"
+    },
+    {
+      "player_id": 3,
+      "price": 30.272,
+      "lp_abs": 1291,
+      "recorded_at": "2026-03-11T15:10:55.441000+00:00"
+    },
+    {
+      "player_id": 3,
+      "price": 33.485,
+      "lp_abs": 1321,
+      "recorded_at": "2026-03-11T15:50:59.255000+00:00"
+    },
+    {
+      "player_id": 3,
+      "price": 36.9275,
+      "lp_abs": 1351,
+      "recorded_at": "2026-03-12T17:21:40.898000+00:00"
+    },
+    {
+      "player_id": 3,
+      "price": 40.5995,
+      "lp_abs": 1381,
+      "recorded_at": "2026-03-12T18:03:27.512000+00:00"
+    },
+    {
+      "player_id": 3,
+      "price": 44.501,
+      "lp_abs": 1411,
+      "recorded_at": "2026-03-16T16:08:00.522000+00:00"
+    },
+    {
+      "player_id": 3,
+      "price": 42.54212,
+      "lp_abs": 1397,
+      "recorded_at": "2026-03-16T16:51:06.846000+00:00"
+    },
+    {
+      "player_id": 3,
+      "price": 44.95442,
+      "lp_abs": 1423,
+      "recorded_at": "2026-03-17T11:01:33.599000+00:00"
+    },
+    {
+      "player_id": 3,
+      "price": 47.58602,
+      "lp_abs": 1449,
+      "recorded_at": "2026-03-18T18:02:49.605000+00:00"
+    },
+    {
+      "player_id": 3,
+      "price": 50.43692,
+      "lp_abs": 1475,
+      "recorded_at": "2026-03-18T18:41:30.875000+00:00"
+    },
+    {
+      "player_id": 3,
+      "price": 48.47804,
+      "lp_abs": 1461,
+      "recorded_at": "2026-03-19T18:46:40.673000+00:00"
+    },
+    {
+      "player_id": 3,
+      "price": 50.86229,
+      "lp_abs": 1486,
+      "recorded_at": "2026-03-19T19:38:01.559000+00:00"
+    },
+    {
+      "player_id": 3,
+      "price": 48.763490000000004,
+      "lp_abs": 1471,
+      "recorded_at": "2026-03-19T20:24:01.697000+00:00"
+    },
+    {
+      "player_id": 4,
+      "price": 10.0,
+      "lp_abs": 0,
+      "recorded_at": "2026-03-20T11:01:01.493019+00:00"
+    },
+    {
+      "player_id": 5,
+      "price": 22.820086956521738,
+      "lp_abs": 1243,
+      "recorded_at": "2026-03-10T21:28:26.347000+00:00"
+    },
+    {
+      "player_id": 5,
+      "price": 25.20433695652174,
+      "lp_abs": 1268,
+      "recorded_at": "2026-03-10T21:28:27.347000+00:00"
+    },
+    {
+      "player_id": 5,
+      "price": 23.24545695652174,
+      "lp_abs": 1254,
+      "recorded_at": "2026-03-11T22:06:40.328000+00:00"
+    },
+    {
+      "player_id": 5,
+      "price": 25.62970695652174,
+      "lp_abs": 1279,
+      "recorded_at": "2026-03-11T22:46:33.911000+00:00"
+    },
+    {
+      "player_id": 5,
+      "price": 23.67082695652174,
+      "lp_abs": 1265,
+      "recorded_at": "2026-03-11T23:36:41.147000+00:00"
+    },
+    {
+      "player_id": 5,
+      "price": 26.05507695652174,
+      "lp_abs": 1290,
+      "recorded_at": "2026-03-12T10:32:29.270000+00:00"
+    },
+    {
+      "player_id": 5,
+      "price": 24.09619695652174,
+      "lp_abs": 1276,
+      "recorded_at": "2026-03-12T11:14:17.854000+00:00"
+    },
+    {
+      "player_id": 5,
+      "price": 26.480446956521742,
+      "lp_abs": 1301,
+      "recorded_at": "2026-03-12T11:56:31.842000+00:00"
+    },
+    {
+      "player_id": 5,
+      "price": 24.521566956521742,
+      "lp_abs": 1287,
+      "recorded_at": "2026-03-17T10:59:05.407000+00:00"
+    },
+    {
+      "player_id": 5,
+      "price": 26.905816956521743,
+      "lp_abs": 1312,
+      "recorded_at": "2026-03-17T11:38:53.748000+00:00"
+    },
+    {
+      "player_id": 5,
+      "price": 29.506816956521742,
+      "lp_abs": 1337,
+      "recorded_at": "2026-03-17T12:41:00.207000+00:00"
+    },
+    {
+      "player_id": 5,
+      "price": 32.32456695652174,
+      "lp_abs": 1362,
+      "recorded_at": "2026-03-19T12:00:27.796000+00:00"
+    },
+    {
+      "player_id": 6,
+      "price": 31.9488,
+      "lp_abs": 2072,
+      "recorded_at": "2026-03-12T13:10:11.512000+00:00"
+    },
+    {
+      "player_id": 6,
+      "price": 34.22085,
+      "lp_abs": 2093,
+      "recorded_at": "2026-03-12T13:10:12.512000+00:00"
+    },
+    {
+      "player_id": 7,
+      "price": 31.484727272727273,
+      "lp_abs": 1945,
+      "recorded_at": "2026-03-10T18:19:07.837000+00:00"
+    },
+    {
+      "player_id": 7,
+      "price": 29.525847272727272,
+      "lp_abs": 1931,
+      "recorded_at": "2026-03-10T18:19:08.837000+00:00"
+    },
+    {
+      "player_id": 7,
+      "price": 31.910097272727274,
+      "lp_abs": 1956,
+      "recorded_at": "2026-03-10T18:53:17.385000+00:00"
+    },
+    {
+      "player_id": 7,
+      "price": 29.951217272727273,
+      "lp_abs": 1942,
+      "recorded_at": "2026-03-10T19:18:06.714000+00:00"
+    },
+    {
+      "player_id": 7,
+      "price": 27.881457272727275,
+      "lp_abs": 1928,
+      "recorded_at": "2026-03-10T19:41:41.052000+00:00"
+    },
+    {
+      "player_id": 7,
+      "price": 30.265707272727276,
+      "lp_abs": 1953,
+      "recorded_at": "2026-03-10T20:15:32.294000+00:00"
+    },
+    {
+      "player_id": 7,
+      "price": 28.306827272727276,
+      "lp_abs": 1939,
+      "recorded_at": "2026-03-10T21:12:46.217000+00:00"
+    },
+    {
+      "player_id": 7,
+      "price": 30.691077272727277,
+      "lp_abs": 1964,
+      "recorded_at": "2026-03-10T21:48:10.313000+00:00"
+    },
+    {
+      "player_id": 7,
+      "price": 28.732197272727277,
+      "lp_abs": 1950,
+      "recorded_at": "2026-03-10T22:32:01.085000+00:00"
+    },
+    {
+      "player_id": 7,
+      "price": 26.662437272727274,
+      "lp_abs": 1936,
+      "recorded_at": "2026-03-11T19:37:29.908000+00:00"
+    },
+    {
+      "player_id": 7,
+      "price": 29.046687272727276,
+      "lp_abs": 1961,
+      "recorded_at": "2026-03-11T20:09:06.467000+00:00"
+    },
+    {
+      "player_id": 7,
+      "price": 31.647687272727275,
+      "lp_abs": 1986,
+      "recorded_at": "2026-03-11T20:48:58.563000+00:00"
+    },
+    {
+      "player_id": 7,
+      "price": 34.46543727272727,
+      "lp_abs": 2011,
+      "recorded_at": "2026-03-11T21:21:14.160000+00:00"
+    },
+    {
+      "player_id": 7,
+      "price": 37.49993727272727,
+      "lp_abs": 2036,
+      "recorded_at": "2026-03-11T21:52:53.959000+00:00"
+    },
+    {
+      "player_id": 7,
+      "price": 40.75118727272727,
+      "lp_abs": 2061,
+      "recorded_at": "2026-03-11T22:41:47.465000+00:00"
+    },
+    {
+      "player_id": 7,
+      "price": 38.79230727272727,
+      "lp_abs": 2047,
+      "recorded_at": "2026-03-11T23:20:36.614000+00:00"
+    },
+    {
+      "player_id": 7,
+      "price": 41.17655727272727,
+      "lp_abs": 2072,
+      "recorded_at": "2026-03-11T23:55:36.530000+00:00"
+    },
+    {
+      "player_id": 7,
+      "price": 43.77755727272727,
+      "lp_abs": 2097,
+      "recorded_at": "2026-03-12T00:36:01.873000+00:00"
+    },
+    {
+      "player_id": 7,
+      "price": 41.81867727272727,
+      "lp_abs": 2083,
+      "recorded_at": "2026-03-12T18:52:28.688000+00:00"
+    },
+    {
+      "player_id": 7,
+      "price": 44.20292727272727,
+      "lp_abs": 2108,
+      "recorded_at": "2026-03-12T19:21:37.134000+00:00"
+    },
+    {
+      "player_id": 7,
+      "price": 46.80392727272727,
+      "lp_abs": 2133,
+      "recorded_at": "2026-03-12T20:00:50.829000+00:00"
+    },
+    {
+      "player_id": 7,
+      "price": 49.62167727272727,
+      "lp_abs": 2158,
+      "recorded_at": "2026-03-12T20:37:21.144000+00:00"
+    },
+    {
+      "player_id": 7,
+      "price": 52.65617727272727,
+      "lp_abs": 2183,
+      "recorded_at": "2026-03-12T21:09:45.876000+00:00"
+    },
+    {
+      "player_id": 7,
+      "price": 55.90742727272727,
+      "lp_abs": 2208,
+      "recorded_at": "2026-03-12T21:54:50.600000+00:00"
+    },
+    {
+      "player_id": 7,
+      "price": 59.375427272727265,
+      "lp_abs": 2233,
+      "recorded_at": "2026-03-12T22:28:41.120000+00:00"
+    },
+    {
+      "player_id": 7,
+      "price": 57.416547272727264,
+      "lp_abs": 2219,
+      "recorded_at": "2026-03-12T23:01:48.200000+00:00"
+    },
+    {
+      "player_id": 7,
+      "price": 59.800797272727266,
+      "lp_abs": 2244,
+      "recorded_at": "2026-03-12T23:36:13.826000+00:00"
+    },
+    {
+      "player_id": 7,
+      "price": 57.841917272727265,
+      "lp_abs": 2230,
+      "recorded_at": "2026-03-13T00:07:01.297000+00:00"
+    },
+    {
+      "player_id": 7,
+      "price": 55.77215727272726,
+      "lp_abs": 2216,
+      "recorded_at": "2026-03-13T00:55:49.461000+00:00"
+    },
+    {
+      "player_id": 7,
+      "price": 53.591517272727266,
+      "lp_abs": 2202,
+      "recorded_at": "2026-03-13T01:29:48.892000+00:00"
+    },
+    {
+      "player_id": 7,
+      "price": 51.29999727272727,
+      "lp_abs": 2188,
+      "recorded_at": "2026-03-15T18:32:13.215000+00:00"
+    },
+    {
+      "player_id": 7,
+      "price": 48.89759727272727,
+      "lp_abs": 2174,
+      "recorded_at": "2026-03-15T19:10:51.305000+00:00"
+    },
+    {
+      "player_id": 7,
+      "price": 51.28184727272727,
+      "lp_abs": 2199,
+      "recorded_at": "2026-03-15T19:37:06.489000+00:00"
+    },
+    {
+      "player_id": 7,
+      "price": 53.88284727272727,
+      "lp_abs": 2224,
+      "recorded_at": "2026-03-15T20:13:21.983000+00:00"
+    },
+    {
+      "player_id": 7,
+      "price": 56.700597272727265,
+      "lp_abs": 2249,
+      "recorded_at": "2026-03-15T20:55:29.653000+00:00"
+    },
+    {
+      "player_id": 7,
+      "price": 59.735097272727266,
+      "lp_abs": 2274,
+      "recorded_at": "2026-03-15T21:25:08.225000+00:00"
+    },
+    {
+      "player_id": 8,
+      "price": 33.537951219512195,
+      "lp_abs": 2183,
+      "recorded_at": "2026-03-10T10:50:12.208000+00:00"
+    },
+    {
+      "player_id": 8,
+      "price": 35.810001219512195,
+      "lp_abs": 2204,
+      "recorded_at": "2026-03-10T10:50:13.208000+00:00"
+    },
+    {
+      "player_id": 8,
+      "price": 33.1515212195122,
+      "lp_abs": 2185,
+      "recorded_at": "2026-03-10T11:19:50.994000+00:00"
+    },
+    {
+      "player_id": 8,
+      "price": 35.4235712195122,
+      "lp_abs": 2206,
+      "recorded_at": "2026-03-10T12:15:33.789000+00:00"
+    },
+    {
+      "player_id": 8,
+      "price": 32.7650912195122,
+      "lp_abs": 2187,
+      "recorded_at": "2026-03-10T13:37:51.882000+00:00"
+    },
+    {
+      "player_id": 8,
+      "price": 29.9561312195122,
+      "lp_abs": 2168,
+      "recorded_at": "2026-03-10T18:16:13.433000+00:00"
+    },
+    {
+      "player_id": 8,
+      "price": 26.9966912195122,
+      "lp_abs": 2149,
+      "recorded_at": "2026-03-10T19:00:35.359000+00:00"
+    },
+    {
+      "player_id": 8,
+      "price": 23.8867712195122,
+      "lp_abs": 2130,
+      "recorded_at": "2026-03-11T10:28:32.769000+00:00"
+    },
+    {
+      "player_id": 8,
+      "price": 20.6263712195122,
+      "lp_abs": 2111,
+      "recorded_at": "2026-03-11T11:09:37.015000+00:00"
+    },
+    {
+      "player_id": 9,
+      "price": 41.99892617449665,
+      "lp_abs": 3117,
+      "recorded_at": "2026-03-10T14:02:29.205000+00:00"
+    },
+    {
+      "player_id": 9,
+      "price": 44.24292617449665,
+      "lp_abs": 3137,
+      "recorded_at": "2026-03-10T14:02:30.205000+00:00"
+    },
+    {
+      "player_id": 9,
+      "price": 41.44452617449665,
+      "lp_abs": 3117,
+      "recorded_at": "2026-03-10T14:52:05.716000+00:00"
+    },
+    {
+      "player_id": 9,
+      "price": 43.68852617449665,
+      "lp_abs": 3137,
+      "recorded_at": "2026-03-10T16:47:43.513000+00:00"
+    },
+    {
+      "player_id": 9,
+      "price": 40.89012617449665,
+      "lp_abs": 3117,
+      "recorded_at": "2026-03-11T14:12:22.905000+00:00"
+    },
+    {
+      "player_id": 9,
+      "price": 37.93332617449665,
+      "lp_abs": 3097,
+      "recorded_at": "2026-03-11T15:07:05.073000+00:00"
+    },
+    {
+      "player_id": 9,
+      "price": 40.17732617449665,
+      "lp_abs": 3117,
+      "recorded_at": "2026-03-11T16:38:47.644000+00:00"
+    },
+    {
+      "player_id": 9,
+      "price": 42.62532617449665,
+      "lp_abs": 3137,
+      "recorded_at": "2026-03-12T15:27:25.183000+00:00"
+    },
+    {
+      "player_id": 9,
+      "price": 45.27732617449665,
+      "lp_abs": 3157,
+      "recorded_at": "2026-03-14T12:10:18.103000+00:00"
+    },
+    {
+      "player_id": 9,
+      "price": 48.13332617449665,
+      "lp_abs": 3177,
+      "recorded_at": "2026-03-14T20:25:39.928000+00:00"
+    },
+    {
+      "player_id": 9,
+      "price": 51.193326174496654,
+      "lp_abs": 3197,
+      "recorded_at": "2026-03-15T12:51:59.119000+00:00"
+    },
+    {
+      "player_id": 9,
+      "price": 54.45732617449666,
+      "lp_abs": 3217,
+      "recorded_at": "2026-03-15T20:08:58.747000+00:00"
+    },
+    {
+      "player_id": 9,
+      "price": 51.51900617449666,
+      "lp_abs": 3196,
+      "recorded_at": "2026-03-16T20:02:21.912000+00:00"
+    },
+    {
+      "player_id": 9,
+      "price": 48.56220617449666,
+      "lp_abs": 3176,
+      "recorded_at": "2026-03-18T16:40:57.876000+00:00"
+    },
+    {
+      "player_id": 9,
+      "price": 50.80620617449666,
+      "lp_abs": 3196,
+      "recorded_at": "2026-03-18T18:52:51.509000+00:00"
+    },
+    {
+      "player_id": 9,
+      "price": 48.00780617449666,
+      "lp_abs": 3176,
+      "recorded_at": "2026-03-19T09:32:41.412000+00:00"
+    },
+    {
+      "player_id": 9,
+      "price": 45.051006174496656,
+      "lp_abs": 3156,
+      "recorded_at": "2026-03-19T10:10:33.692000+00:00"
+    },
+    {
+      "player_id": 10,
+      "price": 18.7,
+      "lp_abs": 870,
+      "recorded_at": "2026-03-10T20:19:33.195000+00:00"
+    },
+    {
+      "player_id": 10,
+      "price": 16.88104,
+      "lp_abs": 857,
+      "recorded_at": "2026-03-10T20:19:34.195000+00:00"
+    },
+    {
+      "player_id": 10,
+      "price": 14.959119999999999,
+      "lp_abs": 844,
+      "recorded_at": "2026-03-10T20:57:41.569000+00:00"
+    },
+    {
+      "player_id": 10,
+      "price": 17.39947,
+      "lp_abs": 871,
+      "recorded_at": "2026-03-10T21:39:16.039000+00:00"
+    },
+    {
+      "player_id": 10,
+      "price": 15.58051,
+      "lp_abs": 858,
+      "recorded_at": "2026-03-10T22:49:03.483000+00:00"
+    },
+    {
+      "player_id": 10,
+      "price": 18.02086,
+      "lp_abs": 885,
+      "recorded_at": "2026-03-11T13:05:33.272000+00:00"
+    },
+    {
+      "player_id": 10,
+      "price": 16.2019,
+      "lp_abs": 872,
+      "recorded_at": "2026-03-11T13:55:10.572000+00:00"
+    },
+    {
+      "player_id": 10,
+      "price": 14.279979999999998,
+      "lp_abs": 859,
+      "recorded_at": "2026-03-11T14:34:13.532000+00:00"
+    },
+    {
+      "player_id": 10,
+      "price": 12.352296939839999,
+      "lp_abs": 846,
+      "recorded_at": "2026-03-11T15:16:51.528000+00:00"
+    },
+    {
+      "player_id": 10,
+      "price": 10.600049505142056,
+      "lp_abs": 833,
+      "recorded_at": "2026-03-11T15:48:39.998000+00:00"
+    },
+    {
+      "player_id": 10,
+      "price": 9.02361014273733,
+      "lp_abs": 820,
+      "recorded_at": "2026-03-11T16:34:07.071000+00:00"
+    },
+    {
+      "player_id": 10,
+      "price": 7.619680782289684,
+      "lp_abs": 807,
+      "recorded_at": "2026-03-11T17:29:36.383000+00:00"
+    },
+    {
+      "player_id": 10,
+      "price": 10.060030782289685,
+      "lp_abs": 834,
+      "recorded_at": "2026-03-11T18:19:12.788000+00:00"
+    },
+    {
+      "player_id": 10,
+      "price": 8.840111209506109,
+      "lp_abs": 821,
+      "recorded_at": "2026-03-11T18:52:26.435000+00:00"
+    },
+    {
+      "player_id": 10,
+      "price": 11.28046120950611,
+      "lp_abs": 848,
+      "recorded_at": "2026-03-13T19:11:51.300000+00:00"
+    },
+    {
+      "player_id": 10,
+      "price": 13.94266120950611,
+      "lp_abs": 875,
+      "recorded_at": "2026-03-13T19:46:18.258000+00:00"
+    },
+    {
+      "player_id": 10,
+      "price": 12.25191834059656,
+      "lp_abs": 862,
+      "recorded_at": "2026-03-15T16:45:34.822000+00:00"
+    },
+    {
+      "player_id": 10,
+      "price": 10.682104547452605,
+      "lp_abs": 849,
+      "recorded_at": "2026-03-15T17:19:48.751000+00:00"
+    },
+    {
+      "player_id": 10,
+      "price": 13.122454547452605,
+      "lp_abs": 876,
+      "recorded_at": "2026-03-17T19:50:57.046000+00:00"
+    },
+    {
+      "player_id": 10,
+      "price": 15.784654547452606,
+      "lp_abs": 903,
+      "recorded_at": "2026-03-17T20:35:14.510000+00:00"
+    },
+    {
+      "player_id": 10,
+      "price": 14.105614547452605,
+      "lp_abs": 891,
+      "recorded_at": "2026-03-17T21:11:19.090000+00:00"
+    },
+    {
+      "player_id": 10,
+      "price": 16.545964547452606,
+      "lp_abs": 918,
+      "recorded_at": "2026-03-17T21:43:50.859000+00:00"
+    },
+    {
+      "player_id": 10,
+      "price": 19.208164547452604,
+      "lp_abs": 945,
+      "recorded_at": "2026-03-17T22:14:35.313000+00:00"
+    },
+    {
+      "player_id": 10,
+      "price": 22.125364547452605,
+      "lp_abs": 973,
+      "recorded_at": "2026-03-17T22:51:44.959000+00:00"
+    },
+    {
+      "player_id": 10,
+      "price": 25.266964547452606,
+      "lp_abs": 1001,
+      "recorded_at": "2026-03-18T12:05:47.746000+00:00"
+    },
+    {
+      "player_id": 10,
+      "price": 23.587924547452605,
+      "lp_abs": 989,
+      "recorded_at": "2026-03-18T12:32:29.098000+00:00"
+    },
+    {
+      "player_id": 10,
+      "price": 21.666004547452605,
+      "lp_abs": 976,
+      "recorded_at": "2026-03-18T13:14:05.076000+00:00"
+    },
+    {
+      "player_id": 10,
+      "price": 24.106354547452604,
+      "lp_abs": 1003,
+      "recorded_at": "2026-03-18T14:48:06.689000+00:00"
+    },
+    {
+      "player_id": 10,
+      "price": 26.768554547452602,
+      "lp_abs": 1030,
+      "recorded_at": "2026-03-18T15:27:10.520000+00:00"
+    },
+    {
+      "player_id": 10,
+      "price": 24.9495945474526,
+      "lp_abs": 1017,
+      "recorded_at": "2026-03-18T16:12:03.567000+00:00"
+    },
+    {
+      "player_id": 10,
+      "price": 23.0276745474526,
+      "lp_abs": 1004,
+      "recorded_at": "2026-03-18T20:50:19.317000+00:00"
+    },
+    {
+      "player_id": 10,
+      "price": 25.4399745474526,
+      "lp_abs": 1030,
+      "recorded_at": "2026-03-18T21:25:33.063000+00:00"
+    },
+    {
+      "player_id": 10,
+      "price": 23.4810945474526,
+      "lp_abs": 1016,
+      "recorded_at": "2026-03-18T22:25:45.504000+00:00"
+    },
+    {
+      "player_id": 11,
+      "price": 28.37,
+      "lp_abs": 1837,
+      "recorded_at": "2026-03-11T12:53:54.430000+00:00"
+    },
+    {
+      "player_id": 11,
+      "price": 26.9708,
+      "lp_abs": 1827,
+      "recorded_at": "2026-03-11T12:53:55.430000+00:00"
+    },
+    {
+      "player_id": 11,
+      "price": 29.2148,
+      "lp_abs": 1847,
+      "recorded_at": "2026-03-11T13:43:27.315000+00:00"
+    },
+    {
+      "player_id": 11,
+      "price": 27.8156,
+      "lp_abs": 1837,
+      "recorded_at": "2026-03-11T15:40:45.765000+00:00"
+    },
+    {
+      "player_id": 11,
+      "price": 30.0596,
+      "lp_abs": 1857,
+      "recorded_at": "2026-03-11T16:07:53.010000+00:00"
+    },
+    {
+      "player_id": 11,
+      "price": 32.5076,
+      "lp_abs": 1877,
+      "recorded_at": "2026-03-11T16:40:36.804000+00:00"
+    },
+    {
+      "player_id": 11,
+      "price": 35.1596,
+      "lp_abs": 1897,
+      "recorded_at": "2026-03-11T19:06:59.790000+00:00"
+    },
+    {
+      "player_id": 11,
+      "price": 38.0156,
+      "lp_abs": 1917,
+      "recorded_at": "2026-03-11T19:45:07.507000+00:00"
+    },
+    {
+      "player_id": 11,
+      "price": 36.6164,
+      "lp_abs": 1907,
+      "recorded_at": "2026-03-12T11:02:19.389000+00:00"
+    },
+    {
+      "player_id": 11,
+      "price": 35.138,
+      "lp_abs": 1897,
+      "recorded_at": "2026-03-12T11:30:12.195000+00:00"
+    },
+    {
+      "player_id": 11,
+      "price": 33.5804,
+      "lp_abs": 1887,
+      "recorded_at": "2026-03-12T12:06:43.157000+00:00"
+    },
+    {
+      "player_id": 11,
+      "price": 31.943599999999996,
+      "lp_abs": 1877,
+      "recorded_at": "2026-03-12T13:02:37.517000+00:00"
+    },
+    {
+      "player_id": 11,
+      "price": 34.187599999999996,
+      "lp_abs": 1897,
+      "recorded_at": "2026-03-12T13:24:49.896000+00:00"
+    },
+    {
+      "player_id": 11,
+      "price": 36.6356,
+      "lp_abs": 1917,
+      "recorded_at": "2026-03-12T14:09:46.639000+00:00"
+    },
+    {
+      "player_id": 11,
+      "price": 39.2876,
+      "lp_abs": 1937,
+      "recorded_at": "2026-03-12T15:53:04.258000+00:00"
+    },
+    {
+      "player_id": 11,
+      "price": 37.8884,
+      "lp_abs": 1927,
+      "recorded_at": "2026-03-12T18:39:59.293000+00:00"
+    },
+    {
+      "player_id": 11,
+      "price": 36.41,
+      "lp_abs": 1917,
+      "recorded_at": "2026-03-12T19:22:13.247000+00:00"
+    },
+    {
+      "player_id": 11,
+      "price": 34.852399999999996,
+      "lp_abs": 1907,
+      "recorded_at": "2026-03-12T20:05:26.634000+00:00"
+    },
+    {
+      "player_id": 11,
+      "price": 37.096399999999996,
+      "lp_abs": 1927,
+      "recorded_at": "2026-03-12T20:36:19.739000+00:00"
+    },
+    {
+      "player_id": 11,
+      "price": 35.697199999999995,
+      "lp_abs": 1917,
+      "recorded_at": "2026-03-12T21:10:36.741000+00:00"
+    },
+    {
+      "player_id": 11,
+      "price": 34.218799999999995,
+      "lp_abs": 1907,
+      "recorded_at": "2026-03-12T21:47:15.692000+00:00"
+    },
+    {
+      "player_id": 11,
+      "price": 36.462799999999994,
+      "lp_abs": 1927,
+      "recorded_at": "2026-03-15T11:08:58.349000+00:00"
+    },
+    {
+      "player_id": 11,
+      "price": 38.910799999999995,
+      "lp_abs": 1947,
+      "recorded_at": "2026-03-15T11:59:16.634000+00:00"
+    },
+    {
+      "player_id": 11,
+      "price": 41.562799999999996,
+      "lp_abs": 1967,
+      "recorded_at": "2026-03-15T12:40:20.544000+00:00"
+    },
+    {
+      "player_id": 11,
+      "price": 44.4188,
+      "lp_abs": 1987,
+      "recorded_at": "2026-03-15T13:31:00.665000+00:00"
+    },
+    {
+      "player_id": 11,
+      "price": 47.4788,
+      "lp_abs": 2007,
+      "recorded_at": "2026-03-15T15:23:50.742000+00:00"
+    },
+    {
+      "player_id": 11,
+      "price": 46.49936,
+      "lp_abs": 2000,
+      "recorded_at": "2026-03-17T17:11:39.195000+00:00"
+    },
+    {
+      "player_id": 11,
+      "price": 48.74336,
+      "lp_abs": 2020,
+      "recorded_at": "2026-03-17T17:47:26.278000+00:00"
+    },
+    {
+      "player_id": 11,
+      "price": 47.34416,
+      "lp_abs": 2010,
+      "recorded_at": "2026-03-17T19:35:13.287000+00:00"
+    },
+    {
+      "player_id": 11,
+      "price": 45.86576,
+      "lp_abs": 2000,
+      "recorded_at": "2026-03-17T20:12:43.012000+00:00"
+    },
+    {
+      "player_id": 12,
+      "price": 23.38025,
+      "lp_abs": 1281,
+      "recorded_at": "2026-03-14T15:33:07.642000+00:00"
+    },
+    {
+      "player_id": 12,
+      "price": 25.90475,
+      "lp_abs": 1311,
+      "recorded_at": "2026-03-14T15:33:08.642000+00:00"
+    },
+    {
+      "player_id": 12,
+      "price": 28.65875,
+      "lp_abs": 1341,
+      "recorded_at": "2026-03-16T23:01:07.650000+00:00"
+    },
+    {
+      "player_id": 12,
+      "price": 31.64225,
+      "lp_abs": 1371,
+      "recorded_at": "2026-03-18T11:12:07.483000+00:00"
+    }
+  ]
+}

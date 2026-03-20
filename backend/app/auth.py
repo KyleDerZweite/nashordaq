@@ -1,3 +1,4 @@
+import secrets
 from functools import lru_cache
 from ipaddress import ip_address, ip_network
 from typing import Annotated
@@ -59,14 +60,47 @@ def is_admin_user(user: User) -> bool:
     return is_admin_email(user.email or user.username)
 
 
+def is_demo_user(user: User) -> bool:
+    return user.is_demo
+
+
 async def _get_current_user(request: Request, session: SessionDep) -> User:
+    email = request.headers.get(settings.remote_email_header)
+    username = request.headers.get(settings.auth_header, "")
+
+    # Demo mode: create or resume ephemeral session when no proxy headers
+    if settings.demo_mode_enabled and not email and not username:
+        cookie_token = request.cookies.get("nashordaq_demo_session")
+        if cookie_token:
+            result = await session.execute(
+                select(User).where(
+                    User.username == f"demo_{cookie_token}",
+                    User.is_demo == True,  # noqa: E712
+                )
+            )
+            user = result.scalar_one_or_none()
+            if user is not None:
+                return user
+
+        # Create new demo user
+        token = secrets.token_urlsafe(16)
+        user = User(
+            username=f"demo_{token}",
+            email=f"demo_{token}@demo.nashordaq.local",
+            display_name="",
+            balance=settings.starting_balance,
+            is_demo=True,
+        )
+        session.add(user)
+        await session.commit()
+        await session.refresh(user)
+        request.state.demo_session_token = token
+        return user
+
     if not _is_trusted_proxy_request(request):
         raise HTTPException(status_code=403, detail="Untrusted proxy source")
 
-    email = request.headers.get(settings.remote_email_header)
     display_name = request.headers.get(settings.remote_name_header, "")
-    # Fallback: legacy setups that only have Remote-User
-    username = request.headers.get(settings.auth_header, "")
 
     if not email and not username:
         raise HTTPException(status_code=401, detail="Missing authentication header")
@@ -120,6 +154,9 @@ CurrentUser = Annotated[User, Depends(_get_current_user)]
 
 
 def _require_onboarded_user(user: CurrentUser) -> User:
+    if user.is_demo:
+        return user
+
     if is_admin_user(user):
         raise HTTPException(status_code=403, detail="Admin users cannot trade")
 

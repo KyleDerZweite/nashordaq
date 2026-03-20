@@ -479,6 +479,16 @@ export function useClaimPoro() {
   });
 }
 
+export function useSetDemoNickname() {
+  const qc = useQueryClient();
+  return useMutation<UserResponse, Error, { display_name: string }>({
+    mutationFn: (body) => post<UserResponse>("/user/demo-nickname", body),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.user });
+    },
+  });
+}
+
 // ---- Simulation ----
 
 export function useSimulationDefaults(enabled = true) {

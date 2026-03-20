@@ -19,6 +19,7 @@ from app.pricing import (
 from app.riot import PlayerNotFoundError, RateLimitedError, get_rank
 from app.schemas import (
     BalanceInsightsResponse,
+    DemoNicknameRequest,
     UserOnboardingCreate,
     UserProfileUpdate,
     UserResponse,
@@ -124,8 +125,9 @@ def _to_user_response(user: User) -> UserResponse:
         role=get_user_role(identity),
         balance=user.balance,
         linked_player_id=user.linked_player_id,
-        onboarding_complete=user.linked_player_id is not None,
+        onboarding_complete=user.is_demo or user.linked_player_id is not None,
         created_at=user.created_at,
+        is_demo=user.is_demo,
     )
 
 
@@ -167,6 +169,21 @@ async def get_balance_insights(
     )
 
 
+@router.post("/user/demo-nickname", response_model=UserResponse)
+async def set_demo_nickname(
+    body: DemoNicknameRequest,
+    user: CurrentUser,
+    session: SessionDep,
+) -> UserResponse:
+    if not user.is_demo:
+        raise HTTPException(status_code=403, detail="Only available for demo users")
+
+    user.display_name = body.display_name
+    await session.commit()
+    await session.refresh(user)
+    return _to_user_response(user)
+
+
 @router.post("/user/onboarding", response_model=UserResponse)
 async def complete_onboarding(
     body: UserOnboardingCreate,
@@ -174,6 +191,8 @@ async def complete_onboarding(
     user: CurrentUser,
     session: SessionDep,
 ) -> UserResponse:
+    if user.is_demo:
+        raise HTTPException(status_code=403, detail="Not available in demo mode")
     if is_admin_user(user):
         raise HTTPException(status_code=403, detail="Admin users cannot onboard")
 
@@ -230,6 +249,8 @@ async def update_profile(
     user: CurrentUser,
     session: SessionDep,
 ) -> UserResponse:
+    if user.is_demo:
+        raise HTTPException(status_code=403, detail="Not available in demo mode")
     if is_admin_user(user):
         raise HTTPException(
             status_code=403,

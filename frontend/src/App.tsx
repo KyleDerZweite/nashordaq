@@ -3,6 +3,8 @@ import BalanceInsightsModal from "./components/BalanceInsightsModal";
 import AdminDashboard from "./components/admin/AdminDashboard";
 import Header from "./components/Header";
 import BankModal from "./components/BankModal";
+import DemoBanner from "./components/DemoBanner";
+import DemoNicknameModal from "./components/DemoNicknameModal";
 import SimulationView from "./components/SimulationView";
 import FlyingPoro from "./components/FlyingPoro";
 import MarketGrid from "./components/MarketGrid";
@@ -71,6 +73,7 @@ export default function App() {
 
   const { data: user } = useUser();
   const onboardingComplete = user?.onboarding_complete ?? false;
+  const isDemo = user?.is_demo ?? false;
   const isAdmin = user?.role === "admin";
   const { data: players, isLoading: playersLoading } = usePlayers();
   const { data: portfolio } = usePortfolio(onboardingComplete && !isAdmin);
@@ -97,9 +100,11 @@ export default function App() {
   }, [adminViewMode]);
 
   const balance = user?.balance ?? 0;
+  const gambaEnabled = systemStatus?.gamba_enabled ?? true;
   const canTrade =
-    Boolean(user) && user?.role === "player" && onboardingComplete;
-  const canManageBank = canTrade;
+    Boolean(user) && user?.role === "player" && (onboardingComplete || isDemo);
+  const canManageBank = canTrade && !isDemo;
+  const showGamba = gambaEnabled && !isDemo;
   const effectiveAdminViewMode: AdminViewMode = isAdmin
     ? adminViewMode
     : "spectator";
@@ -141,7 +146,6 @@ export default function App() {
     });
   }, [players, tickerSortMode]);
 
-  const gambaEnabled = systemStatus?.gamba_enabled ?? true;
   const resolvedSystemStatus = isAdmin ? adminSystemStatus : systemStatus;
   const marketStatusTone = resolvedSystemStatus?.market_status ?? "idle";
   const marketStatusLabel =
@@ -185,6 +189,7 @@ export default function App() {
         canEditProfile={Boolean(linkedPlayer) && !isAdmin}
         canToggleAdminView={isAdmin}
         adminViewMode={effectiveAdminViewMode}
+        isDemo={isDemo}
         onOpenBalanceInsights={() => setIsBalanceInsightsOpen(true)}
         onEditProfile={() => setIsProfileEditorOpen(true)}
         showSimulation={showSimulation}
@@ -197,6 +202,7 @@ export default function App() {
       />
 
       <main className="mx-auto w-full max-w-[88rem] flex-1 px-6 py-8">
+        {isDemo && <DemoBanner />}
         {showSimulation ? (
           <SimulationView onClose={() => setShowSimulation(false)} />
         ) : (
@@ -374,10 +380,10 @@ export default function App() {
                     <Portfolio
                       portfolio={portfolio}
                       onOpenInsights={() => setIsPortfolioInsightsOpen(true)}
-                      gambaEnabled={gambaEnabled}
+                      gambaEnabled={showGamba}
                     />
                     <Leaderboard entries={leaderboard ?? []} />
-                    {gambaEnabled && (
+                    {showGamba && (
                       <GambaWidget balance={balance} canTrade={canTrade} />
                     )}
                   </div>
@@ -438,6 +444,7 @@ export default function App() {
           balance={balance}
           ownedQuantity={tradeHolding?.quantity ?? 0}
           isOwnStock={user?.linked_player_id === tradePlayer.id}
+          isDemo={isDemo}
           onClose={() => setTrade(null)}
         />
       )}
@@ -449,7 +456,7 @@ export default function App() {
           canOpenBank={canManageBank}
           debtOutstanding={bankSummary?.debt_outstanding ?? 0}
           rescueLoanAvailable={bankSummary?.rescue_loan_available ?? false}
-          gambaEnabled={gambaEnabled}
+          gambaEnabled={showGamba}
           onOpenBank={() => {
             setIsBalanceInsightsOpen(false);
             setIsBankModalOpen(true);
@@ -461,16 +468,16 @@ export default function App() {
         <PortfolioInsightsModal
           portfolio={portfolio}
           canTrade={canTrade}
-          gambaEnabled={gambaEnabled}
+          gambaEnabled={showGamba}
           onTrade={(playerId, side) => setTrade({ playerId, side })}
           onClose={() => setIsPortfolioInsightsOpen(false)}
         />
       )}
 
-      {isBankModalOpen && (
+      {isBankModalOpen && !isDemo && (
         <BankModal
           canManageBank={canManageBank}
-          gambaEnabled={gambaEnabled}
+          gambaEnabled={showGamba}
           onClose={() => setIsBankModalOpen(false)}
         />
       )}
@@ -509,9 +516,15 @@ export default function App() {
         </div>
       )}
 
-      {user && !user.onboarding_complete && !isAdmin && <OnboardingModal />}
+      {user && !user.onboarding_complete && !isAdmin && !isDemo && (
+        <OnboardingModal />
+      )}
 
-      <FlyingPoro enabled={canTrade} />
+      {isDemo && (!user?.display_name || user.display_name === "") && (
+        <DemoNicknameModal />
+      )}
+
+      {!isDemo && <FlyingPoro enabled={canTrade} />}
     </div>
   );
 }

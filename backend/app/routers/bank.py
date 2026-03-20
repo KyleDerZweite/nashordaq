@@ -106,6 +106,8 @@ async def get_bank_summary(
     user: CurrentOnboardedUser,
     session: SessionDep,
 ) -> BankSummaryResponse:
+    if user.is_demo:
+        raise HTTPException(status_code=403, detail="Not available in demo mode")
     return await _build_bank_summary(session, user, as_of=datetime.now(UTC))
 
 
@@ -115,6 +117,8 @@ async def borrow_from_bank(
     user: CurrentOnboardedUser,
     session: SessionDep,
 ) -> BankSummaryResponse:
+    if user.is_demo:
+        raise HTTPException(status_code=403, detail="Not available in demo mode")
     now = datetime.now(UTC)
     await apply_due_interest(session, user, as_of=now)
     snapshot = await build_account_snapshot(session, user, as_of=now)
@@ -154,6 +158,8 @@ async def repay_bank_debt(
     user: CurrentOnboardedUser,
     session: SessionDep,
 ) -> BankSummaryResponse:
+    if user.is_demo:
+        raise HTTPException(status_code=403, detail="Not available in demo mode")
     now = datetime.now(UTC)
     await apply_due_interest(session, user, as_of=now)
     outstanding = current_outstanding_debt(user)

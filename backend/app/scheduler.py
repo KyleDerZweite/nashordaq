@@ -1070,11 +1070,134 @@ async def poro_maintenance_job() -> None:
         await poro_state_notifier.notify(user_id)
 
 
+async def demo_market_tick_job() -> None:
+    """Simulate market movements for demo mode using random LP deltas."""
+    import random
+
+    async with SessionLocal() as session:
+        result = await session.execute(select(TrackedPlayer))
+        players = result.scalars().all()
+
+        for player in players:
+            avg_gain = player.avg_lp_gain_on_win or 20.0
+            avg_loss = player.avg_lp_loss_on_loss or 18.0
+
+            # Bias direction by streak: positive streak -> more likely to win
+            win_probability = 0.5 + (player.streak * 0.03)
+            win_probability = max(0.2, min(0.8, win_probability))
+            is_win = random.random() < win_probability
+
+            if is_win:
+                delta_lp = max(1, int(random.gauss(avg_gain, avg_gain * 0.3)))
+            else:
+                delta_lp = -max(1, int(random.gauss(avg_loss, avg_loss * 0.3)))
+
+            player.previous_lp_abs = player.lp_abs
+            player.lp_abs = max(0, player.lp_abs + delta_lp)
+            player.streak = update_streak(player.streak, delta_lp)
+            player.current_price = calculate_new_price(
+                player.current_price,
+                delta_lp,
+                player.streak,
+                avg_lp_loss_on_loss=player.avg_lp_loss_on_loss,
+                avg_lp_gain_on_win=player.avg_lp_gain_on_win,
+            )
+            player.last_updated = datetime.now(UTC)
+
+            session.add(
+                PriceHistory(
+                    player_id=player.id,
+                    price=player.current_price,
+                    lp_abs=player.lp_abs,
+                )
+            )
+
+        await session.commit()
+        logger.info("Demo market tick: updated %d players", len(players))
+
+
+async def demo_cleanup_job() -> None:
+    """Remove expired demo users and all their related rows."""
+    cutoff = datetime.now(UTC) - timedelta(hours=settings.demo_session_ttl_hours)
+
+    async with SessionLocal() as session:
+        expired_result = await session.execute(
+            select(User).where(
+                User.is_demo == True,  # noqa: E712
+                User.created_at < cutoff,
+            )
+        )
+        expired_users = expired_result.scalars().all()
+
+        if not expired_users:
+            return
+
+        expired_ids = [u.id for u in expired_users]
+
+        # Delete in dependency order
+        from sqlalchemy import delete as sa_delete
+
+        from app.models import (
+            BankLedgerEntry,
+            HoldingLot,
+            PoroSpawn,
+            UserPoroState,
+            UserWealthSnapshot,
+        )
+
+        for model in [
+            UserPoroState,
+            PoroSpawn,
+            UserWealthSnapshot,
+            PlayingIncomeEntry,
+            BankLedgerEntry,
+            GambaPosition,
+            Transaction,
+            HoldingLot,
+            Holding,
+            Order,
+        ]:
+            await session.execute(
+                sa_delete(model).where(model.user_id.in_(expired_ids))
+            )
+
+        await session.execute(sa_delete(User).where(User.id.in_(expired_ids)))
+
+        await session.commit()
+        logger.info("Demo cleanup: removed %d expired demo users", len(expired_ids))
+
+
 def start_scheduler(app: FastAPI) -> None:
     global _app, _last_market_update_at
 
     _app = app
     _last_market_update_at = None
+
+    if settings.demo_mode_enabled:
+        scheduler.add_job(
+            demo_market_tick_job,
+            IntervalTrigger(seconds=settings.demo_sim_interval_seconds),
+            id="demo_market_tick",
+            replace_existing=True,
+            max_instances=1,
+            next_run_time=datetime.now(UTC)
+            + timedelta(seconds=settings.demo_sim_interval_seconds),
+        )
+        scheduler.add_job(
+            demo_cleanup_job,
+            IntervalTrigger(seconds=600),
+            id="demo_cleanup",
+            replace_existing=True,
+            max_instances=1,
+            next_run_time=datetime.now(UTC) + timedelta(seconds=60),
+        )
+        scheduler.start()
+        logger.info(
+            "Scheduler started in demo mode (sim interval=%ds, cleanup interval=600s)",
+            settings.demo_sim_interval_seconds,
+        )
+        return
+
     scheduler.add_job(
         market_update_job,
         IntervalTrigger(seconds=MARKET_UPDATE_JOB_INTERVAL_SECONDS),

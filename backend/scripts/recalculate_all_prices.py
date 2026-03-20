@@ -270,9 +270,7 @@ async def _fetch_all_match_ids(
                     start = 0
                     all_ids.clear()
                     continue
-                print(
-                    f"    Riot 400 (unfiltered): {exc.response.text}"
-                )
+                print(f"    Riot 400 (unfiltered): {exc.response.text}")
             elif exc.response.status_code in (401, 403):
                 print(
                     f"    Riot {exc.response.status_code}: "
@@ -746,9 +744,7 @@ def _compute_playing_income(
                 continue
 
             daily_match_counts[day_start] = match_number
-            user_income_totals[user_id] = (
-                user_income_totals.get(user_id, 0.0) + amount
-            )
+            user_income_totals[user_id] = user_income_totals.get(user_id, 0.0) + amount
             income_records.append(
                 PlayingIncomeRecord(
                     user_id=user_id,
@@ -814,9 +810,7 @@ async def _backfill_and_replay(
                         rank_data.rank,
                         rank_data.league_points,
                     )
-                    win_rate = impl.calculate_win_rate(
-                        rank_data.wins, rank_data.losses
-                    )
+                    win_rate = impl.calculate_win_rate(rank_data.wins, rank_data.losses)
                     if player.puuid != rank_data.puuid:
                         print(
                             f"    Refreshed puuid: "
@@ -833,10 +827,7 @@ async def _backfill_and_replay(
                     await asyncio.sleep(API_STAGGER_SECONDS)
                     break
                 except impl.player_not_found_error:
-                    print(
-                        f"    rank not found, using stored "
-                        f"LP={current_lp_abs}"
-                    )
+                    print(f"    rank not found, using stored LP={current_lp_abs}")
                     break
                 except impl.rate_limited_error:
                     print(
@@ -852,9 +843,7 @@ async def _backfill_and_replay(
                     impl, client, player, existing_ids
                 )
             else:
-                print(
-                    f"    Skipping match fetch (no fresh puuid)"
-                )
+                print(f"    Skipping match fetch (no fresh puuid)")
                 new_summaries = []
 
             # Estimate LP deltas for backfilled matches
@@ -958,7 +947,9 @@ def _apply_reset(
 
     # -- Update tracked players with replayed prices --
     for r in results:
-        last_match_at = r.last_match_completed_at.isoformat() if r.last_match_completed_at else None
+        last_match_at = (
+            r.last_match_completed_at.isoformat() if r.last_match_completed_at else None
+        )
         # Find the last match_id for playing income tracking
         last_income_match_id = None
         last_income_match_end_at = None

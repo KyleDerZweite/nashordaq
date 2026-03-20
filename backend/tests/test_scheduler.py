@@ -1240,9 +1240,7 @@ async def test_market_update_job_refreshes_stale_puuid_before_match_history(
 
 
 @pytest.mark.asyncio
-async def test_market_update_job_falls_back_on_400_puuid_error(
-    db_engine, monkeypatch
-):
+async def test_market_update_job_falls_back_on_400_puuid_error(db_engine, monkeypatch):
     session_factory = async_sessionmaker(
         db_engine, class_=AsyncSession, expire_on_commit=False
     )
@@ -1325,9 +1323,7 @@ async def test_market_update_job_falls_back_on_400_puuid_error(
 
     async with session_factory() as session:
         player = await session.scalar(
-            select(TrackedPlayer).where(
-                TrackedPlayer.game_name == "StalePuuidPlayer"
-            )
+            select(TrackedPlayer).where(TrackedPlayer.game_name == "StalePuuidPlayer")
         )
 
     assert player is not None
