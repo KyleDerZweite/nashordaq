@@ -640,12 +640,29 @@ async def market_update_job() -> None:
         for player in players:
             try:
                 if player.puuid:
-                    rank_data = await get_rank_by_puuid(
-                        client=http_client,
-                        region_url=settings.riot_api_region_url,
-                        api_key=settings.riot_api_key,
-                        puuid=player.puuid,
-                    )
+                    try:
+                        rank_data = await get_rank_by_puuid(
+                            client=http_client,
+                            region_url=settings.riot_api_region_url,
+                            api_key=settings.riot_api_key,
+                            puuid=player.puuid,
+                        )
+                    except httpx.HTTPStatusError as exc:
+                        if exc.response.status_code != 400:
+                            raise
+                        logger.warning(
+                            "Bad PUUID for %s#%s (400), re-resolving via Riot ID",
+                            player.game_name,
+                            player.tag_line,
+                        )
+                        rank_data = await get_rank(
+                            client=http_client,
+                            base_url=settings.riot_api_base_url,
+                            region_url=settings.riot_api_region_url,
+                            api_key=settings.riot_api_key,
+                            game_name=player.game_name,
+                            tag_line=player.tag_line,
+                        )
                 else:
                     rank_data = await get_rank(
                         client=http_client,
