@@ -12,16 +12,6 @@ Users trade shares in League of Legends players using virtual currency. Share pr
 - **Self-Hosted** -- single-process deployment, no external database or message broker required.
 - **Proxy-Ready Auth** -- designed to sit behind an Identity-Aware Proxy for zero-friction user management.
 
-## Tech Stack
-
-| Layer | Technology |
-|---|---|
-| Frontend | Vite, React, TypeScript, TailwindCSS, TanStack Query |
-| Backend | FastAPI (Python) |
-| Database | SQLite (via aiosqlite) |
-| Background Tasks | APScheduler (in-process) |
-| Deployment | Podman-compose |
-
 ## Self-Hosting Guide
 
 ### Prerequisites
