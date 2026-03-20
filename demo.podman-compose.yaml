@@ -1,12 +1,16 @@
-version: "3"
+networks:
+  demo:
+    driver: bridge
 
 services:
   backend:
     build:
       context: ./backend
       dockerfile: Containerfile
-    container_name: nashordaq-backend
+    container_name: nashordaq-demo-backend
     restart: unless-stopped
+    networks:
+      - demo
     env_file:
       - .env
     environment:
@@ -14,6 +18,7 @@ services:
       - NASHORDAQ_CORS_ORIGINS=http://localhost,https://${NASHORDAQ_DOMAIN:-localhost}
     volumes:
       - ./data:/app/data:z
+      - ./demo:/demo:z,ro
     expose:
       - "8000"
     healthcheck:
@@ -27,8 +32,10 @@ services:
     build:
       context: ./frontend
       dockerfile: Containerfile
-    container_name: nashordaq-frontend
+    container_name: nashordaq-demo-frontend
     restart: unless-stopped
+    networks:
+      - demo
     expose:
       - "80"
     depends_on:
@@ -37,8 +44,10 @@ services:
 
   newt:
     image: docker.io/fosrl/newt:latest
-    container_name: nashordaq-newt
+    container_name: nashordaq-demo-newt
     restart: unless-stopped
+    networks:
+      - demo
     env_file:
       - .env
     environment:
@@ -47,4 +56,3 @@ services:
       - NEWT_SECRET=${NEWT_SECRET}
     depends_on:
       - frontend
-

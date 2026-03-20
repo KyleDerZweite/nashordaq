@@ -16,7 +16,7 @@ class DemoCookieMiddleware(BaseHTTPMiddleware):
                 token,
                 path="/",
                 httponly=True,
-                samesite="lax",
+                samesite="strict",
                 max_age=max_age,
             )
         return response
