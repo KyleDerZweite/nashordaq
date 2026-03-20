@@ -61,8 +61,8 @@ Add a self-contained authentication layer so the app can run standalone without 
 
 **Two auth modes, auto-detected:**
 
-- `proxy` — current behavior. Reads `Remote-Email` / `Remote-Name` headers injected by a reverse proxy (Pangolin, Authelia, Caddy forward_auth, etc.). Unchanged.
-- `builtin` — the app handles registration, login, and sessions directly. No proxy required.
+- `proxy` - current behavior. Reads `Remote-Email` / `Remote-Name` headers injected by a reverse proxy (Pangolin, Authelia, Caddy forward_auth, etc.). Unchanged.
+- `builtin` - the app handles registration, login, and sessions directly. No proxy required.
 
 The mode is configured via `NASHORDAQ_AUTH_MODE` (default: `builtin`). When both are available (proxy headers present AND a builtin session exists), proxy headers take precedence.
 
@@ -70,7 +70,7 @@ The mode is configured via `NASHORDAQ_AUTH_MODE` (default: `builtin`). When both
 
 1. User visits the app, sees a registration/login page.
 2. Registration collects: email, display name, password, game name, tag line.
-3. Backend creates the `User`, hashes the password, resolves the Riot PUUID, creates the `TrackedPlayer`, and links them — combining current auto-provisioning and onboarding into one step.
+3. Backend creates the `User`, hashes the password, resolves the Riot PUUID, creates the `TrackedPlayer`, and links them - combining current auto-provisioning and onboarding into one step.
 4. Login via email + password returns a signed session cookie.
 
 **Implementation notes:**
@@ -95,7 +95,7 @@ Gate all Gamba functionality behind `NASHORDAQ_GAMBA_ENABLED` (default: `true`).
 - Frontend: Gamba UI elements hidden when the flag is off (exposed via a public `/api/config` or similar endpoint).
 - No code removal. The feature stays in the codebase, just gated at runtime.
 
-This is required for any future Riot-compliant public deployment (Riot's developer policies prohibit gambling mechanics), but is also good hygiene — operators should be able to disable features they don't want.
+This is required for any future Riot-compliant public deployment (Riot's developer policies prohibit gambling mechanics), but is also good hygiene - operators should be able to disable features they don't want.
 
 ---
 
@@ -112,7 +112,7 @@ Each friend group runs their own instance with their own Riot Personal API key. 
 - Personal API keys are free and instant to obtain at developer.riotgames.com.
 - Rate limit (100 req/2min) is sufficient for 5-50 tracked players.
 - Each instance is independent. This is NOT the "BYOK" violation Riot prohibits (that refers to one application pooling multiple keys).
-- Gamba is fine on private instances — Riot's developer policies apply to applications submitted for Production key review, not to private deployments.
+- Gamba is fine on private instances - Riot's developer policies apply to applications submitted for Production key review, not to private deployments.
 - The built-in auth mode (item 8) removes the need for any external auth stack, making deployment trivial.
 
 **Secondary model (only if demand proves it): centralized hosting.**
@@ -142,9 +142,9 @@ Only available with a Production API key. Provides verified PUUID via OAuth2 ins
 Riot's developer ToS allows charging for hosting/compute and premium features unrelated to Riot data. It prohibits charging for access to Riot data itself, real-money gambling, and selling Riot data.
 
 Viable models for a centralized instance:
-- **Hosting fee** ($3-5/month per market) — paying for server resources, not data.
-- **Donations** (Patreon, GitHub Sponsors, Ko-fi) — simplest, covers small hosting costs.
-- **Cosmetic premium** — custom themes, profile badges, extended history. Engineering effort probably not worth the revenue at realistic scale.
+- **Hosting fee** ($3-5/month per market) - paying for server resources, not data.
+- **Donations** (Patreon, GitHub Sponsors, Ko-fi) - simplest, covers small hosting costs.
+- **Cosmetic premium** - custom themes, profile badges, extended history. Engineering effort probably not worth the revenue at realistic scale.
 
 Realistic market: 50-500 active friend groups. This is a niche community tool, not a SaaS business. Optimize for sustainability, not growth.
 
@@ -154,6 +154,6 @@ Realistic market: 50-500 active friend groups. This is a niche community tool, n
 - Zero direct competitors do "ranked LP stock market for friend groups."
 - The niche is real but small: LoL friend groups who want a meta-game on top of ranked.
 - Conversion from "plays LoL" to "would use a fantasy LP market" is low.
-- The product's strength is personal and social — trading your friends' performance is fun because they're your friends. This doesn't scale to strangers.
+- The product's strength is personal and social - trading your friends' performance is fun because they're your friends. This doesn't scale to strangers.
 - Global markets, federation, and multi-exchange designs don't serve the core use case and should not be pursued.
 

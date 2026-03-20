@@ -172,7 +172,7 @@ class ResolvedMatch:
 
 @dataclass
 class ReplayedMatch:
-    """A match after price replay — has all snapshot fields."""
+    """A match after price replay - has all snapshot fields."""
 
     match: ResolvedMatch
     player_id: int
@@ -581,7 +581,7 @@ def _merge_matches(
 ) -> list[ResolvedMatch]:
     """Merge DB matches (OBSERVED LP) with backfilled API matches (ESTIMATED).
 
-    DB matches take priority — if a match_id exists in both, the DB version
+    DB matches take priority - if a match_id exists in both, the DB version
     with its observed LP delta is kept.
     """
     resolved: dict[str, ResolvedMatch] = {}
@@ -846,7 +846,7 @@ async def _backfill_and_replay(
                     await asyncio.sleep(RATE_LIMIT_BACKOFF_SECONDS)
 
             # Fetch new match summaries from API (skip if puuid
-            # couldn't be refreshed — stale puuids cause 400s)
+            # couldn't be refreshed - stale puuids cause 400s)
             if rank_ok:
                 new_summaries = await _fetch_new_match_summaries(
                     impl, client, player, existing_ids
