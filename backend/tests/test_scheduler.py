@@ -1240,6 +1240,102 @@ async def test_market_update_job_refreshes_stale_puuid_before_match_history(
 
 
 @pytest.mark.asyncio
+async def test_market_update_job_falls_back_on_400_puuid_error(
+    db_engine, monkeypatch
+):
+    session_factory = async_sessionmaker(
+        db_engine, class_=AsyncSession, expire_on_commit=False
+    )
+
+    async with session_factory() as session:
+        player = TrackedPlayer(
+            game_name="StalePuuidPlayer",
+            tag_line="EUW",
+            display_name="Stale Puuid Player",
+            puuid="stale-puuid-400",
+            summoner_id="old-summoner",
+            current_price=20.0,
+            lp_abs=1500,
+            previous_lp_abs=1500,
+            streak=0,
+            last_updated=datetime(2026, 3, 10, 12, 0, tzinfo=UTC),
+        )
+        session.add(player)
+        await session.flush()
+        session.add(
+            User(
+                username="stale-puuid-user",
+                balance=1000.0,
+                linked_player_id=player.id,
+            )
+        )
+        await session.commit()
+
+    call_sequence: list[str] = []
+
+    async def fake_get_rank_by_puuid(**kwargs: object) -> RankData:
+        call_sequence.append("get_rank_by_puuid")
+        request = httpx.Request(
+            "GET", "https://euw1.api.riotgames.com/lol/league/v4/entries/by-puuid/stale"
+        )
+        response = httpx.Response(400, request=request)
+        raise httpx.HTTPStatusError(
+            "Client error '400 Bad Request'",
+            request=request,
+            response=response,
+        )
+
+    async def fake_get_rank(**kwargs: object) -> RankData:
+        call_sequence.append("get_rank")
+        return RankData(
+            puuid="resolved-puuid",
+            summoner_id="resolved-summoner",
+            tier="GOLD",
+            rank="I",
+            league_points=0,
+            wins=10,
+            losses=10,
+            hot_streak=False,
+            inactive=False,
+        )
+
+    async def fake_get_recent_match_ids(**kwargs: object) -> list[str]:
+        return []
+
+    http_client = httpx.AsyncClient()
+    monkeypatch.setattr(scheduler_module, "SessionLocal", session_factory)
+    monkeypatch.setattr(scheduler_module, "get_rank_by_puuid", fake_get_rank_by_puuid)
+    monkeypatch.setattr(scheduler_module, "get_rank", fake_get_rank)
+    monkeypatch.setattr(
+        scheduler_module, "get_recent_match_ids", fake_get_recent_match_ids
+    )
+    monkeypatch.setattr(
+        scheduler_module,
+        "_app",
+        SimpleNamespace(state=SimpleNamespace(http_client=http_client)),
+    )
+    monkeypatch.setattr(scheduler_module, "_last_market_update_at", None)
+
+    try:
+        await scheduler_module.market_update_job()
+    finally:
+        await http_client.aclose()
+
+    assert call_sequence == ["get_rank_by_puuid", "get_rank"]
+
+    async with session_factory() as session:
+        player = await session.scalar(
+            select(TrackedPlayer).where(
+                TrackedPlayer.game_name == "StalePuuidPlayer"
+            )
+        )
+
+    assert player is not None
+    assert player.puuid == "resolved-puuid"
+    assert player.summoner_id == "resolved-summoner"
+
+
+@pytest.mark.asyncio
 async def test_market_update_job_skips_malformed_match_summary_and_continues(
     db_engine, monkeypatch
 ):
