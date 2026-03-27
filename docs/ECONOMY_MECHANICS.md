@@ -334,6 +334,7 @@ This table uses `1 / reward` as the spawn probability for each reward tier, with
 ### Processing Rules
 
 - Claim validation happens on the backend, not in the browser.
+- Claim requests must include the user's click coordinates (normalized viewport fraction). The backend validates the click is within tolerance of the poro's server-computed position at claim time. This prevents automated claiming via SSE stream listeners.
 - A poro claim credits cash immediately and records the change in user wealth history.
 - Duplicate or expired claims are rejected.
 - This mechanic is intentionally separate from LP-driven pricing, order execution, bank debt, and Playing Income.

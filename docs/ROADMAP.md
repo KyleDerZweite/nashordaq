@@ -55,6 +55,44 @@ Market impact (4a) is live as the first step. Supply cap and P2P trading remain 
 
 ## Next Up
 
+### SECURITY: Poro Auto-Claim Bot Vulnerability
+
+**Severity:** Critical. The poro claim system is trivially automatable via browser JS.
+
+**Problem:** The SSE stream (`/api/poro/stream`) pushes `active_spawn` including `spawn_id` the instant a poro spawns. The claim endpoint (`POST /api/poro/claim`) only requires `spawn_id` — no proof of interaction. A user can paste ~5 lines of JS into their browser console to claim every poro within milliseconds of spawning with 100% success rate, bypassing the intended gameplay entirely.
+
+```js
+// exploit — claims every poro automatically
+const es = new EventSource("/api/poro/stream");
+es.onmessage = async (e) => {
+  const data = JSON.parse(e.data);
+  if (data.active_spawn?.spawn_id) {
+    await fetch("/api/poro/claim", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ spawn_id: data.active_spawn.spawn_id }),
+    });
+  }
+};
+```
+
+**Fix plan (click-coordinate validation):**
+
+1. Extend `PoroClaimRequest` schema with optional `click_x` and `click_y` (float, 0-1 range, fraction of viewport).
+2. In `claim_poro_spawn`, after existing validation, compute the poro's position at claim time using `spawned_at`, `expires_at`, `start_x/y`, `end_x/y`. Reject if the click position is more than 0.15 (15% of viewport) from the actual poro position.
+3. Make `click_x`/`click_y` required after a grace period (or immediately since the frontend already has this data).
+4. Frontend: pass the click event's normalized viewport position in the claim request.
+5. Optional hardening: add a short-lived nonce (obtained from `GET /api/poro`) that must be included in the claim, to prevent stale claims and add a round-trip cost.
+
+**Why this approach:** The server already knows the poro's exact position at every millisecond (it has `spawned_at`, `expires_at`, `start/end x/y`). Requiring the click position is a zero-cost UX change that completely defeats the listener-based exploit. A determined attacker could reverse-engineer the position math, but that raises the bar significantly from "paste 5 lines of JS."
+
+**Files to modify:**
+- `backend/app/schemas.py` — add `click_x`, `click_y` to `PoroClaimRequest`
+- `backend/app/poro.py` — add position validation in `claim_poro_spawn`
+- `frontend/src/components/FlyingPoro.tsx` — pass click coordinates to claim mutation
+
+---
+
 ### 8. Built-In Auth Mode
 
 Add a self-contained authentication layer so the app can run standalone without any reverse proxy or external auth provider. This is the default for self-hosters who just want `docker compose up`.
