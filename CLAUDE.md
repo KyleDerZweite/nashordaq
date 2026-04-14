@@ -8,7 +8,7 @@ Read and follow [AGENTS.md](AGENTS.md) as the primary source of instructions.
 
 ## Project Overview
 
-Nashordaq is a self-hosted fantasy stock market for a private League of Legends friend group. Users trade shares in LoL players using virtual currency; share prices fluctuate based on real-time Ranked LP changes fetched from the Riot Games API.
+Nashordaq is a self-hosted virtual share market for a private League of Legends friend group. Users trade shares in LoL players using virtual currency; share prices fluctuate based on real-time Ranked LP changes fetched from the Riot Games API.
 
 ## Tech Stack
 
@@ -37,7 +37,7 @@ nashordaq/
       database.py        # Async SQLAlchemy engine + session factory
       models.py          # ORM models and table definitions
       schemas.py         # Pydantic request/response schemas
-      auth.py            # Remote-User auth dependency
+      auth.py            # Remote-Email auth dependency with Remote-User fallback
       pricing.py         # Pure pricing functions
       riot.py            # Riot Games API client
       scheduler.py       # APScheduler market update job

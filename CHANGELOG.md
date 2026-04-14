@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Docs
+
+- Refreshed architecture, deployment, and product-strategy docs to reflect `Remote-Email` as the primary identity key, current onboarding behavior, and the single-tenant/private deployment model.
+- Clarified that the future production-facing Nashordaq product path excludes the private-only `gamba` mechanic entirely and is framed as a virtual investing and social market product.
+
 ## [0.2.0] - 2026-03-20
 
 ### Added

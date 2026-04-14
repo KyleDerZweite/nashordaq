@@ -2,7 +2,7 @@
 
 ## Objective
 
-Create a private, web-based platform where users can speculate on the ranked progression of a defined list of League of Legends accounts.
+Create a private, web-based platform where users can virtually invest in the ranked progression of a defined list of League of Legends accounts.
 
 ## Target Audience
 
@@ -10,15 +10,15 @@ A closed, trusted friend group. Public registration and email verification are o
 
 ## Core User Flows
 
-1. **Authentication:** User access is gated by an external Identity-Aware Proxy (e.g., Zitadel/Pangolin). Upon successful proxy authentication, the user is seamlessly passed to the Nashordaq interface. The backend automatically provisions a configured starting balance the first time it detects a new `Remote-User` header.
+1. **Authentication:** User access is gated by an external Identity-Aware Proxy (e.g., Zitadel/Pangolin). Upon successful proxy authentication, the user is seamlessly passed to the Nashordaq interface. The backend automatically provisions a configured starting balance the first time it detects a new `Remote-Email` header, with `Remote-User` retained as a fallback for legacy setups.
 
 2. **Market Overview:** Users can view a dashboard listing all tracked LoL accounts with their current share price and last update time.
 
 3. **Trading:** Users can place buy or sell market orders for whole shares of tracked players. Orders execute immediately at the currently visible market price. Shares are locked for a minimum holding period (default 4 hours) after purchase before they can be sold. Executed buy orders can be reverted for full refund within a short grace period (configurable, default 120 seconds), as long as none of those shares were sold.
 
-4. **Portfolio Management:** Users can view their cash balance, owned shares with current market values, active Gamba exposure, outstanding bank debt, and total net worth.
+4. **Portfolio Management:** Users can view their cash balance, owned shares with current market values, outstanding bank debt, total net worth, and any optional private-only side-position exposure when that feature is enabled in a private deployment.
 
-5. **Leaderboard:** Users can view a ranked list of all participants ordered by total net worth (cash + holdings value + active Gamba mark value - outstanding bank debt).
+5. **Leaderboard:** Users can view a ranked list of all participants ordered by total net worth (cash + holdings value + optional side-position mark value - outstanding bank debt).
 
 6. **Bank Failsafe:** Clicking the balance card opens a bank modal where onboarded player accounts can claim a fixed rescue loan only after falling under the configured debt-adjusted net-worth threshold. The rescue adds cash immediately, adds an immediate opening interest charge, rolls forward every 120 hours at a low fixed rate, can be repaid at any time, and is single-use until an admin restores access.
 
@@ -29,7 +29,8 @@ A closed, trusted friend group. Public registration and email verification are o
 - **Long only:** Users cannot short sell. Selling requires owning sufficient shares (accounting for pending sell orders).
 - **Whole shares only:** Fractional share quantities are not supported.
 - **Market orders only:** No limit orders or other order types.
-- **Self-onboarding players:** Each user links their own Riot account on first access by submitting `game_name`, `tag_line`, and `display_name`. Linked players become tracked in the market. Deletion is out of scope.
+- **Self-onboarding players:** Each user links their own Riot account on first access by submitting `game_name` and `tag_line`. Linked players become tracked in the market. Deletion is out of scope.
+- **Production-compliant product path:** Any future Riot-compliant production application excludes the private-only `gamba` mechanic entirely and frames Nashordaq as a virtual investing and social market product.
 
 ## System Requirements
 
@@ -37,7 +38,7 @@ A closed, trusted friend group. Public registration and email verification are o
 
 2. **Pricing Engine:** Share prices are computed from Absolute LP using a formula that incorporates base volatility, momentum streaks, per-player obfuscation, and random noise. See [Economy Mechanics](ECONOMY_MECHANICS.md) for details.
 
-3. **Immediate Execution + Hold Adjustment:** Orders execute at the visible market price at submission time. Sell proceeds are adjusted by holding duration to discourage rapid flips and reward longer holds.
+3. **Immediate Execution + Market Impact:** Orders execute at the visible market price at submission time. Buys and sells apply market impact based on order size, and bought shares remain locked during the minimum holding period.
 
 4. **Transaction Ledger:** Every executed order produces an immutable transaction record. Balances and holdings are updated atomically within the same database transaction as price updates.
 

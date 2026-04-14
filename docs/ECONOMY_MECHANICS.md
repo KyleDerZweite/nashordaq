@@ -1,5 +1,7 @@
 # Economy Mechanics
 
+Compliance note: this document reflects the current codebase. The planned production-compliant product path keeps the core market, portfolio, debt, and progression systems, but excludes the private-only `gamba` mechanic entirely. That feature remains documented here only because it still exists in the current private/self-hosted implementation.
+
 ## 1. Absolute LP Calculation
 
 Translates a player's League of Legends rank into a continuous integer for price computation.
@@ -104,9 +106,9 @@ Each attributed match produces a `PlayerMatch` row storing `lp_before`, `lp_afte
 		- Losses-only refresh (`losses` increased, `wins` unchanged, `Delta_LP_abs < 0`) updates `AvgLpLossOnLoss`.
 	- Mixed or ambiguous refreshes still update snapshot counters but do not create LP-per-win/loss samples.
 - Low-price loss dampening
-	- When a stock's price is below `pricing_low_price_threshold` (default `15.0 P`), negative price moves are scaled by `price / threshold`.
-	- This caps the percentage loss at the threshold-level rate, preventing low-priced stocks from spiraling into the floor.
-	- Gains are not dampened; low-priced stocks recover at full speed.
+	- When a share price is below `pricing_low_price_threshold` (default `15.0 P`), negative price moves are scaled by `price / threshold`.
+	- This caps the percentage loss at the threshold-level rate, preventing low-priced positions from spiraling into the floor.
+	- Gains are not dampened; low-priced positions recover at full speed.
 - Flat LP cycle
 	- If Riot reports the same Absolute LP as the previous refresh and no new matches are detected, Nashordaq does not change price, streak, `last_updated`, or stored price history for that cycle.
 
@@ -174,7 +176,7 @@ A round-trip (buy then sell the same quantity) always loses money to slippage. T
 
 Order splitting does not help: each sub-order moves the price, and subsequent sub-orders face the moved price. Due to compounding, splitting is slightly more expensive than a single large order.
 
-**Exemptions:** Gamba (system-generated) orders do not apply market impact. Only `MANUAL` source orders move the market.
+**Exemptions:** Private-only `gamba` (system-generated) orders do not apply market impact. Only `MANUAL` source orders move the market.
 
 Each trade records a `PriceHistory` row so the price chart reflects trade-driven movements.
 
@@ -210,7 +212,7 @@ The bank offers a fixed failsafe package only when debt-adjusted net worth is lo
 debt_adjusted_net_worth = cash_balance + holdings_value + active_gamba_mark_value - outstanding_debt
 ```
 
-- `active_gamba_mark_value` is the sum of `cash_amount` of all active Gamba positions. It represents the value "locked" in those positions.
+- `active_gamba_mark_value` is the sum of `cash_amount` of all active `gamba` positions when that private-only feature is enabled. It represents the value "locked" in those positions.
 
 Current defaults:
 
@@ -234,9 +236,11 @@ Debt_next = Debt_current + (Debt_current * 0.02)
 
 Implementation: `app/banking.py`, `app/routers/bank.py`, `app/scheduler.py`
 
-## 7. Gamba (Long-Term Leveraged Positions)
+## 7. Private-Only `Gamba` (Excluded From Production Path)
 
-Users can choose to enter a "Gamba" position, which is a leveraged long-term investment in a randomly selected tracked player (excluding their own linked player).
+Users can choose to enter a `gamba` position, which is a randomized leveraged side-position in a tracked player (excluding their own linked player).
+
+This feature is private-only and is explicitly excluded from the future production-compliant Nashordaq product path.
 
 ### Placement
 
@@ -305,7 +309,7 @@ Examples:
 
 Implementation: `app/riot.py`, `app/scheduler.py`, `app/banking.py`, `app/routers/bank.py`
 
-## 8. Poro Flyby Reward
+## 9. Poro Flyby Reward
 
 Nashordaq can occasionally spawn a small clickable poro that flies across the UI and grants a flat cash reward when claimed before it leaves the screen.
 
@@ -333,8 +337,9 @@ This table uses `1 / reward` as the spawn probability for each reward tier, with
 
 ### Processing Rules
 
-- Claim validation happens on the backend, not in the browser.
-- Claim requests must include the user's click coordinates (normalized viewport fraction). The backend validates the click is within tolerance of the poro's server-computed position at claim time. This prevents automated claiming via SSE stream listeners.
+- Current claim validation happens on the backend, not in the browser.
+- In the current codebase, claim requests only require `spawn_id`. This is sufficient for private play but is not production-safe for a public deployment.
+- The roadmap tracks a hardening change where claim requests will also include normalized click coordinates and the backend will validate them against the server-computed poro position at claim time.
 - A poro claim credits cash immediately and records the change in user wealth history.
 - Duplicate or expired claims are rejected.
 - This mechanic is intentionally separate from LP-driven pricing, order execution, bank debt, and Playing Income.

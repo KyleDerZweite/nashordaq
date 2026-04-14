@@ -13,7 +13,7 @@ See the [README](README.md#development) for backend and frontend dev commands.
 
 You will need:
 - A [Riot Games API key](https://developer.riotgames.com/) (development keys rotate every 24 hours)
-- An Identity-Aware Proxy (e.g. [Pangolin](https://github.com/fosrl/pangolin)) or a way to inject `Remote-Email`, `Remote-Name`, and `Remote-User` headers for local testing
+- An Identity-Aware Proxy (e.g. [Pangolin](https://github.com/fosrl/pangolin)) or a way to inject `Remote-Email`, `Remote-Name`, and optional `Remote-User` fallback headers for local testing
 
 ## Pull requests
 

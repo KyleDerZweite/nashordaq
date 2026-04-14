@@ -1,9 +1,9 @@
 # Nashordaq
 
 > **Early Development Notice**
-> This project is in early development and subject to breaking changes. It is intended for personal use only and is **not compliant with Riot Games Production API key requirements**. Self-hosting requires technical knowledge (Identity-Aware Proxy setup, environment configuration, containerized deployment). Use at your own risk.
+> This project is in early development and subject to breaking changes. It is intended for personal use only and is **not compliant with Riot Games Production API key requirements**. Self-hosting requires technical knowledge (Identity-Aware Proxy setup, environment configuration, containerized deployment). The future production-facing path documented in this repo excludes the private-only `gamba` mechanic entirely.
 
-A self-hosted fantasy stock market for a private League of Legends friend group.
+A self-hosted virtual share market for a private League of Legends friend group.
 
 Users trade shares in League of Legends players using virtual currency. Share prices fluctuate automatically based on real-time Ranked LP changes fetched from the Riot Games API.
 
@@ -15,7 +15,7 @@ A live demo is available at **[demo-nashordaq.kylehub.dev](https://demo-nashorda
 
 Nashordaq started as a personal project for my friend group, and it does what I set out to build. But I'm curious whether others would find it useful too.
 
-I'm considering turning this into a **hosted service with public rooms** -- one instance where any League friend group can create their own market without self-hosting anything. See the [Roadmap](docs/ROADMAP.md#future-v2) for more on this idea.
+The current direction is to explore Nashordaq as a **private-league product for friend groups**, with a self-hosted product first and a hosted multi-room version only if demand proves out. See the [Productization Plan](docs/PRODUCTIZATION_PLAN.md) for the market research and sequencing, and the [Roadmap](docs/ROADMAP.md#future-v2) for implementation-oriented future work.
 
 **If that sounds interesting to you:**
 - Drop your thoughts in the [Discussions](https://github.com/KyleDerZweite/nashordaq/discussions) tab
@@ -102,11 +102,15 @@ Nashordaq does not handle login or passwords. It expects an Identity-Aware Proxy
 For defense-in-depth, enable trusted-proxy enforcement so direct backend requests are rejected unless they originate from your reverse proxy network:
 
 ```env
-# Header injected by Pangolin (default: Remote-User)
+# Primary identity header (recommended: Remote-Email)
+NASHORDAQ_REMOTE_EMAIL_HEADER=Remote-Email
+NASHORDAQ_REMOTE_NAME_HEADER=Remote-Name
+
+# Legacy fallback identity header (default: Remote-User)
 NASHORDAQ_AUTH_HEADER=Remote-User
 
 # Optional admin account list for the operator dashboard. Comma-separate
-# multiple usernames if you want more than one admin.
+# multiple email addresses if you want more than one admin.
 NASHORDAQ_ADMIN_REMOTE_USERS=admin@yourdomain.com
 
 # Optional hardening (recommended in production)
@@ -115,6 +119,12 @@ NASHORDAQ_TRUSTED_PROXY_CIDRS=10.89.0.0/16,127.0.0.1/32,::1/128
 ```
 
 Set `NASHORDAQ_TRUSTED_PROXY_CIDRS` to the CIDR(s) used by your proxy/tunnel containers on the Podman network.
+
+For any public-facing, compliance-oriented, or future production-style deployment, also set:
+
+```env
+NASHORDAQ_GAMBA_ENABLED=false
+```
 
 Newly tracked players cannot be bought until they receive their first successful market update, so users do not trade against the placeholder startup price.
 
@@ -125,7 +135,7 @@ NASHORDAQ_HTTP_TIMEOUT_SECONDS=10
 NASHORDAQ_HTTP_CONNECT_TIMEOUT_SECONDS=5
 ```
 
-When a user visits Nashordaq, Pangolin authenticates them first. The backend reads the forwarded header to identify the user. New users are automatically provisioned with the configured starting balance and then complete a one-time in-app self-onboarding step to link their Riot `game_name`, `tag_line`, and `display_name`.
+When a user visits Nashordaq, Pangolin authenticates them first. The backend identifies users primarily from `Remote-Email`, with `Remote-User` retained as a legacy fallback. New users are automatically provisioned with the configured starting balance and then complete a one-time in-app self-onboarding step to link their Riot `game_name` and `tag_line`.
 
 ### 7. Start the application
 

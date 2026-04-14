@@ -36,6 +36,16 @@ Settlement multiplier scales linearly with the random hold duration: 2.0x at 24h
 
 User identity is now based on `Remote-Email` (stable) instead of `Remote-User` (mutable). The `User` model has `email` (identity key) and `display_name` (from Zitadel's `Remote-Name`, updated on each login). Admin role matching uses email. Onboarding only asks for game name and tag line; `TrackedPlayer.display_name` is auto-set from the game name.
 
+### 8. Gamba Feature Flag
+
+All current `gamba` functionality is gated behind `NASHORDAQ_GAMBA_ENABLED`.
+
+- Backend: the Gamba router returns `404` when disabled.
+- Scheduler: settlement is skipped when disabled.
+- Frontend: the system status endpoint exposes `gamba_enabled`, and the UI hides Gamba surfaces when the flag is off.
+
+This is already implemented. For the future production-compliant product path, `gamba` should remain disabled and excluded entirely.
+
 ## Open (v1)
 
 ### 4b. Limited Share Supply + Player-to-Player Trading
@@ -125,21 +135,11 @@ The mode is configured via `NASHORDAQ_AUTH_MODE` (default: `builtin`). When both
 - Self-hosters who prefer an IAP can set `NASHORDAQ_AUTH_MODE=proxy` and use their existing setup.
 - The maintainer's own deployment continues using Pangolin exactly as it does today.
 
-### 9. Gamba Feature Flag
-
-Gate all Gamba functionality behind `NASHORDAQ_GAMBA_ENABLED` (default: `true`).
-
-- Backend: Gamba router returns 404 when disabled. Scheduler skips Gamba settlement.
-- Frontend: Gamba UI elements hidden when the flag is off (exposed via a public `/api/config` or similar endpoint).
-- No code removal. The feature stays in the codebase, just gated at runtime.
-
-This is required for any future Riot-compliant public deployment (Riot's developer policies prohibit gambling mechanics), but is also good hygiene - operators should be able to disable features they don't want.
-
----
-
 ## Future (v2+)
 
 The items below are not on the current roadmap. They are documented for reference and should only be pursued after demand is proven.
+
+The canonical strategy document for commercialization, market research, and product sequencing is [PRODUCTIZATION_PLAN.md](PRODUCTIZATION_PLAN.md). This roadmap section stays focused on future implementation directions.
 
 ### Distribution Strategy
 
@@ -150,12 +150,12 @@ Each friend group runs their own instance with their own Riot Personal API key. 
 - Personal API keys are free and instant to obtain at developer.riotgames.com.
 - Rate limit (100 req/2min) is sufficient for 5-50 tracked players.
 - Each instance is independent. This is NOT the "BYOK" violation Riot prohibits (that refers to one application pooling multiple keys).
-- Gamba is fine on private instances - Riot's developer policies apply to applications submitted for Production key review, not to private deployments.
+- `gamba` can remain a private/self-hosted-only feature. It should not be part of any production-facing build submitted for Riot review.
 - The built-in auth mode (item 8) removes the need for any external auth stack, making deployment trivial.
 
 **Secondary model (only if demand proves it): centralized hosting.**
 
-A single public instance serving multiple groups. This requires a Riot Production API key (30,000 req/10min), multi-room architecture, and Riot policy compliance (no Gamba, no gambling terminology). Only pursue if self-hosted adoption demonstrates real demand and people explicitly ask for a hosted alternative.
+A single public instance serving multiple groups. This requires a Riot Production API key (30,000 req/10min), multi-room architecture, and Riot policy compliance. The production-facing build should exclude `gamba` entirely and frame Nashordaq as a private virtual investing and social market product. Only pursue if self-hosted adoption demonstrates real demand and people explicitly ask for a hosted alternative.
 
 Production key application requires: working public demo, legal docs (Impressum, privacy policy, ToS), and a product that serves a broad community. Expected approval timeline: 2 weeks to 6 months.
 
@@ -189,9 +189,8 @@ Realistic market: 50-500 active friend groups. This is a niche community tool, n
 ### Market Sizing Reality Check
 
 - LoL has ~150M monthly players. Fantasy esports exists (DraftKings, Fantasy LCS) but focuses on pro play.
-- Zero direct competitors do "ranked LP stock market for friend groups."
+- Zero direct competitors do "ranked LP virtual market game for friend groups."
 - The niche is real but small: LoL friend groups who want a meta-game on top of ranked.
-- Conversion from "plays LoL" to "would use a fantasy LP market" is low.
+- Conversion from "plays LoL" to "would use a private LP market meta-game" is low.
 - The product's strength is personal and social - trading your friends' performance is fun because they're your friends. This doesn't scale to strangers.
 - Global markets, federation, and multi-exchange designs don't serve the core use case and should not be pursued.
-

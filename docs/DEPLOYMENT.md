@@ -28,13 +28,16 @@ NEWT_SECRET=your-newt-secret
 
 | Variable | Default | Description |
 |---|---|---|
-| `NASHORDAQ_AUTH_HEADER` | `Remote-User` | Header containing the authenticated username |
-| `NASHORDAQ_ADMIN_REMOTE_USERS` | unset | Comma-separated authenticated usernames that should be treated as admin/operator accounts |
+| `NASHORDAQ_REMOTE_EMAIL_HEADER` | `Remote-Email` | Primary identity header injected by the proxy |
+| `NASHORDAQ_REMOTE_NAME_HEADER` | `Remote-Name` | Display-name header injected by the proxy |
+| `NASHORDAQ_AUTH_HEADER` | `Remote-User` | Legacy fallback identity header |
+| `NASHORDAQ_ADMIN_REMOTE_USERS` | unset | Comma-separated authenticated email addresses that should be treated as admin/operator accounts |
 | `NASHORDAQ_STARTING_BALANCE` | `1000.0` | Initial balance for new users |
 | `NASHORDAQ_ENFORCE_TRUSTED_PROXY` | `false` | Reject auth headers from non-trusted source IPs |
 | `NASHORDAQ_TRUSTED_PROXY_CIDRS` | `127.0.0.1/32,::1/128` | Allowed proxy CIDR ranges (when enforcement is on) |
 | `NASHORDAQ_RIOT_API_BASE_URL` | `https://europe.api.riotgames.com` | Riot account/match API region |
 | `NASHORDAQ_RIOT_API_REGION_URL` | `https://euw1.api.riotgames.com` | Riot league/summoner API region |
+| `NASHORDAQ_GAMBA_ENABLED` | `true` | Private-only side-position feature flag. Set this to `false` for any public-facing or compliance-oriented deployment. |
 
 ### Market Update Cadence
 
@@ -47,11 +50,17 @@ The scheduler wakes every 30 seconds internally and runs immediately on startup,
 
 ## 2. Tracked Players
 
-Tracked players are created through user self-onboarding. On first authenticated visit, each user must enter their own Riot `game_name`, `tag_line`, and `display_name`. After submission, their linked Riot account is added to the tracked player set.
+Tracked players are created through user self-onboarding. On first authenticated visit, each user must enter their own Riot `game_name` and `tag_line`. After submission, their linked Riot account is added to the tracked player set.
 
 Players cannot be bought until they have received their first successful market update. This avoids trading against the placeholder pre-update price.
 
 This replaces static player seeding and does not require editing JSON files during deployment.
+
+If you are preparing a public-facing, compliance-oriented, or future production-style deployment, set:
+
+```env
+NASHORDAQ_GAMBA_ENABLED=false
+```
 
 ## 3. Build and Run
 
@@ -67,9 +76,9 @@ Pangolin Enterprise Edition forwards user identity headers automatically when a 
 
 | Pangolin Header | Used By Backend |
 |---|---|
-| `Remote-User` | Identifies the user (required) |
-| `Remote-Email` | Forwarded through Nginx (informational) |
-| `Remote-Name` | Forwarded through Nginx (informational) |
+| `Remote-Email` | Primary identity key (recommended) |
+| `Remote-Name` | Display name |
+| `Remote-User` | Legacy fallback identity key |
 
 ### 4a. Create a Site
 
@@ -85,14 +94,14 @@ Pangolin Enterprise Edition forwards user identity headers automatically when a 
 
 ### 4c. Enable SSO Authentication
 
-This is the critical step that makes Pangolin inject the `Remote-User` header.
+This is the critical step that makes Pangolin inject the SSO identity headers Nashordaq expects.
 
 1. Open the resource you created.
 2. Go to the **Authentication** tab.
 3. Enable **Pangolin SSO** (Platform SSO). This is on by default for new public resources.
 4. Optionally restrict access to specific **Users** or **Roles** in your Pangolin organization.
 
-When SSO is active, unauthenticated visitors are redirected to the Pangolin login page. After authentication, Pangolin proxies the request with identity headers (`Remote-User`, `Remote-Email`, `Remote-Name`, `Remote-Role`) attached. See [Pangolin Forwarded Headers docs](https://docs.pangolin.net/manage/access-control/forwarded-headers) for details.
+When SSO is active, unauthenticated visitors are redirected to the Pangolin login page. After authentication, Pangolin proxies the request with identity headers (`Remote-User`, `Remote-Email`, `Remote-Name`, `Remote-Role`) attached. Nashordaq uses `Remote-Email` as the primary identity key and `Remote-User` as a legacy fallback. See [Pangolin Forwarded Headers docs](https://docs.pangolin.net/manage/access-control/forwarded-headers) for details.
 
 ### 4d. External Identity Providers (Optional)
 
@@ -145,10 +154,13 @@ cd frontend
 pnpm run dev
 ```
 
-To simulate an authenticated user, send the header manually:
+To simulate an authenticated user, send the headers manually:
 
 ```bash
-curl -H "Remote-User: kyle" http://localhost:8000/api/user/me
+curl \
+  -H "Remote-Email: kyle@example.com" \
+  -H "Remote-Name: Kyle" \
+  http://localhost:8000/api/user/me
 ```
 
-Or use a browser extension (e.g., ModHeader) to inject `Remote-User: kyle` when accessing `http://localhost:5173`.
+Or use a browser extension (e.g., ModHeader) to inject `Remote-Email` and `Remote-Name` when accessing `http://localhost:5173`. `Remote-User` remains available as a fallback for legacy testing flows.
