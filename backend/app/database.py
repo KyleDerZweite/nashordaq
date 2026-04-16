@@ -15,7 +15,9 @@ from sqlalchemy.ext.asyncio import (
 from app.config import settings
 
 logger = logging.getLogger(__name__)
-DEMO_SEED_PATH = Path(__file__).resolve().parent.parent.parent / "demo" / "demo_seed.json"
+DEMO_SEED_PATH = (
+    Path(__file__).resolve().parent.parent.parent / "demo" / "demo_seed.json"
+)
 
 engine = create_async_engine(settings.database_url, echo=False)
 

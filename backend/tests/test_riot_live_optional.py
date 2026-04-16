@@ -40,6 +40,13 @@ def _resolve_riot_key(dotenv_values: dict[str, str]) -> str | None:
     return None
 
 
+def _skip_if_live_riot_auth_failed(response: httpx.Response) -> None:
+    if response.status_code not in {401, 403}:
+        return
+
+    pytest.skip("Riot API key was rejected during optional live test")
+
+
 async def test_live_riot_three_call_chain_optional():
     dotenv_values = _read_dotenv()
     riot_api_key = _resolve_riot_key(dotenv_values)
@@ -83,6 +90,7 @@ async def test_live_riot_three_call_chain_optional():
         )
         if account_resp.status_code == 429:
             pytest.skip("Riot API rate limited during optional live test")
+        _skip_if_live_riot_auth_failed(account_resp)
         assert account_resp.status_code == 200, account_resp.text
 
         account_data = account_resp.json()
@@ -95,6 +103,7 @@ async def test_live_riot_three_call_chain_optional():
         )
         if summoner_resp.status_code == 429:
             pytest.skip("Riot API rate limited during optional live test")
+        _skip_if_live_riot_auth_failed(summoner_resp)
         assert summoner_resp.status_code == 200, summoner_resp.text
 
         summoner_data = summoner_resp.json()
@@ -108,6 +117,7 @@ async def test_live_riot_three_call_chain_optional():
         league_resp = await client.get(league_url, headers=headers)
         if league_resp.status_code == 429:
             pytest.skip("Riot API rate limited during optional live test")
+        _skip_if_live_riot_auth_failed(league_resp)
         assert league_resp.status_code == 200, league_resp.text
 
         entries = league_resp.json()

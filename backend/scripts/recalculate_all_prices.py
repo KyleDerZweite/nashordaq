@@ -843,7 +843,7 @@ async def _backfill_and_replay(
                     impl, client, player, existing_ids
                 )
             else:
-                print(f"    Skipping match fetch (no fresh puuid)")
+                print("    Skipping match fetch (no fresh puuid)")
                 new_summaries = []
 
             # Estimate LP deltas for backfilled matches
