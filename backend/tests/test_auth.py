@@ -1,8 +1,42 @@
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import select
 
 from app.config import settings
 from app.main import app
+from app.models import User
 from app.routers import user as user_router
+
+
+async def test_email_backfill_persists_for_legacy_user(auth_client, db_session):
+    del auth_client  # ensures the session override is installed
+
+    legacy_user = User(
+        username="legacyuser",
+        email=None,
+        display_name="Legacy User",
+        balance=settings.starting_balance,
+    )
+    db_session.add(legacy_user)
+    await db_session.commit()
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(
+        transport=transport,
+        base_url="http://test",
+        headers={
+            "Remote-User": "legacyuser",
+            "Remote-Email": "legacy@test.dev",
+            # Same display name as stored, so only the backfill needs a commit
+            "Remote-Name": "Legacy User",
+        },
+    ) as legacy_client:
+        resp = await legacy_client.get("/api/user/me")
+    assert resp.status_code == 200
+
+    result = await db_session.execute(select(User).where(User.username == "legacyuser"))
+    refreshed = result.scalar_one()
+    await db_session.refresh(refreshed)
+    assert refreshed.email == "legacy@test.dev"
 
 
 async def test_auto_provision_new_user(auth_client):

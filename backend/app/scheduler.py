@@ -17,6 +17,7 @@ from app.banking import (
     get_playing_income_daily_multiplier,
     get_playing_income_outcome_multiplier,
     record_user_wealth_snapshot,
+    round_currency,
     start_of_utc_day,
 )
 from app.config import settings
@@ -569,7 +570,7 @@ async def _apply_playing_income_for_player(
         if amount <= 0:
             continue
 
-        user.balance += amount
+        user.balance = round_currency(user.balance + amount)
         daily_rewarded_match_counts[day_start] = match_number_for_day
         session.add(
             PlayingIncomeEntry(
@@ -942,7 +943,7 @@ async def market_update_job() -> None:
                     order.status = OrderStatus.CANCELLED
                     logger.info("Cancelled order %d: insufficient balance", order.id)
                     continue
-                user.balance -= total_cost
+                user.balance = round_currency(user.balance - total_cost)
                 holding = await _get_or_create_holding(session, user.id, player.id)
                 holding.quantity += order.quantity
 
@@ -953,7 +954,7 @@ async def market_update_job() -> None:
                     logger.info("Cancelled order %d: insufficient shares", order.id)
                     continue
                 holding.quantity -= order.quantity
-                user.balance += total_cost
+                user.balance = round_currency(user.balance + total_cost)
 
             order.status = OrderStatus.EXECUTED
             order.execution_price = execution_price
@@ -996,7 +997,7 @@ async def market_update_job() -> None:
                 )
                 settled_pnl = payout_total - position.cash_amount
 
-                user.balance += payout_total
+                user.balance = round_currency(user.balance + payout_total)
                 position.exit_price = exit_price
                 position.settled_at = now
                 position.raw_pnl = raw_pnl

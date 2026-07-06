@@ -6,6 +6,7 @@ from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import CurrentOnboardedUser, CurrentUser, is_admin_user
+from app.banking import round_currency
 from app.config import settings
 from app.database import get_session
 from app.models import (
@@ -253,7 +254,7 @@ async def place_order(
         total_cost = execution_price * body.quantity
         if user.balance < total_cost:
             raise HTTPException(status_code=400, detail="Insufficient balance")
-        user.balance -= total_cost
+        user.balance = round_currency(user.balance - total_cost)
         if not user.is_demo:
             player.current_price = new_market_price
 
@@ -391,7 +392,7 @@ async def place_order(
             )
 
         holding.quantity -= body.quantity
-        user.balance += total_value
+        user.balance = round_currency(user.balance + total_value)
         if not user.is_demo:
             player.current_price = new_market_price
 
@@ -597,7 +598,7 @@ async def cancel_order(
     refund_total = execution_price * order.quantity
     lot.quantity -= order.quantity
     holding.quantity -= order.quantity
-    user.balance += refund_total
+    user.balance = round_currency(user.balance + refund_total)
     order.status = OrderStatus.REVERTED
 
     # Reverse the market impact: the original BUY pushed price up, so we

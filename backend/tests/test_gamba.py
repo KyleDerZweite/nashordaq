@@ -78,13 +78,14 @@ async def test_create_gamba_position_creates_recent_order(
     assert recent_order["quantity"] == pytest.approx(4.0)
 
 
-async def test_create_gamba_position_allows_multiple_active_positions(
+async def test_create_gamba_position_allows_multiple_when_limit_raised(
     auth_client,
     tradable_player,
     monkeypatch,
 ):
     monkeypatch.setattr("app.routers.gamba.random.choice", lambda players: players[0])
     monkeypatch.setattr("app.routers.gamba.random.uniform", lambda a, b: 24.0)
+    monkeypatch.setattr(settings, "gamba_max_active_positions_per_user", 2)
 
     first_resp = await auth_client.post("/api/gamba", json={"cash_amount": 100})
     assert first_resp.status_code == 201
@@ -99,6 +100,31 @@ async def test_create_gamba_position_allows_multiple_active_positions(
     me_resp = await auth_client.get("/api/user/me")
     assert me_resp.status_code == 200
     assert me_resp.json()["balance"] == pytest.approx(settings.starting_balance - 200)
+
+
+async def test_create_gamba_position_enforces_active_position_limit(
+    auth_client,
+    tradable_player,
+    monkeypatch,
+):
+    monkeypatch.setattr("app.routers.gamba.random.choice", lambda players: players[0])
+    monkeypatch.setattr("app.routers.gamba.random.uniform", lambda a, b: 24.0)
+    monkeypatch.setattr(settings, "gamba_max_active_positions_per_user", 1)
+
+    first_resp = await auth_client.post("/api/gamba", json={"cash_amount": 100})
+    assert first_resp.status_code == 201
+
+    second_resp = await auth_client.post("/api/gamba", json={"cash_amount": 100})
+    assert second_resp.status_code == 400
+    assert "Maximum number of active Gamba positions" in second_resp.json()["detail"]
+
+    positions_resp = await auth_client.get("/api/gamba")
+    assert positions_resp.status_code == 200
+    assert len(positions_resp.json()) == 1
+
+    me_resp = await auth_client.get("/api/user/me")
+    assert me_resp.status_code == 200
+    assert me_resp.json()["balance"] == pytest.approx(settings.starting_balance - 100)
 
 
 @pytest.mark.asyncio

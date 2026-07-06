@@ -33,8 +33,8 @@ NEWT_SECRET=your-newt-secret
 | `NASHORDAQ_AUTH_HEADER` | `Remote-User` | Legacy fallback identity header |
 | `NASHORDAQ_ADMIN_REMOTE_USERS` | unset | Comma-separated authenticated email addresses that should be treated as admin/operator accounts |
 | `NASHORDAQ_STARTING_BALANCE` | `1000.0` | Initial balance for new users |
-| `NASHORDAQ_ENFORCE_TRUSTED_PROXY` | `false` | Reject auth headers from non-trusted source IPs |
-| `NASHORDAQ_TRUSTED_PROXY_CIDRS` | `127.0.0.1/32,::1/128` | Allowed proxy CIDR ranges (when enforcement is on) |
+| `NASHORDAQ_ENFORCE_TRUSTED_PROXY` | `false` | Reject auth headers from non-trusted source IPs. Strongly recommended: set to `true` in every deployment — the backend trusts `Remote-*` headers for identity, so anything that can reach the backend port directly can otherwise impersonate any user or admin. |
+| `NASHORDAQ_TRUSTED_PROXY_CIDRS` | `127.0.0.1/32,::1/128` | Allowed proxy CIDR ranges (when enforcement is on). The default is localhost-only; in the compose deployment you must add the container network subnet (`podman network inspect <network>`), otherwise all requests are rejected. |
 | `NASHORDAQ_RIOT_API_BASE_URL` | `https://europe.api.riotgames.com` | Riot account/match API region |
 | `NASHORDAQ_RIOT_API_REGION_URL` | `https://euw1.api.riotgames.com` | Riot league/summoner API region |
 | `NASHORDAQ_GAMBA_ENABLED` | `true` | Private-only side-position feature flag. Set this to `false` for any public-facing or compliance-oriented deployment. |
@@ -128,8 +128,10 @@ You must use **SSO** (Platform SSO or External IdP) for Nashordaq to identify us
 Once everything is running:
 
 ```bash
-# Health check (no auth required)
-curl https://nashordaq.example.com/api/health
+# Health check (note: if the Pangolin resource is SSO-gated, this returns a
+# login redirect from outside; the container healthcheck hits the backend
+# directly and is not affected)
+curl https://nashordaq.example.com/health
 
 # Authenticated request (through Pangolin SSO in a browser)
 # Navigate to https://nashordaq.example.com

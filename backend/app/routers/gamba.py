@@ -3,10 +3,11 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import CurrentOnboardedUser, CurrentUser, is_admin_user
+from app.banking import round_currency
 from app.config import settings
 from app.database import get_session
 from app.models import (
@@ -80,6 +81,23 @@ async def create_gamba_position(
     if body.cash_amount > user.balance:
         raise HTTPException(status_code=400, detail="Insufficient balance")
 
+    active_count = (
+        await session.scalar(
+            select(func.count())
+            .select_from(GambaPosition)
+            .where(
+                GambaPosition.user_id == user.id,
+                GambaPosition.status == GambaStatus.ACTIVE,
+            )
+        )
+        or 0
+    )
+    if active_count >= settings.gamba_max_active_positions_per_user:
+        raise HTTPException(
+            status_code=400,
+            detail="Maximum number of active Gamba positions reached",
+        )
+
     player = await _get_random_eligible_player(session, user.linked_player_id)
     if player.current_price <= 0:
         raise HTTPException(status_code=400, detail="Selected player is not tradable")
@@ -103,7 +121,7 @@ async def create_gamba_position(
         - settings.gamba_settlement_multiplier_min
     )
 
-    user.balance -= body.cash_amount
+    user.balance = round_currency(user.balance - body.cash_amount)
 
     buy_order = Order(
         user_id=user.id,

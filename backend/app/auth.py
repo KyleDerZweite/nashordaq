@@ -106,6 +106,7 @@ async def _get_current_user(request: Request, session: SessionDep) -> User:
         raise HTTPException(status_code=401, detail="Missing authentication header")
 
     user: User | None = None
+    needs_commit = False
 
     if email:
         result = await session.execute(select(User).where(User.email == email))
@@ -118,6 +119,7 @@ async def _get_current_user(request: Request, session: SessionDep) -> User:
         # Backfill email on first login with the new header
         if user is not None and email and user.email is None:
             user.email = email
+            needs_commit = True
 
     if user is None:
         identity = email or username
@@ -144,6 +146,9 @@ async def _get_current_user(request: Request, session: SessionDep) -> User:
     # Update display name from Zitadel if it changed
     if display_name and user.display_name != display_name:
         user.display_name = display_name
+        needs_commit = True
+
+    if needs_commit:
         await session.commit()
         await session.refresh(user)
 

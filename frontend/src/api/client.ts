@@ -10,6 +10,21 @@ export class ApiError extends Error {
   }
 }
 
+// FastAPI validation errors (422) return detail as an array of error objects.
+function formatErrorDetail(detail: unknown): string | undefined {
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    const messages = detail
+      .map((entry) =>
+        typeof entry?.msg === "string" ? entry.msg : JSON.stringify(entry),
+      )
+      .join(", ");
+    return messages || undefined;
+  }
+  if (detail != null) return JSON.stringify(detail);
+  return undefined;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
     ...init,
@@ -21,7 +36,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new ApiError(
-      body.detail ?? `Request failed: ${res.status}`,
+      formatErrorDetail(body.detail) ?? `Request failed: ${res.status}`,
       res.status,
     );
   }

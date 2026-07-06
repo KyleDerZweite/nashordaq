@@ -58,8 +58,38 @@ jobs:
         if: env.PR_NUMBER != '' && env.MERGE_STATE == 'DIRTY'
         run: echo "Dependabot PR has merge conflicts. Auto-merge stays disabled."
 
-      - name: Merge Dependabot PR
+      - name: Allow only patch and minor updates
         if: env.PR_NUMBER != '' && env.MERGE_STATE != 'DIRTY'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_URL: ${{ env.PR_URL }}
+        run: |
+          text="$(gh pr view "$PR_URL" --json title,body --jq '.title + " " + .body')"
+          pairs="$(printf '%s' "$text" | grep -oE 'from [0-9]+(\.[0-9]+)* to [0-9]+(\.[0-9]+)*' || true)"
+
+          if [ -z "$pairs" ]; then
+            echo "Could not determine version changes. Leaving PR for manual review."
+            exit 0
+          fi
+
+          allow=true
+          while IFS= read -r pair; do
+            from_version="$(printf '%s' "$pair" | awk '{print $2}')"
+            to_version="$(printf '%s' "$pair" | awk '{print $4}')"
+            if [ "${from_version%%.*}" != "${to_version%%.*}" ]; then
+              echo "Major bump detected ($from_version -> $to_version). Leaving PR for manual review."
+              allow=false
+            fi
+          done <<EOF
+          $pairs
+          EOF
+
+          if [ "$allow" = "true" ]; then
+            echo "ALLOW_MERGE=true" >> "$GITHUB_ENV"
+          fi
+
+      - name: Merge Dependabot PR
+        if: env.PR_NUMBER != '' && env.MERGE_STATE != 'DIRTY' && env.ALLOW_MERGE == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           PR_URL: ${{ env.PR_URL }}

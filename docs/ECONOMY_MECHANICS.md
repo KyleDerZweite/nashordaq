@@ -212,7 +212,7 @@ The bank offers a fixed failsafe package only when debt-adjusted net worth is lo
 debt_adjusted_net_worth = cash_balance + holdings_value + active_gamba_mark_value - outstanding_debt
 ```
 
-- `active_gamba_mark_value` is the sum of `cash_amount` of all active `gamba` positions when that private-only feature is enabled. It represents the value "locked" in those positions.
+- `active_gamba_mark_value` is the current mark-to-market value (`quantity * current_price`) of all active `gamba` positions when that private-only feature is enabled. It represents the live value of the shares underlying those positions.
 
 Current defaults:
 

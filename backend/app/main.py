@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth import CurrentUser
 from app.config import settings
 from app.database import engine, get_session, init_db
 from app.models import TrackedPlayer
@@ -140,9 +141,11 @@ async def system_status(session: SessionDep) -> SystemStatusResponse:
 
 @app.get("/api/market/quote")
 async def quote(
+    user: CurrentUser,
     gameName: str = Query(...),
     tagLine: str = Query(...),
 ) -> dict[str, Any]:
+    del user
     try:
         rank_data = await get_rank(
             client=app.state.http_client,
@@ -156,6 +159,10 @@ async def quote(
         return JSONResponse(status_code=404, content={"detail": str(e)})
     except RateLimitedError as e:
         return JSONResponse(status_code=429, content={"detail": str(e)})
+    except httpx.HTTPError:
+        return JSONResponse(
+            status_code=502, content={"detail": "Riot API request failed"}
+        )
 
     return {
         "gameName": gameName,
@@ -172,9 +179,11 @@ async def quote(
 
 @app.get("/api/market/account", response_model=MarketAccountResponse)
 async def verify_market_account(
+    user: CurrentUser,
     gameName: str = Query(...),
     tagLine: str = Query(...),
 ) -> MarketAccountResponse:
+    del user
     try:
         account = await get_account_by_riot_id(
             client=app.state.http_client,
@@ -187,6 +196,10 @@ async def verify_market_account(
         return JSONResponse(status_code=404, content={"detail": str(e)})
     except RateLimitedError as e:
         return JSONResponse(status_code=429, content={"detail": str(e)})
+    except httpx.HTTPError:
+        return JSONResponse(
+            status_code=502, content={"detail": "Riot API request failed"}
+        )
 
     return MarketAccountResponse(
         game_name=account.game_name,

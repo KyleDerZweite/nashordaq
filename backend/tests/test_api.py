@@ -111,7 +111,23 @@ async def test_system_status_is_degraded_when_market_refresh_is_stale(
     assert data["last_market_update_at"] is not None
 
 
-async def test_quote_success(client):
+async def test_quote_requires_auth(auth_client, client):
+    del auth_client  # ensures the session override is installed
+    resp = await client.get(
+        "/api/market/quote", params={"gameName": "TestPlayer", "tagLine": "NA1"}
+    )
+    assert resp.status_code == 401
+
+
+async def test_market_account_requires_auth(auth_client, client):
+    del auth_client
+    resp = await client.get(
+        "/api/market/account", params={"gameName": "TestPlayer", "tagLine": "NA1"}
+    )
+    assert resp.status_code == 401
+
+
+async def test_quote_success(auth_client):
     mock_rank = RankData(
         puuid="test-puuid",
         summoner_id="test-summoner",
@@ -125,7 +141,7 @@ async def test_quote_success(client):
     )
 
     with patch("app.main.get_rank", new_callable=AsyncMock, return_value=mock_rank):
-        resp = await client.get(
+        resp = await auth_client.get(
             "/api/market/quote", params={"gameName": "TestPlayer", "tagLine": "NA1"}
         )
 
@@ -139,13 +155,13 @@ async def test_quote_success(client):
     assert data["hotStreak"] is True
 
 
-async def test_quote_not_found(client):
+async def test_quote_not_found(auth_client):
     with patch(
         "app.main.get_rank",
         new_callable=AsyncMock,
         side_effect=PlayerNotFoundError("Not found"),
     ):
-        resp = await client.get(
+        resp = await auth_client.get(
             "/api/market/quote", params={"gameName": "Nobody", "tagLine": "0000"}
         )
 
@@ -153,7 +169,7 @@ async def test_quote_not_found(client):
     assert "Not found" in resp.json()["detail"]
 
 
-async def test_market_account_success(client):
+async def test_market_account_success(auth_client):
     mock_account = AccountData(
         puuid="test-puuid",
         game_name="TestPlayer",
@@ -165,7 +181,7 @@ async def test_market_account_success(client):
         new_callable=AsyncMock,
         return_value=mock_account,
     ):
-        resp = await client.get(
+        resp = await auth_client.get(
             "/api/market/account", params={"gameName": "TestPlayer", "tagLine": "NA1"}
         )
 
@@ -178,13 +194,13 @@ async def test_market_account_success(client):
     }
 
 
-async def test_market_account_not_found(client):
+async def test_market_account_not_found(auth_client):
     with patch(
         "app.main.get_account_by_riot_id",
         new_callable=AsyncMock,
         side_effect=PlayerNotFoundError("Player not found"),
     ):
-        resp = await client.get(
+        resp = await auth_client.get(
             "/api/market/account", params={"gameName": "Nobody", "tagLine": "0000"}
         )
 

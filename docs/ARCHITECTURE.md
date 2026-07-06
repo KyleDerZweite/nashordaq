@@ -18,7 +18,7 @@ The current architecture is single-tenant: one deployment runs one private marke
 |  FastAPI Application                                     |
 |                                                          |
 |  Routers          Auth          Scheduler (APScheduler)  |
-|  /api/user/*      Remote-Email  30-min interval job      |
+|  /api/user/*      Remote-Email  dynamic-interval job     |
 |  /api/market/*    primary key   - Fetch LP from Riot     |
 |  /api/orders/*    auto-provision- Update prices          |
 |  /api/portfolio   new users     - Execute pending orders |
@@ -48,7 +48,7 @@ The current architecture is single-tenant: one deployment runs one private marke
 - **FastAPI:** Async Python web framework. Hosts all REST endpoints and the scheduler in a single process.
 - **SQLAlchemy 2.0:** ORM layer using the `Mapped`/`mapped_column` declarative style. No SQLModel.
 - **SQLite (aiosqlite):** Embedded database with WAL mode enabled for concurrent read/write access.
-- **APScheduler v3:** In-process `AsyncIOScheduler` that runs the market update job on a configurable interval (default 30 minutes).
+- **APScheduler v3:** In-process `AsyncIOScheduler` that wakes every 30 seconds and runs a full market update when the dynamic interval (derived from tracked-player count and the Riot rate-limit budget) is due. See [DEPLOYMENT.md](DEPLOYMENT.md) "Market Update Cadence".
 - **httpx:** Async HTTP client for Riot Games API calls.
 
 ## Data Model

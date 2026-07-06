@@ -430,7 +430,8 @@ class SimulationRequest(BaseModel):
     starting_price: float = 25.0
     starting_streak: int = 0
     parameter_sets: list[SimulationParameterSet] = Field(
-        default_factory=lambda: [SimulationParameterSet()]
+        default_factory=lambda: [SimulationParameterSet()],
+        max_length=20,
     )
 
 
