@@ -87,8 +87,8 @@ Core endpoints:
 | PUT | `/api/user/profile` | Yes | Update linked Riot account |
 | GET | `/api/market/players` | No | List all tracked players with current prices |
 | GET | `/api/market/players/{id}` | No | Player detail with price history |
-| GET | `/api/market/quote` | No | Ad hoc Riot rank lookup |
-| GET | `/api/market/account` | No | Riot account verification by Riot ID |
+| GET | `/api/market/quote` | Yes | Ad hoc Riot rank lookup |
+| GET | `/api/market/account` | Yes | Riot account verification by Riot ID |
 | POST | `/api/orders` | Yes | Place a buy or sell order |
 | GET | `/api/orders` | Yes | List user's orders |
 | GET | `/api/orders/recent` | Yes | List recent executed orders |
