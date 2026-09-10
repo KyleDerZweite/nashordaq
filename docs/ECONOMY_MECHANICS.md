@@ -6,14 +6,27 @@ Compliance note: this document reflects the current codebase. The planned produc
 
 Translates a player's League of Legends rank into a continuous integer for price computation.
 
+**For Iron through Diamond:**
 ```
 LP_abs = (T * 400) + (D * 100) + LP_current
 ```
 
+**For Master, Grandmaster, and Challenger:**
+```
+LP_abs = 2800 + LP_current
+```
+
 | Variable | Values |
 |---|---|
-| T (Tier) | Iron=0, Bronze=1, Silver=2, Gold=3, Platinum=4, Emerald=5, Diamond=6, Master/Grandmaster/Challenger=7 |
-| D (Division) | IV=0, III=1, II=2, I=3. Master+ uses D=3. |
+| T (Tier) | Iron=0, Bronze=1, Silver=2, Gold=3, Platinum=4, Emerald=5, Diamond=6 |
+| D (Division) | IV=0, III=1, II=2, I=3 |
+
+Master+ tiers (Master, Grandmaster, Challenger) all use the same LP formula because their tier thresholds are **dynamic and leaderboard-based**, not fixed. The Riot API provides the current tier designation (which tier the player is in right now), but for pricing we use LP as the single source of truth. All three tiers share the same 2800 base:
+- Diamond I at 100 LP = 2800 (rank-up threshold)
+- Master/GM/Challenger at 0 LP = 2800 (seamless from Diamond)
+- A player at 2800 + 420 LP = 3220 (may be Master, GM, or Challenger depending on leaderboard)
+
+Tier thresholds change dynamically: a fixed LP value could be Master at one moment and Grandmaster the next as the leaderboard shifts. Since we cannot predict tier membership by LP alone, we use the Riot API's tier designation for identity but the raw LP for pricing.
 
 Implementation: `app/pricing.py::calculate_lp_abs()`
 

@@ -24,10 +24,17 @@ def test_lp_abs_diamond_i_99():
 
 
 def test_lp_abs_master_plus():
-    # Master+ all map to T=7, D=3 -> 7*400 + 3*100 + LP
-    assert calculate_lp_abs("MASTER", "I", 0) == 3100
-    assert calculate_lp_abs("GRANDMASTER", "I", 500) == 3600
-    assert calculate_lp_abs("CHALLENGER", "I", 1200) == 4300
+    # Master+: all use same base (2800), no fixed tier offsets
+    # Tier thresholds are dynamic (leaderboard-based), so we price by LP only
+    # Diamond I 100 LP = 2800 (rank-up point), Master/GM/Challenger I 0 LP = 2800
+    assert calculate_lp_abs("DIAMOND", "I", 100) == 2800
+    assert calculate_lp_abs("MASTER", "I", 0) == 2800
+    assert calculate_lp_abs("MASTER", "I", 300) == 3100
+    assert calculate_lp_abs("GRANDMASTER", "I", 0) == 2800
+    assert calculate_lp_abs("GRANDMASTER", "I", 300) == 3100
+    assert calculate_lp_abs("CHALLENGER", "I", 0) == 2800
+    assert calculate_lp_abs("CHALLENGER", "I", 500) == 3300
+    assert calculate_lp_abs("CHALLENGER", "I", 1200) == 4000
 
 
 def test_lp_abs_case_insensitive():

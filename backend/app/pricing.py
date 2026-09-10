@@ -8,9 +8,6 @@ TIER_MAP: dict[str, int] = {
     "PLATINUM": 4,
     "EMERALD": 5,
     "DIAMOND": 6,
-    "MASTER": 7,
-    "GRANDMASTER": 7,
-    "CHALLENGER": 7,
 }
 
 DIVISION_MAP: dict[str, int] = {
@@ -19,6 +16,12 @@ DIVISION_MAP: dict[str, int] = {
     "II": 2,
     "I": 3,
 }
+
+# Master+ base floor (no tier distinction in formula)
+# Master, Grandmaster, and Challenger thresholds are dynamic (based on leaderboard)
+# All three use the same base: Diamond I max (100 LP) = 2800, so Master+ starts at 2800
+# Tier designation comes from Riot API but doesn't affect LP_abs pricing
+MASTER_PLUS_FLOOR = 2800
 
 BETA = 0.1
 PRICE_FLOOR = 1.0
@@ -77,8 +80,11 @@ def _apply_lp_efficiency(delta_lp: int) -> float:
 
 
 def calculate_lp_abs(tier: str, rank: str, league_points: int) -> int:
-    t = TIER_MAP.get(tier.upper(), 0)
-    d = DIVISION_MAP.get(rank.upper(), 3) if t < 7 else 3
+    tier_upper = tier.upper()
+    if tier_upper in ("MASTER", "GRANDMASTER", "CHALLENGER"):
+        return MASTER_PLUS_FLOOR + league_points
+    t = TIER_MAP.get(tier_upper, 0)
+    d = DIVISION_MAP.get(rank.upper(), 3)
     return (t * 400) + (d * 100) + league_points
 
 
