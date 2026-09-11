@@ -1,6 +1,6 @@
 # Productization Plan
 
-> Note: hosted operation is out of scope. Nashordaq is self-hosted only. The hosted multi-room track below is retained for context and will not be built.
+> Note: Nashordaq is currently self-hosted only. Hosted multi-room operation, Riot Sign-On, and monetization models are retained here as exploratory side-notes for a future revisit, not as active roadmap goals.
 
 This document is the canonical strategy reference for Nashordaq as a private friend-group product.
 
@@ -13,10 +13,10 @@ It does not change the current implementation scope. It exists to answer two que
 
 Nashordaq should remain a **private League of Legends market game for friend groups**, not a public trading network.
 
-The strategy is self-hosted only:
+Current strategy:
 
-- **Self-hosted product only**
-- **No hosted multi-room product**
+- **Self-hosted product first**
+- **Hosted multi-room and monetization ideas kept as side-notes for future revisit**
 
 This sequence matches the current architecture, keeps early risk low, and creates a realistic path to validating demand before taking on the cost and policy burden of a hosted service.
 
@@ -273,6 +273,8 @@ Use these thresholds as the minimum bar:
 If those thresholds are not met, keep Nashordaq self-hosted and niche.
 
 ## Monetization Strategy
+
+> Note: Kept as an exploratory side-note. Not an active goal; approach and viability to be revisited later if self-hosted demand warrants it.
 
 ### Recommended business goal
 

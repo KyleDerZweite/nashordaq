@@ -137,7 +137,7 @@ The mode is configured via `NASHORDAQ_AUTH_MODE` (default: `builtin`). When both
 
 ## Future (v2+)
 
-The items below are not on the current roadmap. Hosted multi-room operation, Riot Sign-On, and monetization are out of scope. Nashordaq is self-hosted only.
+The items below are not on the current roadmap. Nashordaq is currently self-hosted only; hosted multi-room operation, Riot Sign-On, and monetization concepts are kept as exploratory side-notes for a future revisit rather than active goals.
 
 The canonical strategy document for market research is [PRODUCTIZATION_PLAN.md](PRODUCTIZATION_PLAN.md). This roadmap section stays focused on future implementation directions.
 
