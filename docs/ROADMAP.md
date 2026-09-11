@@ -137,13 +137,13 @@ The mode is configured via `NASHORDAQ_AUTH_MODE` (default: `builtin`). When both
 
 ## Future (v2+)
 
-The items below are not on the current roadmap. They are documented for reference and should only be pursued after demand is proven.
+The items below are not on the current roadmap. Hosted multi-room operation, Riot Sign-On, and monetization are out of scope. Nashordaq is self-hosted only.
 
-The canonical strategy document for commercialization, market research, and product sequencing is [PRODUCTIZATION_PLAN.md](PRODUCTIZATION_PLAN.md). This roadmap section stays focused on future implementation directions.
+The canonical strategy document for market research is [PRODUCTIZATION_PLAN.md](PRODUCTIZATION_PLAN.md). This roadmap section stays focused on future implementation directions.
 
 ### Distribution Strategy
 
-**Primary model: self-hosted open source (single-tenant).**
+**Model: self-hosted open source (single-tenant).**
 
 Each friend group runs their own instance with their own Riot Personal API key. One instance = one friend group = one market. This is the standard self-hosted software model (same as Jellyfin, Gitea, Uptime Kuma, etc.) and does not violate any Riot policies.
 
@@ -153,38 +153,12 @@ Each friend group runs their own instance with their own Riot Personal API key. 
 - `gamba` can remain a private/self-hosted-only feature. It should not be part of any production-facing build submitted for Riot review.
 - The built-in auth mode (item 8) removes the need for any external auth stack, making deployment trivial.
 
-**Secondary model (only if demand proves it): centralized hosting.**
+### Selectable Queues
 
-A single public instance serving multiple groups. This requires a Riot Production API key (30,000 req/10min), multi-room architecture, and Riot policy compliance. The production-facing build should exclude `gamba` entirely and frame Nashordaq as a private virtual investing and social market product. Only pursue if self-hosted adoption demonstrates real demand and people explicitly ask for a hosted alternative.
+Planned as separate GitHub issues rather than a single roadmap item:
 
-Production key application requires: working public demo, legal docs (Impressum, privacy policy, ToS), and a product that serves a broad community. Expected approval timeline: 2 weeks to 6 months.
-
-### Multi-Room Architecture (centralized only)
-
-Only relevant if a centralized instance is pursued.
-
-- New `rooms` and `room_members` tables. Most existing tables gain a `room_id` scope.
-- `TrackedPlayer` stays global (LP fetched once per unique PUUID). Streak, price, and economy state are per-room.
-- Room creator is admin. Joining requires an invite code. Economy parameters configurable per room.
-- Scheduler: LP fetching is global, price/order/settlement logic becomes per-room.
-- Poro, bank, playing income all become per-room-scoped.
-
-**Open questions:** room lifecycle, member limits, admin disappearance, migration of existing single-tenant data, economy parameter bounds.
-
-### Riot Sign-On (RSO)
-
-Only available with a Production API key. Provides verified PUUID via OAuth2 instead of manual Riot ID entry. Benefits: proof of account ownership, immutable identity, no manual verification. Only worth implementing after Production key approval.
-
-### Monetization (if centralized)
-
-Riot's developer ToS allows charging for hosting/compute and premium features unrelated to Riot data. It prohibits charging for access to Riot data itself, real-money gambling, and selling Riot data.
-
-Viable models for a centralized instance:
-- **Hosting fee** ($3-5/month per market) - paying for server resources, not data.
-- **Donations** (Patreon, GitHub Sponsors, Ko-fi) - simplest, covers small hosting costs.
-- **Cosmetic premium** - custom themes, profile badges, extended history. Engineering effort probably not worth the revenue at realistic scale.
-
-Realistic market: 50-500 active friend groups. This is a niche community tool, not a SaaS business. Optimize for sustainability, not growth.
+- Ranked Flex shares alongside Ranked Solo, using the same League and Match APIs.
+- TFT Ranked and TFT Double Up shares, which need separate TFT APIs and rating handling.
 
 ### Market Sizing Reality Check
 

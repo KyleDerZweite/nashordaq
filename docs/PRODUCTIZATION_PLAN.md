@@ -1,6 +1,8 @@
 # Productization Plan
 
-This document is the canonical strategy reference for turning Nashordaq from a private friend-group project into a product.
+> Note: hosted operation is out of scope. Nashordaq is self-hosted only. The hosted multi-room track below is retained for context and will not be built.
+
+This document is the canonical strategy reference for Nashordaq as a private friend-group product.
 
 It does not change the current implementation scope. It exists to answer two questions clearly:
 
@@ -9,12 +11,12 @@ It does not change the current implementation scope. It exists to answer two que
 
 ## Summary
 
-Nashordaq should be productized as a **private League of Legends market game for friend groups**, not as a public trading network.
+Nashordaq should remain a **private League of Legends market game for friend groups**, not a public trading network.
 
-The recommended strategy is a dual-track approach with strict sequencing:
+The strategy is self-hosted only:
 
-- **Track 1: self-hosted product first**
-- **Track 2: hosted multi-room product second**
+- **Self-hosted product only**
+- **No hosted multi-room product**
 
 This sequence matches the current architecture, keeps early risk low, and creates a realistic path to validating demand before taking on the cost and policy burden of a hosted service.
 

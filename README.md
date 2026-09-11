@@ -11,18 +11,16 @@ Users trade shares in League of Legends players using virtual currency. Share pr
 
 A live demo is available at **[demo-nashordaq.kylehub.dev](https://demo-nashordaq.kylehub.dev/)**. No account or API key needed -- just open the link and start trading with simulated data.
 
-## What's Next? You Decide
+## What's Next
 
-Nashordaq started as a personal project for my friend group, and it does what I set out to build. But I'm curious whether others would find it useful too.
+Nashordaq started as a personal project for my friend group, and it does what I set out to build. The direction now is Nashordaq as a **self-hosted private-league product for friend groups**. There is no hosted version planned.
 
-The current direction is to explore Nashordaq as a **private-league product for friend groups**, with a self-hosted product first and a hosted multi-room version only if demand proves out. See the [Productization Plan](docs/PRODUCTIZATION_PLAN.md) for the market research and sequencing, and the [Roadmap](docs/ROADMAP.md#future-v2) for implementation-oriented future work.
+The next areas of interest are more trackable queues as selectable shares, such as Ranked Flex, TFT Ranked, and TFT Double Up alongside Ranked Solo. See the [Roadmap](docs/ROADMAP.md#future-v2) and open GitHub issues for the current plan.
 
 **If that sounds interesting to you:**
 - Drop your thoughts in the [Discussions](https://github.com/KyleDerZweite/nashordaq/discussions) tab
-- Leave a star if you'd want a hosted version
+- Leave a star if you self-host it with your group
 - Open an [Idea](https://github.com/KyleDerZweite/nashordaq/discussions/categories/ideas) for features you'd like to see
-
-I'll keep developing this if there's a community that wants it.
 
 ## Features
 
