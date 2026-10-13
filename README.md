@@ -1,6 +1,6 @@
 # Nashordaq
 
-Local setup and username/password sessions are implemented from [ADR-0001](docs/adr/0001-self-host-baseline.md). The complete standalone deployment, invitations, recovery and explicit demo sessions remain subsequent slices of [spec #19](https://github.com/KyleDerZweite/nashordaq/issues/19).
+Local setup and username/password sessions are implemented from [ADR-0001](docs/adr/0001-self-host-baseline.md). The complete standalone deployment and recovery remain subsequent slices of [spec #19](https://github.com/KyleDerZweite/nashordaq/issues/19).
 
 > **Early Development Notice**
 > This project is in early development and subject to breaking changes. It is intended for personal use only and is **not compliant with Riot Games Production API key requirements**. Self-hosting requires technical knowledge (environment configuration and containerized deployment). The future production-facing path documented in this repo excludes the private-only `gamba` mechanic entirely.
@@ -11,7 +11,7 @@ Users trade shares in League of Legends players using virtual currency. Share pr
 
 ## Try It
 
-A live demo is available at **[demo-nashordaq.kylehub.dev](https://demo-nashordaq.kylehub.dev/)**. The previously deployed demo may use older code. This development revision denies demo access until explicit isolated demo sessions are implemented.
+A live demo is available at **[demo-nashordaq.kylehub.dev](https://demo-nashordaq.kylehub.dev/)**. The previously deployed demo may use older code. This development revision requires demo/demo login when demo mode is explicitly enabled. Each visitor has separate temporary game state in a shared simulated market. Sign out to delete personal state immediately. Inactivity expires access after 30 minutes, and automatic cleanup follows within one minute. Closing a browser does not guarantee immediate deletion.
 
 ## What's Next
 

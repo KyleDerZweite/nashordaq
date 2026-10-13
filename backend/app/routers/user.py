@@ -19,7 +19,6 @@ from app.pricing import (
 from app.riot import PlayerNotFoundError, get_rank
 from app.schemas import (
     BalanceInsightsResponse,
-    DemoNicknameRequest,
     UserOnboardingCreate,
     UserProfileUpdate,
     UserResponse,
@@ -100,13 +99,8 @@ async def _initialize_player_market_state(
 
 def _to_user_response(user: User) -> UserResponse:
     identity = user.email or user.username
-    if user.is_demo:
-        demo_fallback = "Demo Trader"
-        display = user.display_name or demo_fallback
-        shown_email = demo_fallback
-    else:
-        display = user.display_name or identity
-        shown_email = identity
+    display = user.username if user.is_demo else user.display_name or identity
+    shown_email = identity
     return UserResponse(
         id=user.id,
         email=shown_email,
@@ -156,21 +150,6 @@ async def get_balance_insights(
             for entry in summary.history
         ],
     )
-
-
-@router.post("/user/demo-nickname", response_model=UserResponse)
-async def set_demo_nickname(
-    body: DemoNicknameRequest,
-    user: CurrentUser,
-    session: SessionDep,
-) -> UserResponse:
-    if not user.is_demo:
-        raise HTTPException(status_code=403, detail="Only available for demo users")
-
-    user.display_name = body.display_name
-    await session.commit()
-    await session.refresh(user)
-    return _to_user_response(user)
 
 
 @router.post("/user/onboarding", response_model=UserResponse)

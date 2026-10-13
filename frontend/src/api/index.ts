@@ -37,7 +37,6 @@ export {
   useCancelOrder,
   useCompleteOnboarding,
   useUpdateUserProfile,
-  useSetDemoNickname,
   useSimulationDefaults,
   useSimulationPlayerMatches,
   useRunSimulation,

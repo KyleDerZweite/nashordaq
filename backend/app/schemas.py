@@ -108,10 +108,6 @@ class BalanceInsightsResponse(BaseModel):
     history: list[UserWealthSnapshotResponse]
 
 
-class DemoNicknameRequest(BaseModel):
-    display_name: str = Field(min_length=1, max_length=32)
-
-
 class UserOnboardingCreate(BaseModel):
     game_name: str = Field(min_length=1, max_length=255)
     tag_line: str = Field(min_length=1, max_length=10)

@@ -14,7 +14,7 @@ A closed, trusted friend group. Public registration and email verification are o
 
 Public registration, a mail-server requirement, OAuth/OIDC, additional administrators and hosted multi-room operation are outside this baseline. The first standalone release starts with fresh data; subsequent standalone releases establish the supported update path.
 
-Local setup, invitation registration and sessions are implemented. Recovery, administrator participation and explicit demo sessions remain later slices of the accepted baseline.
+Local setup, invitation registration, sessions and explicit isolated demo sessions are implemented. Recovery and administrator participation remain later slices of the accepted baseline.
 
 ## Current core user flows
 

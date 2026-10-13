@@ -89,7 +89,7 @@ Core endpoints:
 | GET | `/api/portfolio` | Yes | Current holdings, balance, debt, and total net worth |
 | GET | `/api/leaderboard` | Yes | Ranked user leaderboard |
 
-Additional optional/admin endpoints exist for bank, poro, simulation, demo helpers, admin dashboards, and the private-only `gamba` feature.
+Additional optional/admin endpoints exist for bank, poro, simulation, admin dashboards, and the private-only `gamba` feature.
 
 ## Accepted self-host target
 
@@ -97,7 +97,7 @@ The accepted direction is recorded in [ADR-0001](adr/0001-self-host-baseline.md)
 
 The application owns identity, authentication, invite access and administrator permissions. A deployment's reverse proxy owns public TLS termination and does not establish application identity. Game data requires an authenticated session. Demo operation is explicit and isolates each visitor's temporary game state.
 
-Setup, invitations, local login, logout and the private game-data gate are implemented. Password recovery, isolated demo sessions and the new deployment packaging are later slices of [spec #19](https://github.com/KyleDerZweite/nashordaq/issues/19). Administrator participation remains restricted until its dedicated slice. This distinction does not change the accepted requirements.
+Setup, invitations, local login, logout, isolated demo sessions and the private game-data gate are implemented. Password recovery and the new deployment packaging are later slices of [spec #19](https://github.com/KyleDerZweite/nashordaq/issues/19). Administrator participation remains restricted until its dedicated slice. This distinction does not change the accepted requirements.
 
 ## Authentication and session trust boundary
 
@@ -113,7 +113,9 @@ The browser session cookie is `HttpOnly`, `SameSite=Strict`, scoped to `/`, and 
 
 Every state-changing `/api` request requires `X-Nashordaq-CSRF: 1`, including setup, login and logout. Browser `Origin` must match the request origin, configured public URL or an explicit CORS origin. `Origin: null` and cross-site Fetch Metadata are rejected. Native/API tools may omit Origin if they supply the custom header. CORS allows explicit origins and this header, so an unrelated browser origin cannot send an authorized mutation. Public endpoints contain only health and login/setup metadata. Market, leaderboard, history, simulation, system status and administrator data require a valid session.
 
-API responses use `Cache-Control: no-store`. Responses and the frontend use `Referrer-Policy: no-referrer` to avoid disclosing setup or invitation URLs. Frontend access logs omit query strings and referrers. The frontend mounts game components after session validation and clears cached game queries when login ends. No proxy header creates a user, and no anonymous request creates demo state. Demo access fails closed until the explicit demo-session slice lands.
+API responses use `Cache-Control: no-store`. Responses and the frontend use `Referrer-Policy: no-referrer` to avoid disclosing setup or invitation URLs. Frontend access logs omit query strings and referrers. The frontend mounts game components after session validation and clears cached game queries when login ends. No proxy header creates a user, and no anonymous request creates demo state. Explicit demo mode accepts only demo/demo and creates a distinct temporary user. Sessions from the other mode cannot resume. Demo order lists and details authorize personal state against that user. Authentication owns deletion of personal state; scheduler invokes the same cleanup operation each minute. Shared tracked players, prices and history remain outside personal cleanup.
+
+Demo sessions retain the same seven-day browser cookie, but the persisted deadline expires after thirty minutes without explicit activity. Only protected `POST /api/auth/activity` extends it, and it cannot revive an expired session. Normal requests, polling and SSE never extend it. The visible authenticated browser sends that signal on trusted pointer, keyboard, scroll or touch events, immediately on the first event. Further events within one second are coalesced into one trailing signal, so the last gesture in a burst is retained. The timer sends only when trusted human input is pending; it never sends a periodic renewal. Logout revokes access and deletes all temporary personal rows immediately. Browser closure does not guarantee immediate deletion.
 
 Persistence checks the database marker before schema creation, alteration or switching SQLite to WAL. A database from the proxy version fails startup with instructions to preserve it and select a separate empty data directory. There is no automatic migration or deletion. Supported standalone databases preserve users, sessions and completed setup across restart.
 

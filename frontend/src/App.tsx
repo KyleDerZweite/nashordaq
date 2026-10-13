@@ -5,7 +5,6 @@ import AdminAccessManagement from "./components/admin/AdminAccessManagement";
 import Header from "./components/Header";
 import BankModal from "./components/BankModal";
 import DemoBanner from "./components/DemoBanner";
-import DemoNicknameModal from "./components/DemoNicknameModal";
 import SimulationView from "./components/SimulationView";
 import FlyingPoro from "./components/FlyingPoro";
 import MarketGrid from "./components/MarketGrid";
@@ -552,10 +551,6 @@ export default function App({
 
       {user && !user.onboarding_complete && !isAdmin && !isDemo && (
         <OnboardingModal />
-      )}
-
-      {isDemo && (!user?.display_name || user.display_name === "") && (
-        <DemoNicknameModal />
       )}
 
       {!isDemo && <FlyingPoro enabled={canTrade} />}
