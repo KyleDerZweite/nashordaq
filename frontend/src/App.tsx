@@ -1,3 +1,4 @@
+import AccountPassword from "./components/AccountPassword";
 import { useEffect, useMemo, useState } from "react";
 import BalanceInsightsModal from "./components/BalanceInsightsModal";
 import AdminDashboard from "./components/admin/AdminDashboard";
@@ -221,6 +222,7 @@ export default function App({
             {logoutError}
           </p>
         )}
+        {!isDemo && user && <AccountPassword />}
         {systemStatus &&
           [
             "missing_key",

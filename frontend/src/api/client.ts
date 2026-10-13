@@ -39,7 +39,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (!res.ok) {
     if (
       res.status === 401 &&
-      (!path.startsWith("/auth/") || path.startsWith("/auth/invites"))
+      (!path.startsWith("/auth/") ||
+        path.startsWith("/auth/invites") ||
+        path.startsWith("/auth/resets") ||
+        path === "/auth/password")
     ) {
       window.dispatchEvent(new Event("nashordaq:session-lost"));
     }

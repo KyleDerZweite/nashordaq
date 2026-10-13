@@ -1,6 +1,6 @@
 # Deployment guide
 
-One installation runs one private market. Docker Compose and Podman Compose use the same `podman-compose.yaml` and build application images locally. No external authentication service, tunnel, database server or Riot key is required for account setup and login. The [Architecture](ARCHITECTURE.md#authentication-and-session-trust-boundary) owns the authentication and security contract.
+One installation runs one private market. Docker Compose and Podman Compose use the same `podman-compose.yaml` and build application images locally. No external authentication service, tunnel, database server or Riot key is required for account setup, login and password recovery. The [Architecture](ARCHITECTURE.md#authentication-and-session-trust-boundary) owns the authentication and security contract.
 
 ## Fresh installation
 
@@ -56,6 +56,38 @@ Sign in as the administrator and select Admin View. In Member invitations, selec
 Each invitation expires after seven days and admits one member. The invited member opens the complete `/invite?token=...` link and chooses a username and a password of at least 12 characters. Registration signs them in and removes the token from the browser URL. Email and Riot details are unnecessary for account creation. Riot onboarding remains a separate step after login.
 
 Member invitations lists active, consumed, revoked and expired links. Select Revoke beside an active invitation to withdraw access. An invalid, expired, revoked or consumed link cannot create an account. Ask the administrator for a new link when registration reports that the invitation is unavailable. A validation error or taken username leaves the invitation usable for another attempt.
+
+## Change and recover passwords
+
+Open Change password in your account view. Enter your current password and a new password with at least 12 characters. A successful change ends every session of your account, including the current browser. Sign in again with your new password. Other users retain their sessions.
+
+As administrator, open Password recovery in Admin View. Choose the account and select Create reset link. Copy the generated link and share it privately with that account's owner. The link is delivered only at creation. It expires after one hour and works once. Select Revoke beside an active link to withdraw it.
+
+Open the complete `/reset?token=...` link and choose your new password. Successful reset removes the token from the URL, ends every previous session and requires a new login. Invalid, expired, revoked and used links change nothing. A successful password change or reset also revokes other unused reset links for that account. Ask the administrator for another link when needed. Password and reset operations are unavailable for demo accounts and demo installations.
+
+If the sole administrator cannot sign in, recover that same account on the server. From the backend directory, run:
+
+```bash
+uv run python -m app.operator recover-admin --database /absolute/path/to/nashordaq.db
+```
+
+For the installed Compose stack, run the command in the backend container with your selected runtime:
+
+```bash
+docker compose -f podman-compose.yaml exec backend python -m app.operator recover-admin --database /app/data/nashordaq.db
+podman-compose -f podman-compose.yaml exec backend python -m app.operator recover-admin --database /app/data/nashordaq.db
+```
+
+The command reads and confirms the new password with hidden terminal input. Select the existing standalone SQLite file, not a new or legacy proxy database. Recovery preserves the administrator's identity, game state and sole administrator role. It ends all old administrator sessions and revokes unused administrator reset links. It does not create an account or reopen setup. No Riot key is required.
+
+For automation, pass `--password-stdin` and supply exactly one password line through a protected pipe or file. Never supply a password as a command argument. For example, an existing permission-restricted secret file can be redirected to stdin:
+
+```bash
+uv run python -m app.operator recover-admin --database /absolute/path/to/nashordaq.db \
+  --password-stdin < /protected/path/new-admin-password
+```
+
+Check the command's exit status. Zero means recovery committed; a nonzero status reports a failed operation without committing a password change. Sign in with the new password and verify administrator access. Passwords and reset secrets do not enter the game activity log. Protect reset-link query strings and referrers in any external reverse-proxy logs.
 
 ## Configuration and persistence
 

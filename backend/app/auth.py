@@ -275,6 +275,19 @@ async def login(
     valid = await run_in_threadpool(verify_password, body.password, encoded)
     if user is None or not valid:
         raise HTTPException(status_code=401, detail="Invalid username or password")
+    # Serialize session issuance with password replacement.
+    current = await session.execute(
+        update(User)
+        .where(
+            User.id == user.id,
+            User.password_hash == encoded,
+            User.is_demo.is_(False),
+        )
+        .values(password_hash=encoded)
+        .returning(User.id)
+    )
+    if current.scalar_one_or_none() is None:
+        raise HTTPException(status_code=401, detail="Invalid username or password")
     await create_session(session, user, response)
     return {"status": "ok"}
 
@@ -298,13 +311,7 @@ async def logout(
             )
         )
     await session.commit()
-    response.delete_cookie(
-        SESSION_COOKIE,
-        path="/",
-        httponly=True,
-        secure=settings.public_url.startswith("https://"),
-        samesite="strict",
-    )
+    clear_session_cookie(response)
     return {"status": "ok"}
 
 
@@ -522,5 +529,234 @@ async def revoke_invitation(
     )
     if revoked.scalar_one_or_none() is None:
         raise HTTPException(status_code=409, detail="Invitation is no longer active")
+    await session.commit()
+    return {"status": "ok"}
+
+
+class NewPassword(BaseModel):
+    new_password: str = Field(min_length=12, max_length=1024)
+
+
+class PasswordChange(NewPassword):
+    current_password: str = Field(min_length=1, max_length=1024)
+
+
+async def replace_password(
+    session: AsyncSession,
+    user_id: int,
+    verifier: str,
+    *,
+    expected_hash: str | None = None,
+    session_token: str | None = None,
+) -> bool:
+    """Atomically replace a credential and revoke access in the caller's transaction."""
+    conditions = [User.id == user_id, User.is_demo.is_(False)]
+    if expected_hash is not None:
+        conditions.append(User.password_hash == expected_hash)
+    if session_token is not None:
+        conditions.append(
+            select(AuthSession.token_hash)
+            .where(
+                AuthSession.user_id == user_id,
+                AuthSession.token_hash == hash_token(session_token),
+                AuthSession.expires_at > utc_now(),
+            )
+            .exists()
+        )
+    changed = await session.execute(
+        update(User)
+        .where(*conditions)
+        .values(password_hash=verifier)
+        .returning(User.id)
+    )
+    if changed.scalar_one_or_none() is None:
+        return False
+    await session.execute(delete(AuthSession).where(AuthSession.user_id == user_id))
+    await session.execute(
+        update(AccessToken)
+        .where(
+            AccessToken.kind == "reset",
+            AccessToken.user_id == user_id,
+            AccessToken.consumed_at.is_(None),
+            AccessToken.revoked_at.is_(None),
+        )
+        .values(revoked_at=utc_now())
+    )
+    return True
+
+
+def clear_session_cookie(response: Response) -> None:
+    response.delete_cookie(
+        SESSION_COOKIE,
+        path="/",
+        httponly=True,
+        secure=settings.public_url.startswith("https://"),
+        samesite="strict",
+    )
+
+
+@router.post("/password")
+async def change_password(
+    body: PasswordChange,
+    request: Request,
+    response: Response,
+    user: CurrentUser,
+    session: SessionDep,
+) -> dict[str, str]:
+    if settings.demo_mode_enabled or is_demo_user(user):
+        raise HTTPException(
+            status_code=403, detail="Passwords unavailable in demo mode"
+        )
+    previous = user.password_hash
+    valid = await run_in_threadpool(verify_password, body.current_password, previous)
+    if not valid:
+        raise HTTPException(status_code=403, detail="Current password is incorrect")
+    verifier = await run_in_threadpool(hash_password, body.new_password)
+    if not await replace_password(
+        session,
+        user.id,
+        verifier,
+        expected_hash=previous,
+        session_token=request.cookies.get(SESSION_COOKIE),
+    ):
+        raise HTTPException(
+            status_code=409, detail="Account access changed. Sign in again."
+        )
+    await session.commit()
+    clear_session_cookie(response)
+    return {"status": "ok"}
+
+
+RESET_LIFETIME = timedelta(hours=1)
+
+
+class ResetRequest(BaseModel):
+    user_id: int = Field(gt=0)
+
+
+class ResetCredentials(NewPassword):
+    token: str = Field(min_length=1, max_length=256)
+
+
+class ResetResponse(InvitationResponse):
+    user_id: int
+
+
+class CreatedResetResponse(ResetResponse):
+    url: str
+
+
+def reset_response(token: AccessToken) -> ResetResponse:
+    return ResetResponse(
+        **invitation_response(token).model_dump(),
+        user_id=token.user_id,
+    )
+
+
+def require_password_mode() -> None:
+    if settings.demo_mode_enabled:
+        raise HTTPException(
+            status_code=403, detail="Passwords unavailable in demo mode"
+        )
+
+
+@router.post("/resets", status_code=201)
+async def create_reset(
+    body: ResetRequest,
+    administrator: CurrentAdminUser,
+    session: SessionDep,
+) -> CreatedResetResponse:
+    require_password_mode()
+    target = await session.scalar(
+        select(User.id).where(User.id == body.user_id, User.is_demo.is_(False))
+    )
+    if target is None:
+        raise HTTPException(status_code=404, detail="Account not found")
+    secret = secrets.token_urlsafe(32)
+    token = AccessToken(
+        token_hash=hash_token(secret),
+        kind="reset",
+        user_id=target,
+        expires_at=utc_now() + RESET_LIFETIME,
+    )
+    session.add(token)
+    await session.commit()
+    return CreatedResetResponse(
+        **reset_response(token).model_dump(),
+        url=f"{settings.public_url.rstrip('/')}/reset?token={secret}",
+    )
+
+
+@router.get("/resets")
+async def list_resets(
+    administrator: CurrentAdminUser,
+    session: SessionDep,
+) -> list[ResetResponse]:
+    require_password_mode()
+    tokens = await session.scalars(
+        select(AccessToken)
+        .where(AccessToken.kind == "reset")
+        .order_by(AccessToken.id.desc())
+    )
+    return [reset_response(token) for token in tokens]
+
+
+@router.delete("/resets/{reset_id}")
+async def revoke_reset(
+    reset_id: int,
+    administrator: CurrentAdminUser,
+    session: SessionDep,
+) -> dict[str, str]:
+    require_password_mode()
+    revoked = await session.execute(
+        update(AccessToken)
+        .where(
+            AccessToken.id == reset_id,
+            AccessToken.kind == "reset",
+            AccessToken.expires_at > utc_now(),
+            AccessToken.consumed_at.is_(None),
+            AccessToken.revoked_at.is_(None),
+        )
+        .values(revoked_at=utc_now())
+        .returning(AccessToken.id)
+    )
+    if revoked.scalar_one_or_none() is None:
+        raise HTTPException(status_code=409, detail="Reset link is no longer active")
+    await session.commit()
+    return {"status": "ok"}
+
+
+@router.post("/reset")
+async def reset_password(
+    body: ResetCredentials,
+    session: SessionDep,
+) -> dict[str, str]:
+    require_password_mode()
+    verifier = await run_in_threadpool(hash_password, body.new_password)
+    consumed = await session.execute(
+        update(AccessToken)
+        .where(
+            AccessToken.token_hash == hash_token(body.token),
+            AccessToken.kind == "reset",
+            AccessToken.expires_at > utc_now(),
+            AccessToken.consumed_at.is_(None),
+            AccessToken.revoked_at.is_(None),
+            AccessToken.user_id.in_(select(User.id).where(User.is_demo.is_(False))),
+        )
+        .values(consumed_at=utc_now())
+        .returning(AccessToken.user_id)
+    )
+    target = consumed.scalar_one_or_none()
+    if target is None:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Reset link is invalid, expired, revoked or already used. "
+                "Ask the administrator for a new link."
+            ),
+        )
+    if not await replace_password(session, target, verifier):
+        await session.rollback()
+        raise HTTPException(status_code=400, detail="Reset account is unavailable")
     await session.commit()
     return {"status": "ok"}

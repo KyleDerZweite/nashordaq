@@ -1,4 +1,5 @@
 import { useState } from "react";
+import AdminPasswordResets from "./AdminPasswordResets";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { del, get, post } from "../../api/client";
 import { formatLocalDateTime } from "../../utils/format";
@@ -19,7 +20,7 @@ const queryKey = ["admin", "invitations"];
 const buttonClass =
   "border-2 border-hex-gold px-4 py-2 text-sm font-bold text-hex-gold hover:bg-hex-bg disabled:cursor-wait disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hex-gold";
 
-export default function AdminAccessManagement() {
+function MemberInvitations() {
   const queryClient = useQueryClient();
   const [latestInvitation, setLatestInvitation] = useState<CreatedInvitation>();
   const [copyMessage, setCopyMessage] = useState<string>();
@@ -201,5 +202,14 @@ export default function AdminAccessManagement() {
         </p>
       )}
     </section>
+  );
+}
+
+export default function AdminAccessManagement() {
+  return (
+    <>
+      <MemberInvitations />
+      <AdminPasswordResets />
+    </>
   );
 }
