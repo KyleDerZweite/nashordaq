@@ -354,6 +354,8 @@ class LeaderboardPlayerPortfolioResponse(BaseModel):
 
 
 class SystemStatusResponse(BaseModel):
+    riot_status: str
+    riot_status_detail: str
     service_status: Literal["ok"]
     scheduler_running: bool
     market_status: MarketStatus

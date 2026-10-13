@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 
-import { ApiError, getMarketAccount } from "../api";
+import { ApiError, getMarketAccount, useSystemStatus } from "../api";
 import type { MarketAccountResponse, UserOnboardingCreate } from "../types";
 
 interface Props {
@@ -24,6 +24,8 @@ export default function PlayerProfileModal({
   onSubmit,
   onClose,
 }: Props) {
+  const fieldId = useId();
+  const { data: systemStatus } = useSystemStatus();
   const [gameName, setGameName] = useState(initialValues?.game_name ?? "");
   const [tagLine, setTagLine] = useState(initialValues?.tag_line ?? "");
   const [isCheckingProfile, setIsCheckingProfile] = useState(false);
@@ -54,10 +56,8 @@ export default function PlayerProfileModal({
         setLookupErrorMessage(
           "Riot lookup is temporarily rate limited. Please wait a moment and try again.",
         );
-      } else if (error instanceof Error) {
-        setLookupErrorMessage(
-          "We could not verify this Riot account right now. Please try again in a moment.",
-        );
+      } else if (error instanceof ApiError) {
+        setLookupErrorMessage(error.message);
       } else {
         setLookupErrorMessage(
           "We could not verify this Riot account right now. Please try again in a moment.",
@@ -101,11 +101,26 @@ export default function PlayerProfileModal({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 px-5 py-4">
+          {systemStatus &&
+            [
+              "missing_key",
+              "invalid_key",
+              "unavailable",
+              "rate_limited",
+            ].includes(systemStatus.riot_status) && (
+              <p role="status" className="font-mono text-xs text-hex-gold">
+                {systemStatus.riot_status_detail}
+              </p>
+            )}
           <div>
-            <label className="mb-1 block font-mono text-xs uppercase tracking-wider text-hex-bronze">
+            <label
+              htmlFor={`${fieldId}-game-name`}
+              className="mb-1 block font-mono text-xs uppercase tracking-wider text-hex-bronze"
+            >
               Game Name
             </label>
             <input
+              id={`${fieldId}-game-name`}
               type="text"
               value={gameName}
               onChange={(e) => {
@@ -118,10 +133,14 @@ export default function PlayerProfileModal({
           </div>
 
           <div>
-            <label className="mb-1 block font-mono text-xs uppercase tracking-wider text-hex-bronze">
+            <label
+              htmlFor={`${fieldId}-tag-line`}
+              className="mb-1 block font-mono text-xs uppercase tracking-wider text-hex-bronze"
+            >
               Tag Line (without #)
             </label>
             <input
+              id={`${fieldId}-tag-line`}
               type="text"
               value={tagLine}
               onChange={(e) => {
@@ -134,13 +153,15 @@ export default function PlayerProfileModal({
           </div>
 
           {lookupErrorMessage && (
-            <p className="font-mono text-xs text-hex-zaun">
+            <p role="alert" className="font-mono text-xs text-hex-zaun">
               {lookupErrorMessage}
             </p>
           )}
 
           {errorMessage && (
-            <p className="font-mono text-xs text-hex-zaun">{errorMessage}</p>
+            <p role="alert" className="font-mono text-xs text-hex-zaun">
+              {errorMessage}
+            </p>
           )}
 
           <button

@@ -16,7 +16,7 @@ from app.pricing import (
     calculate_lp_abs,
     calculate_win_rate,
 )
-from app.riot import PlayerNotFoundError, RateLimitedError, get_rank
+from app.riot import PlayerNotFoundError, get_rank
 from app.schemas import (
     BalanceInsightsResponse,
     DemoNicknameRequest,
@@ -60,28 +60,10 @@ async def _initialize_player_market_state(
             tag_line=player.tag_line,
         )
     except PlayerNotFoundError:
-        logger.warning(
-            "Onboarding completed without initial price refresh for %s#%s: "
-            "no ranked Riot data",
-            player.game_name,
-            player.tag_line,
-        )
-        return
-    except RateLimitedError:
-        logger.warning(
-            "Onboarding completed without initial price refresh for %s#%s: "
-            "Riot API rate limited",
-            player.game_name,
-            player.tag_line,
-        )
-        return
-    except Exception:
-        logger.exception(
-            "Onboarding completed without initial price refresh for %s#%s",
-            player.game_name,
-            player.tag_line,
-        )
-        return
+        raise HTTPException(
+            status_code=404,
+            detail="No ranked Solo Queue data found for this Riot account",
+        ) from None
 
     player.puuid = rank_data.puuid
     player.summoner_id = rank_data.summoner_id

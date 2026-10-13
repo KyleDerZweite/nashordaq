@@ -221,6 +221,20 @@ export default function App({
             {logoutError}
           </p>
         )}
+        {systemStatus &&
+          [
+            "missing_key",
+            "invalid_key",
+            "unavailable",
+            "rate_limited",
+          ].includes(systemStatus.riot_status) && (
+            <p
+              role="status"
+              className="mb-6 border border-hex-gold p-4 font-mono text-sm text-hex-gold"
+            >
+              {systemStatus.riot_status_detail}
+            </p>
+          )}
         {isDemo && <DemoBanner />}
         {showSimulation ? (
           <SimulationView onClose={() => setShowSimulation(false)} />

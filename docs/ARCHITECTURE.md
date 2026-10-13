@@ -117,6 +117,10 @@ API responses use `Cache-Control: no-store`. Responses and the frontend use `Ref
 
 Persistence checks the database marker before schema creation, alteration or switching SQLite to WAL. A database from the proxy version fails startup with instructions to preserve it and select a separate empty data directory. There is no automatic migration or deletion. Supported standalone databases preserve users, sessions and completed setup across restart.
 
+## Riot availability boundary
+
+`app/riot.py` owns configuration checks and safe upstream failure reports. Authenticated system status exposes its availability and operator instructions without credentials. Authentication and administration never call Riot to establish access. New links require successful ranked data; failed onboarding rolls back the player and link together. A real scheduler refresh rolls back its complete transaction on authentication, rate-limit or upstream availability failures, preserving existing prices and history. The simulated demo market remains independent.
+
 ## Scheduler Pipeline
 
 The market update job runs as a single atomic operation:

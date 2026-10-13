@@ -19,8 +19,10 @@ from app.models import TrackedPlayer
 from app.riot import (
     PlayerNotFoundError,
     RateLimitedError,
+    RiotIntegrationError,
     get_account_by_riot_id,
     get_rank,
+    integration_status,
 )
 from app.routers import (
     admin,
@@ -70,6 +72,13 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Nashordaq", lifespan=lifespan)
+
+
+@app.exception_handler(RiotIntegrationError)
+async def riot_integration_error(
+    request: Request, error: RiotIntegrationError
+) -> JSONResponse:
+    return JSONResponse(status_code=error.http_status, content={"detail": str(error)})
 
 
 @app.exception_handler(RequestValidationError)
@@ -158,6 +167,12 @@ async def system_status(session: SessionDep) -> SystemStatusResponse:
     scheduler_running = is_scheduler_running()
 
     return SystemStatusResponse(
+        riot_status=integration_status(
+            settings.riot_api_key, settings.demo_mode_enabled
+        )[0],
+        riot_status_detail=integration_status(
+            settings.riot_api_key, settings.demo_mode_enabled
+        )[1],
         service_status="ok",
         scheduler_running=scheduler_running,
         market_status=classify_market_status(

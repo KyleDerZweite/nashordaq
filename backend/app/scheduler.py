@@ -52,7 +52,7 @@ from app.pricing import (
 from app.riot import (
     MatchSummary,
     PlayerNotFoundError,
-    RateLimitedError,
+    RiotIntegrationError,
     get_match_summary,
     get_rank,
     get_rank_by_puuid,
@@ -677,17 +677,18 @@ async def market_update_job() -> None:
                 logger.warning(
                     "Player not found: %s#%s", player.game_name, player.tag_line
                 )
-                continue
-            except RateLimitedError:
-                logger.warning("Rate limited, skipping remaining players")
-                break
+                await session.rollback()
+                return
+            except (RiotIntegrationError, httpx.HTTPError):
+                logger.warning("Riot refresh failed; rolling back the market update")
+                await session.rollback()
+                return
             except Exception:
-                logger.exception(
-                    "Error fetching data for %s#%s",
-                    player.game_name,
-                    player.tag_line,
+                logger.warning(
+                    "Unexpected rank response; rolling back the market update"
                 )
-                continue
+                await session.rollback()
+                return
 
             if player.puuid != rank_data.puuid:
                 player.puuid = rank_data.puuid
@@ -758,13 +759,12 @@ async def market_update_job() -> None:
                         player.tag_line,
                     )
                     all_summaries = []
-                except RateLimitedError:
+                except (RiotIntegrationError, httpx.HTTPError):
                     logger.warning(
-                        "Rate limited while fetching matches for %s#%s",
-                        player.game_name,
-                        player.tag_line,
+                        "Riot match refresh failed; rolling back the market update"
                     )
-                    all_summaries = []
+                    await session.rollback()
+                    return
                 except Exception:
                     logger.exception(
                         "Error fetching matches for %s#%s",
@@ -894,12 +894,12 @@ async def market_update_job() -> None:
                         player.game_name,
                         player.tag_line,
                     )
-                except RateLimitedError:
+                except (RiotIntegrationError, httpx.HTTPError):
                     logger.warning(
-                        "Rate limited while fetching matches for %s#%s",
-                        player.game_name,
-                        player.tag_line,
+                        "Riot match refresh failed; rolling back the market update"
                     )
+                    await session.rollback()
+                    return
                 except Exception:
                     logger.exception(
                         "Error applying playing income for %s#%s",
