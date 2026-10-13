@@ -1,6 +1,6 @@
 # Deployment Guide
 
-Local setup and revocable sessions are implemented. Container packaging still uses the original tunnel wiring until the deployment slice of [spec #19](https://github.com/KyleDerZweite/nashordaq/issues/19). The full standalone installation procedure is not yet delivered. No external authentication service is required by the application.
+Local setup, invitations and revocable sessions are implemented. Container packaging still uses the original tunnel wiring until the deployment slice of [spec #19](https://github.com/KyleDerZweite/nashordaq/issues/19). The full standalone installation procedure is not yet delivered. No external authentication service is required by the application.
 
 ## Local account setup
 
@@ -10,9 +10,17 @@ Start with a separate empty SQLite directory. Startup rejects the previous proxy
 
 Open the setup link printed in the backend log. Choose a username and a password with at least 12 characters. Only that link creates the sole administrator. Successful setup signs you in and closes setup permanently. An unused link rotates on restart. Normal login sessions last seven days, reload preserves a valid session, and logout revokes the current session immediately.
 
-Setup, login and administrator access do not require a Riot key. Live Riot onboarding and updates still require one. Invitation and recovery flows, administrator participation and explicit isolated demo sessions are separate implementation slices. Demo access currently fails closed.
+Setup, login and administrator access do not require a Riot key. Live Riot onboarding and updates still require one. Recovery flows, administrator participation and explicit isolated demo sessions are separate implementation slices. Demo access currently fails closed.
 
 The [Architecture](ARCHITECTURE.md#authentication-and-session-trust-boundary) owns the security contract. Every state-changing API request requires `X-Nashordaq-CSRF: 1`. Browser origins are checked; native API clients may omit Origin when sending this header. All game-data endpoints require the local session cookie.
+
+## Invite members
+
+Sign in as the administrator and select Admin View. In Member invitations, select Create invitation. Copy the generated link and share it privately with the intended member. The link is shown only after creation; later visits show lifecycle metadata without the secret. Create another invitation if you lose an unused link, and revoke the lost invitation. The frontend omits query strings and referrers from access logs. Configure any external reverse proxy to do the same for access-link routes.
+
+Each invitation expires after seven days and admits one member. The invited member opens the complete `/invite?token=...` link and chooses a username and a password of at least 12 characters. Registration signs them in and removes the token from the browser URL. Email and Riot details are unnecessary for account creation. Riot onboarding remains a separate step after login.
+
+Member invitations lists active, consumed, revoked and expired links. Select Revoke beside an active invitation to withdraw access. An invalid, expired, revoked or consumed link cannot create an account. Ask the administrator for a new link when registration reports that the invitation is unavailable. A validation error or taken username leaves the invitation usable for another attempt.
 
 ## Configuration
 
@@ -20,7 +28,7 @@ Copy `.env.example` to `.env`. Relevant settings for this slice:
 
 | Variable | Default | Description |
 |---|---|---|
-| `NASHORDAQ_PUBLIC_URL` | `http://localhost:8080` | Frontend origin for setup links and HTTPS cookie policy |
+| `NASHORDAQ_PUBLIC_URL` | `http://localhost:8080` | Frontend origin for setup/invitation links and HTTPS cookie policy |
 | `NASHORDAQ_CORS_ORIGINS` | `http://localhost:5173` | Explicit allowed frontend origins |
 | `NASHORDAQ_DATABASE_URL` | `sqlite+aiosqlite:///data/nashordaq.db` | SQLite path relative to the backend directory |
 | `NASHORDAQ_RIOT_API_KEY` | empty | Optional for authentication, required for live Riot data |

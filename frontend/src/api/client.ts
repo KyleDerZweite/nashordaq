@@ -37,7 +37,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     headers,
   });
   if (!res.ok) {
-    if (res.status === 401 && !path.startsWith("/auth/")) {
+    if (
+      res.status === 401 &&
+      (!path.startsWith("/auth/") || path.startsWith("/auth/invites"))
+    ) {
       window.dispatchEvent(new Event("nashordaq:session-lost"));
     }
     const body = await res.json().catch(() => ({}));

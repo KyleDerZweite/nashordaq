@@ -20,6 +20,7 @@ from app.models import AccessToken, AuthSession, User
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 SESSION_COOKIE = "nashordaq_session"
 SESSION_LIFETIME = timedelta(days=7)
+INVITE_LIFETIME = timedelta(days=7)
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -284,4 +285,141 @@ async def logout(
         secure=settings.public_url.startswith("https://"),
         samesite="strict",
     )
+    return {"status": "ok"}
+
+
+class InvitationResponse(BaseModel):
+    id: int
+    expires_at: datetime
+    consumed_at: datetime | None
+    revoked_at: datetime | None
+    status: str
+
+
+class CreatedInvitationResponse(InvitationResponse):
+    url: str
+
+
+def invitation_response(invitation: AccessToken) -> InvitationResponse:
+    # SQLite returns naive UTC timestamps; API timestamps remain explicit UTC.
+    expires_at = invitation.expires_at.replace(tzinfo=UTC)
+    status = (
+        "consumed"
+        if invitation.consumed_at
+        else "revoked"
+        if invitation.revoked_at
+        else "expired"
+        if expires_at <= utc_now()
+        else "active"
+    )
+    return InvitationResponse(
+        id=invitation.id,
+        expires_at=expires_at,
+        consumed_at=invitation.consumed_at.replace(tzinfo=UTC)
+        if invitation.consumed_at
+        else None,
+        revoked_at=invitation.revoked_at.replace(tzinfo=UTC)
+        if invitation.revoked_at
+        else None,
+        status=status,
+    )
+
+
+@router.post("/invites", status_code=201)
+async def create_invitation(
+    administrator: CurrentAdminUser, session: SessionDep
+) -> CreatedInvitationResponse:
+    token = secrets.token_urlsafe(32)
+    invitation = AccessToken(
+        token_hash=hash_token(token),
+        kind="invite",
+        expires_at=utc_now() + INVITE_LIFETIME,
+    )
+    session.add(invitation)
+    await session.commit()
+    return CreatedInvitationResponse(
+        **invitation_response(invitation).model_dump(),
+        url=f"{settings.public_url.rstrip('/')}/invite?token={token}",
+    )
+
+
+@router.get("/invites")
+async def list_invitations(
+    administrator: CurrentAdminUser, session: SessionDep
+) -> list[InvitationResponse]:
+    invitations = await session.scalars(
+        select(AccessToken)
+        .where(AccessToken.kind == "invite")
+        .order_by(AccessToken.id.desc())
+    )
+    return [invitation_response(invitation) for invitation in invitations]
+
+
+@router.post("/register", status_code=201)
+async def register_member(
+    body: SetupCredentials, session: SessionDep, response: Response
+) -> dict[str, str]:
+    if settings.demo_mode_enabled:
+        raise HTTPException(
+            status_code=403, detail="Invitations unavailable in demo mode"
+        )
+    verifier = await run_in_threadpool(hash_password, body.password)
+    consumed = await session.execute(
+        update(AccessToken)
+        .where(
+            AccessToken.token_hash == hash_token(body.token),
+            AccessToken.kind == "invite",
+            AccessToken.expires_at > utc_now(),
+            AccessToken.consumed_at.is_(None),
+            AccessToken.revoked_at.is_(None),
+        )
+        .values(consumed_at=utc_now())
+        .returning(AccessToken.id)
+    )
+    if consumed.scalar_one_or_none() is None:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Invitation is invalid, expired, revoked or already used. "
+                "Ask the administrator for a new link."
+            ),
+        )
+    user = User(
+        username=body.username,
+        display_name=body.username,
+        password_hash=verifier,
+        balance=settings.starting_balance,
+    )
+    session.add(user)
+    try:
+        await session.flush()
+        await create_session(session, user, response)
+    except IntegrityError:
+        await session.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Username is already taken. Choose another username.",
+        ) from None
+    return {"status": "ok"}
+
+
+@router.delete("/invites/{invitation_id}")
+async def revoke_invitation(
+    invitation_id: int, administrator: CurrentAdminUser, session: SessionDep
+) -> dict[str, str]:
+    revoked = await session.execute(
+        update(AccessToken)
+        .where(
+            AccessToken.id == invitation_id,
+            AccessToken.kind == "invite",
+            AccessToken.expires_at > utc_now(),
+            AccessToken.consumed_at.is_(None),
+            AccessToken.revoked_at.is_(None),
+        )
+        .values(revoked_at=utc_now())
+        .returning(AccessToken.id)
+    )
+    if revoked.scalar_one_or_none() is None:
+        raise HTTPException(status_code=409, detail="Invitation is no longer active")
+    await session.commit()
     return {"status": "ok"}
