@@ -474,6 +474,8 @@ async def list_recent_orders(
     stmt = select(Order)
     if user.is_demo:
         stmt = stmt.where(Order.user_id == user.id)
+    else:
+        stmt = stmt.join(User, User.id == Order.user_id).where(User.is_demo.is_(False))
     result = await session.execute(stmt.order_by(Order.created_at.desc()).limit(limit))
     orders = result.scalars().all()
     return await build_order_responses(session, orders)

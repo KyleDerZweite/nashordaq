@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth import CurrentUser
 from app.banking import build_account_snapshot
 from app.database import get_session
 from app.models import TrackedPlayer, User
@@ -16,11 +17,16 @@ SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 
 @router.get("/leaderboard", response_model=list[LeaderboardEntry])
-async def get_leaderboard(session: SessionDep) -> list[LeaderboardEntry]:
+async def get_leaderboard(
+    requester: CurrentUser, session: SessionDep
+) -> list[LeaderboardEntry]:
     users_result = await session.execute(
         select(User, TrackedPlayer)
         .join(TrackedPlayer, User.linked_player_id == TrackedPlayer.id)
-        .where(User.linked_player_id.is_not(None))
+        .where(
+            User.linked_player_id.is_not(None),
+            User.is_demo == requester.is_demo,
+        )
     )
     users = users_result.all()
 
@@ -56,12 +62,19 @@ async def get_leaderboard(session: SessionDep) -> list[LeaderboardEntry]:
 )
 async def get_leaderboard_player_portfolio(
     user_id: int,
+    requester: CurrentUser,
     session: SessionDep,
 ) -> LeaderboardPlayerPortfolioResponse:
+    if requester.is_demo and user_id != requester.id:
+        raise HTTPException(status_code=404, detail="Player not found")
     user_result = await session.execute(
         select(User, TrackedPlayer)
         .join(TrackedPlayer, User.linked_player_id == TrackedPlayer.id)
-        .where(User.id == user_id, User.linked_player_id.is_not(None))
+        .where(
+            User.id == user_id,
+            User.linked_player_id.is_not(None),
+            User.is_demo == requester.is_demo,
+        )
     )
     row = user_result.one_or_none()
     if row is None:

@@ -299,3 +299,88 @@ async def test_demo_permissions_features_and_obsolete_nickname(
                 "/api/auth/login", json={"username": "demo", "password": "demo"}
             )
         ).status_code == 401
+
+
+async def test_portfolio_and_recent_orders_enforce_mode_and_demo_owner_boundaries(
+    demo_instance, monkeypatch
+):
+    from app.models import Holding, TrackedPlayer, User
+    from tests.conftest import TEST_PASSWORD, TEST_PASSWORD_HASH
+
+    async with database.SessionLocal() as session:
+        players = (await session.scalars(select(TrackedPlayer))).all()
+        regular = User(
+            username="preserved-member",
+            display_name="preserved-member",
+            password_hash=TEST_PASSWORD_HASH,
+            linked_player_id=players[0].id,
+        )
+        viewer = User(
+            username="normal-viewer",
+            display_name="normal-viewer",
+            password_hash=TEST_PASSWORD_HASH,
+            linked_player_id=players[4].id,
+        )
+        session.add_all([regular, viewer])
+        await session.flush()
+        regular_id = regular.id
+        session.add(Holding(user_id=regular.id, player_id=players[1].id, quantity=3))
+        await session.commit()
+
+    async with demo_instance() as demo, demo_instance() as normal:
+        me = await demo_login(demo)
+        response = await demo.get(f"/api/leaderboard/{regular_id}/portfolio")
+        assert response.status_code == 404
+        assert (await demo.get("/api/leaderboard")).json() == []
+        # Exercise the authorization rule independently of today's unlinked demo model.
+        async with database.SessionLocal() as session:
+            demo_user = await session.get(User, me["id"])
+            demo_user.linked_player_id = players[2].id
+            session.add(
+                Holding(user_id=demo_user.id, player_id=players[1].id, quantity=1)
+            )
+            await session.commit()
+        own = await demo.get(f"/api/leaderboard/{me['id']}/portfolio")
+        assert own.status_code == 200
+        assert own.json()["holdings"][0]["quantity"] == 1
+        assert [
+            entry["user_id"] for entry in (await demo.get("/api/leaderboard")).json()
+        ] == [me["id"]]
+        demo_order = await demo.post(
+            "/api/orders",
+            json={"player_id": players[3].id, "side": "BUY", "quantity": 1},
+        )
+        assert demo_order.status_code == 201
+        demo_order_id = demo_order.json()["id"]
+        assert (await demo.get("/api/orders/recent")).json()[0]["id"] == demo_order_id
+        assert (await demo.get(f"/api/orders/{demo_order_id}")).status_code == 200
+
+        monkeypatch.setattr(settings, "demo_mode_enabled", False)
+        response = await normal.post(
+            "/api/auth/login",
+            json={"username": "normal-viewer", "password": TEST_PASSWORD},
+        )
+        assert response.status_code == 200
+        preserved = await normal.get(f"/api/leaderboard/{regular_id}/portfolio")
+        assert preserved.status_code == 200
+        assert preserved.json()["holdings"][0]["quantity"] == 3
+        normal_id = (await normal.get("/api/user/me")).json()["id"]
+        normal_leaderboard = (await normal.get("/api/leaderboard")).json()
+        assert {entry["user_id"] for entry in normal_leaderboard} == {
+            regular_id,
+            normal_id,
+        }
+        normal_order = await normal.post(
+            "/api/orders",
+            json={"player_id": players[5].id, "side": "BUY", "quantity": 1},
+        )
+        assert normal_order.status_code == 201
+        recent_ids = [
+            order["id"] for order in (await normal.get("/api/orders/recent")).json()
+        ]
+        assert normal_order.json()["id"] in recent_ids
+        assert demo_order_id not in recent_ids
+        assert (await normal.get(f"/api/orders/{demo_order_id}")).status_code == 404
+        assert (
+            await normal.get(f"/api/leaderboard/{me['id']}/portfolio")
+        ).status_code == 404
