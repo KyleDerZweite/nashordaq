@@ -1,8 +1,7 @@
 import { useMemo } from "react";
 
-import { useStreamerMode } from "../contexts/useStreamerMode";
+import { useIdentityPresentation } from "../contexts/useIdentityPresentation";
 import type { HoldingResponse, OrderSide, PortfolioResponse } from "../types";
-import { getStreamerSafeName } from "../utils/streamerMode";
 import { formatAmount } from "../utils/format";
 
 interface Props {
@@ -38,19 +37,17 @@ function PortfolioInsightRow({
   holding,
   canTrade,
   onTrade,
-  isStreamerMode,
+  playerName,
 }: {
   holding: HoldingResponse;
   canTrade: boolean;
   onTrade?: (playerId: number, side: OrderSide) => void;
-  isStreamerMode: boolean;
+  playerName: (id: number) => string;
 }) {
   return (
     <tr className="border-b border-hex-border/50 transition-colors hover:bg-hex-bg-alt/80">
       <td className="px-4 py-3 font-mono text-sm font-medium text-hex-white">
-        {isStreamerMode
-          ? getStreamerSafeName(holding.player_game_name, holding.player_name)
-          : holding.player_name}
+        {playerName(holding.player_id)}
       </td>
       <td className="px-4 py-3 text-right font-mono text-sm text-hex-bronze">
         {holding.quantity}
@@ -116,7 +113,7 @@ export default function PortfolioInsightsModal({
   onTrade,
   onClose,
 }: Props) {
-  const { isStreamerMode } = useStreamerMode();
+  const { playerName } = useIdentityPresentation();
   const holdings = useMemo(
     () => portfolio?.holdings ?? [],
     [portfolio?.holdings],
@@ -272,7 +269,7 @@ export default function PortfolioInsightsModal({
                     holding={holding}
                     canTrade={canTrade}
                     onTrade={onTrade}
-                    isStreamerMode={isStreamerMode}
+                    playerName={playerName}
                   />
                 ))}
                 {holdings.length === 0 && (

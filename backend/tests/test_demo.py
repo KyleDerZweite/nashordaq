@@ -408,3 +408,59 @@ async def test_portfolio_and_recent_orders_enforce_mode_and_demo_owner_boundarie
         assert (
             await normal.get(f"/api/leaderboard/{me['id']}/portfolio")
         ).status_code == 404
+
+
+async def test_identity_directory_preserves_mode_and_demo_owner_privacy(
+    demo_instance, monkeypatch
+):
+    from app.models import TrackedPlayer, User
+    from tests.conftest import TEST_PASSWORD, TEST_PASSWORD_HASH
+
+    async with database.SessionLocal() as session:
+        player = TrackedPlayer(
+            game_name="PreservedRiotSecret",
+            tag_line="HIDDENTAG",
+            display_name="PreservedLabel",
+        )
+        session.add(player)
+        await session.flush()
+        session.add(
+            User(
+                username="PreservedUsername",
+                password_hash=TEST_PASSWORD_HASH,
+                linked_player_id=player.id,
+            )
+        )
+        await session.commit()
+    async with demo_instance() as first, demo_instance() as second:
+        await demo_login(first)
+        await demo_login(second)
+        first_id = (await first.get("/api/user/me")).json()["id"]
+        second_id = (await second.get("/api/user/me")).json()["id"]
+        directory = await first.get("/api/identities")
+        assert directory.status_code == 200
+        assert {member["user_id"] for member in directory.json()["users"]} == {first_id}
+        assert "PreservedUsername" not in directory.text
+        assert "PreservedRiotSecret" not in directory.text
+        assert "HIDDENTAG" not in directory.text
+        assert second_id != first_id
+        first_alias = directory.json()["users"][0]["streamer_alias"]
+        second_alias = (await second.get("/api/identities")).json()["users"][0][
+            "streamer_alias"
+        ]
+        assert first_alias != second_alias
+        assert (await first.get("/api/identities")).json()["users"][0][
+            "streamer_alias"
+        ] == first_alias
+        monkeypatch.setattr(settings, "demo_mode_enabled", False)
+        assert (
+            await first.post(
+                "/api/auth/login",
+                json={"username": "PreservedUsername", "password": TEST_PASSWORD},
+            )
+        ).status_code == 200
+        normal = (await first.get("/api/identities")).json()
+        assert [member["username"] for member in normal["users"]] == [
+            "PreservedUsername"
+        ]
+        assert normal["users"][0]["game_name"] == "PreservedRiotSecret"

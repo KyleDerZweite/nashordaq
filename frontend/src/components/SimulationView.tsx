@@ -1,3 +1,4 @@
+import { useIdentityPresentation } from "../contexts/useIdentityPresentation";
 import { useMemo, useState } from "react";
 import {
   useSimulationDefaults,
@@ -159,6 +160,7 @@ function ParamEditor({ label, params, defaults, onChange }: ParamEditorProps) {
 }
 
 export default function SimulationView({ onClose }: { onClose: () => void }) {
+  const { playerName } = useIdentityPresentation();
   const { data: defaults } = useSimulationDefaults();
   const { data: players } = usePlayers();
   const runSimulation = useRunSimulation();
@@ -340,7 +342,7 @@ export default function SimulationView({ onClose }: { onClose: () => void }) {
                   <option value="">-- Select player --</option>
                   {(players ?? []).map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.display_name} ({p.game_name})
+                      {playerName(p.id)}
                     </option>
                   ))}
                 </select>

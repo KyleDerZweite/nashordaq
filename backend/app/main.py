@@ -14,6 +14,7 @@ from app.auth import CurrentUser, get_current_user, initialize_setup
 from app.auth import router as auth_router
 from app.config import settings
 from app.database import SessionLocal, engine, get_session, init_db
+from app.identities import AliasPoolExhausted
 from app.middleware import SessionRequestProtection
 from app.models import TrackedPlayer
 from app.riot import (
@@ -29,6 +30,7 @@ from app.routers import (
     admin,
     bank,
     gamba,
+    identities,
     leaderboard,
     market,
     orders,
@@ -75,6 +77,13 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Nashordaq", lifespan=lifespan)
 
 
+@app.exception_handler(AliasPoolExhausted)
+async def alias_pool_exhausted(
+    request: Request, error: AliasPoolExhausted
+) -> JSONResponse:
+    return JSONResponse(status_code=503, content={"detail": str(error)})
+
+
 @app.exception_handler(RiotIntegrationError)
 async def riot_integration_error(
     request: Request, error: RiotIntegrationError
@@ -114,6 +123,7 @@ app.add_middleware(SessionRequestProtection)
 
 app.include_router(auth_router, prefix="/api")
 app.include_router(activity.router, prefix="/api")
+app.include_router(identities.router, prefix="/api")
 
 app.include_router(user.router, prefix="/api", dependencies=[Depends(get_current_user)])
 app.include_router(

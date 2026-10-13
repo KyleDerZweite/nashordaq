@@ -1,8 +1,7 @@
 import { useMemo, useState } from "react";
 import { useCreateGambaPosition, useGambaPositions } from "../api";
-import { useStreamerMode } from "../contexts/useStreamerMode";
+import { useIdentityPresentation } from "../contexts/useIdentityPresentation";
 import GambaModal from "./GambaModal";
-import { getStreamerSafeName } from "../utils/streamerMode";
 import {
   formatAmount,
   formatLocalDateTime,
@@ -15,7 +14,7 @@ interface Props {
 }
 
 export default function GambaWidget({ balance, canTrade }: Props) {
-  const { isStreamerMode } = useStreamerMode();
+  const { playerName } = useIdentityPresentation();
   const [cashAmount, setCashAmount] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const { data: positions } = useGambaPositions(canTrade);
@@ -174,12 +173,7 @@ export default function GambaWidget({ balance, canTrade }: Props) {
                     >
                       <td className="px-3 py-2 font-mono text-xs text-hex-white">
                         <div className="truncate font-semibold">
-                          {isStreamerMode
-                            ? getStreamerSafeName(
-                                position.player_game_name,
-                                position.player_name,
-                              )
-                            : position.player_name}
+                          {playerName(position.player_id)}
                         </div>
                         <div className="truncate text-[11px] text-hex-bronze">
                           {formatQuantity(position.quantity)} @{" "}

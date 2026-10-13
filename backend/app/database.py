@@ -107,6 +107,12 @@ async def init_db() -> None:
     if settings.demo_mode_enabled:
         await _seed_demo_data()
 
+    from app.identities import backfill_aliases
+
+    async with SessionLocal() as session:
+        await backfill_aliases(session)
+        await session.commit()
+
 
 async def _seed_demo_data() -> None:
     if not DEMO_SEED_PATH.exists():

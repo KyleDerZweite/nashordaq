@@ -145,6 +145,7 @@ export interface OrderCreate {
 }
 
 export interface OrderResponse {
+  user_id: number | null;
   id: number;
   player_id: number;
   player_name: string;
@@ -507,4 +508,15 @@ export interface GameIntervention {
   previous_uses: number;
   new_uses: number;
   created_at: string;
+}
+
+export interface IdentityDirectory {
+  users: (ActivityIdentity & { streamer_alias: string })[];
+  players: {
+    player_id: number;
+    username: string | null;
+    game_name: string;
+    tag_line: string;
+    streamer_alias: string;
+  }[];
 }

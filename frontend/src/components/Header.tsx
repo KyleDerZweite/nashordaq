@@ -1,14 +1,11 @@
 import { useState } from "react";
-import { useStreamerMode } from "../contexts/useStreamerMode";
+import { useIdentityPresentation } from "../contexts/useIdentityPresentation";
 import { formatAmount } from "../utils/format";
-import { getStreamerSafeName } from "../utils/streamerMode";
 
 export default function Header({
   balance,
   netWorth = 0,
-  displayName,
-  playerDisplayName,
-  playerGameName,
+  userId,
   canEditProfile = false,
   canToggleAdminView = false,
   adminViewMode = "participant",
@@ -23,9 +20,7 @@ export default function Header({
 }: {
   balance: number;
   netWorth?: number;
-  displayName?: string;
-  playerDisplayName?: string;
-  playerGameName?: string;
+  userId?: number;
   canEditProfile?: boolean;
   canToggleAdminView?: boolean;
   adminViewMode?: "participant" | "admin";
@@ -38,8 +33,10 @@ export default function Header({
   onLogout: () => void;
   isLoggingOut?: boolean;
 }) {
-  const { isStreamerMode, toggleStreamerMode } = useStreamerMode();
-  const initial = displayName ? displayName[0].toUpperCase() : "?";
+  const { isStreamerMode, toggleStreamerMode, userName } =
+    useIdentityPresentation();
+  const name = userName(userId);
+  const initial = name[0].toUpperCase();
   const [menuOpen, setMenuOpen] = useState(false);
 
   function handleEditProfile() {
@@ -103,16 +100,8 @@ export default function Header({
                     Signed in as
                   </p>
                   <p className="mt-1 break-all font-mono text-sm font-bold text-hex-white">
-                    {displayName ?? "Unknown User"}
+                    {name}
                   </p>
-                  {(playerDisplayName || playerGameName) && (
-                    <p className="mt-2 font-mono text-xs text-hex-bronze">
-                      Summoner:{" "}
-                      {isStreamerMode
-                        ? getStreamerSafeName(playerGameName, playerDisplayName)
-                        : (playerDisplayName ?? playerGameName)}
-                    </p>
-                  )}
                 </div>
 
                 <button

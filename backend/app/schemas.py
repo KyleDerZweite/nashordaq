@@ -148,6 +148,7 @@ class OrderCreate(BaseModel):
 
 
 class OrderResponse(BaseModel):
+    user_id: int
     id: int
     player_id: int
     player_name: str

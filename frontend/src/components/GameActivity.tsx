@@ -1,14 +1,9 @@
 import { useGameActivity } from "../api";
-import type { ActivityIdentity } from "../types";
+import { useIdentityPresentation } from "../contexts/useIdentityPresentation";
 import { formatLocalDateTime } from "../utils/format";
 
-function memberName(member: ActivityIdentity) {
-  return member.game_name
-    ? `${member.username} (${member.game_name}#${member.tag_line})`
-    : member.username;
-}
-
 export default function GameActivity() {
+  const { userName } = useIdentityPresentation();
   const { data, isPending, isError, refetch, isFetching } = useGameActivity();
   return (
     <section
@@ -55,8 +50,8 @@ export default function GameActivity() {
               className="break-words border border-hex-border bg-hex-bg-alt p-3 font-mono text-sm text-hex-white"
             >
               <p>
-                {memberName(event.actor)} restored rescue-loan access for{" "}
-                {memberName(event.affected)}.
+                {userName(event.actor.user_id)} restored rescue-loan access for{" "}
+                {userName(event.affected.user_id)}.
               </p>
               <p className="mt-2 text-hex-bronze">
                 Rescue uses: {event.previous_uses} to {event.new_uses}.

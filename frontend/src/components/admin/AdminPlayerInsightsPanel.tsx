@@ -1,9 +1,8 @@
 import { useMemo, useState } from "react";
 
 import type { AdminPlayerInsightResponse } from "../../types";
-import { useStreamerMode } from "../../contexts/useStreamerMode";
+import { useIdentityPresentation } from "../../contexts/useIdentityPresentation";
 import { formatAmount, formatLocalDateTime } from "../../utils/format";
-import { getStreamerSafeName } from "../../utils/streamerMode";
 
 interface Props {
   insights: AdminPlayerInsightResponse[];
@@ -35,7 +34,7 @@ function toneForSignedNumber(value: number) {
 }
 
 export default function AdminPlayerInsightsPanel({ insights }: Props) {
-  const { isStreamerMode } = useStreamerMode();
+  const { playerName, userName } = useIdentityPresentation();
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(
     insights[0]?.player_id ?? null,
   );
@@ -72,9 +71,7 @@ export default function AdminPlayerInsightsPanel({ insights }: Props) {
           <aside className="border-b-2 border-hex-border xl:border-r-2 xl:border-b-0">
             <div className="max-h-[70rem] overflow-y-auto">
               {insights.map((entry) => {
-                const playerLabel = isStreamerMode
-                  ? getStreamerSafeName(entry.game_name, entry.display_name)
-                  : entry.display_name;
+                const playerLabel = playerName(entry.player_id);
                 const isSelected =
                   entry.player_id === selectedInsight.player_id;
 
@@ -92,11 +89,6 @@ export default function AdminPlayerInsightsPanel({ insights }: Props) {
                         <div className="font-serif text-lg font-bold text-hex-white">
                           {playerLabel}
                         </div>
-                        {!isStreamerMode && (
-                          <div className="mt-1 font-mono text-[11px] text-hex-bronze">
-                            {entry.game_name}#{entry.tag_line}
-                          </div>
-                        )}
                       </div>
                       <div className="text-right">
                         <div className="font-mono text-sm font-bold text-hex-gold">
@@ -248,8 +240,9 @@ export default function AdminPlayerInsightsPanel({ insights }: Props) {
                     {
                       label: "Linked User",
                       value:
-                        selectedInsight.linked_user_display_name ??
-                        "Not linked",
+                        selectedInsight.linked_user_id === null
+                          ? "Not linked"
+                          : userName(selectedInsight.linked_user_id),
                     },
                     {
                       label: "Net Worth",

@@ -2,6 +2,7 @@ import enum
 from datetime import datetime
 
 from sqlalchemy import (
+    CheckConstraint,
     Enum,
     Float,
     ForeignKey,
@@ -489,3 +490,25 @@ class GameIntervention(Base):
     previous_uses: Mapped[int] = mapped_column(Integer)
     new_uses: Mapped[int] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(index=True)
+
+
+class IdentityAlias(Base):
+    __tablename__ = "identity_aliases"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), unique=True, default=None
+    )
+    player_id: Mapped[int | None] = mapped_column(
+        ForeignKey("tracked_players.id", ondelete="CASCADE"), unique=True, default=None
+    )
+    alias: Mapped[str] = mapped_column(String(255), unique=True)
+    user: Mapped["User | None"] = relationship()
+    player: Mapped["TrackedPlayer | None"] = relationship()
+    __table_args__ = (
+        CheckConstraint(
+            "(user_id IS NOT NULL AND player_id IS NULL) OR "
+            "(user_id IS NULL AND player_id IS NOT NULL)",
+            name="one_identity_alias_target",
+        ),
+    )

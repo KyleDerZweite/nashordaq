@@ -87,6 +87,7 @@ def _order_response(
 
     return OrderResponse(
         id=order.id,
+        user_id=order.user_id,
         player_id=order.player_id,
         player_name=player_name,
         player_game_name=player_game_name,
@@ -126,6 +127,7 @@ def _order_detail_response(
 
     return OrderDetailResponse(
         id=order.id,
+        user_id=order.user_id,
         player_id=order.player_id,
         player_name=player_name,
         player_game_name=player_game_name,
