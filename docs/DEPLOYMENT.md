@@ -106,9 +106,65 @@ Check the command's exit status. Zero means recovery committed; a nonzero status
 
 Compose fixes `NASHORDAQ_DATABASE_URL` to `sqlite+aiosqlite:////app/data/nashordaq.db`. The four slashes identify the absolute container path `/app/data/nashordaq.db`. The host directory `./data` binds to `/app/data` with shared SELinux relabeling. This is a directory bind, not a named volume. Keep the same checkout directory and bind when replacing containers. Ensure the operator can write the directory; rootless Podman uses the operator's user namespace.
 
-Container restart or recreation preserves accounts, consumed setup, sessions and game state. Use your selected runtime's `restart`, or `up -d --force-recreate`, with the same manifest and working directory. `down` removes containers and the project network while retaining `./data`. Do not delete this directory. Copying an active SQLite main file alone is not a consistent backup because committed data may remain in its WAL. Use the operator backup procedure when that slice is available.
+Container restart or recreation preserves accounts, consumed setup, sessions and game state. Use your selected runtime's `restart`, or `up -d --force-recreate`, with the same manifest and working directory. `down` removes containers and the project network while retaining `./data`. Do not delete this directory. Copying an active SQLite main file alone is not a consistent backup because committed data may remain in its WAL. Use the [live backup and fresh restore procedure](#live-backup-and-fresh-restore).
 
 Both Containerfiles pin their base-image tags and immutable manifest digests. The backend copies uv 0.10.12 and installs the committed `uv.lock` with `--frozen`. The frontend uses pnpm 10.34.7, also declared in `packageManager`, and installs the committed `pnpm-lock.yaml` with `--frozen-lockfile`. Release updates deliberately review these inputs together.
+
+## Live backup and fresh restore
+
+Use the operator CLI's SQLite online backup. Keep the application running during backup. A copy of only `nashordaq.db` can omit committed writes in `nashordaq.db-wal`.
+
+Backups contain the complete supported database, including password verifiers, sessions, invitation/reset state and game history. Treat them as credential data. Store backups outside the checkout and application data directory in operator-only storage with directory mode 700 and file mode 600. Keep an encrypted off-host copy and test restore regularly. The command creates its database file with mode 600. Protect the encryption keys separately. Preserve the matching release tag and protected `.env` configuration separately; database backups do not include configuration or the Riot key.
+
+Run from the installation directory. Choose a new filename for every backup and export. Run only the commands for your selected runtime. The following examples store the snapshot in the mounted data directory before exporting it to protected storage:
+
+```bash
+# Docker Compose
+docker compose -f podman-compose.yaml exec -T backend python -m app.operator backup \
+  --database /app/data/nashordaq.db --output /app/data/backup-2026-10-14.db
+
+# Podman Compose
+podman-compose -f podman-compose.yaml exec -T backend python -m app.operator backup \
+  --database /app/data/nashordaq.db --output /app/data/backup-2026-10-14.db
+
+mkdir -p "$HOME/nashordaq-backups"
+chmod 700 "$HOME/nashordaq-backups"
+# Export only the completed snapshot. Noclobber refuses an existing export.
+(umask 077; set -C; docker compose -f podman-compose.yaml exec -T backend \
+  cat /app/data/backup-2026-10-14.db > "$HOME/nashordaq-backups/backup-2026-10-14.db")
+
+# Equivalent Podman export:
+(umask 077; set -C; podman-compose -f podman-compose.yaml exec -T backend \
+  cat /app/data/backup-2026-10-14.db > "$HOME/nashordaq-backups/backup-2026-10-14.db")
+```
+
+Success prints `Backup created` and returns exit code 0. Check that export also returns exit code 0 before treating the off-directory copy as usable. A failed export may leave a partial export file; preserve the completed snapshot and retry to a new export filename. Errors return a nonzero code with instructions. Existing destination files, dangling symlinks and WAL/SHM/journal remnants are refused. A partial or failed snapshot is not published. A lock or copy lasting longer than 60 seconds needs a retry after the lock or load has cleared. Never remove the live database or its WAL/SHM files to make a backup succeed.
+
+Restore into a separate, fresh installation before starting it. Use the matching supported release and restore its protected configuration with the intended public URL and mode. Do not restore over an initialized installation. If you are recovering a failed update, preserve its database and select a separate empty checkout/data directory instead of deleting it.
+
+1. Clone the matching release, configure `.env`, create private `data/` and build the backend image. Keep the destination stack stopped.
+2. Copy the selected backup to `data/restore-source.db`, set its file mode to 600, and retain the original backup in protected storage.
+3. Run one of these commands from the fresh installation directory. The CLI requires the destination database and its SQLite sidecars to be absent.
+
+```bash
+# Docker Compose
+docker compose -f podman-compose.yaml build backend
+docker compose -f podman-compose.yaml run --rm --no-deps backend \
+  python -m app.operator restore \
+  --backup /app/data/restore-source.db --database /app/data/nashordaq.db
+
+# Podman Compose
+podman-compose -f podman-compose.yaml build backend
+podman-compose -f podman-compose.yaml run --rm --no-deps backend \
+  python -m app.operator restore \
+  --backup /app/data/restore-source.db --database /app/data/nashordaq.db
+```
+
+4. Confirm `Restore completed` and exit code 0. Preserve `restore-source.db` until the restored installation passes the checks below. The command validates supported schema, SQLite integrity and foreign-key consistency before publishing the destination and never alters or deletes the backup.
+5. Start the fresh stack with your runtime's `up -d`. Check `/health` and sign in with the existing administrator and member credentials. Confirm their balances, portfolios, orders and history. Completed setup stays closed and no new administrator setup link appears. Existing unexpired sessions and links retain their saved lifecycle state. Writes made after the snapshot are outside that backup.
+6. After successful verification, keep the original protected backup. Remove only the staging copies you created if your retention policy no longer needs them. Restrict who can operate the host, containers and backup directory.
+
+For a source checkout with backend tools installed, run from `backend/` using `uv run python -m app.operator backup --database /absolute/live.db --output /absolute/new-backup.db` or `uv run python -m app.operator restore --backup /absolute/backup.db --database /absolute/fresh.db`. All source and destination paths must be absolute. Restore does not run setup, change passwords, migrate a legacy proxy database or call Riot. Demo snapshots preserve demo state with its original expiry deadlines; they do not extend visitor lifetime. Start a restored database in its original account mode.
 
 ## LAN HTTP and public HTTPS
 
