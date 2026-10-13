@@ -329,6 +329,8 @@ async def test_poro_stream_emits_initial_state(
     force_spawn_roll,
 ):
     class StubRequest:
+        cookies = auth_client.cookies
+
         async def is_disconnected(self) -> bool:
             return False
 
@@ -368,9 +370,6 @@ async def test_poro_stream_emits_initial_state(
 
 
 async def test_poro_requires_onboarding(auth_client):
-    resp = await auth_client.get(
-        "/api/poro",
-        headers={"Remote-User": "fresh-user"},
-    )
+    resp = await auth_client.get("/api/poro")
     assert resp.status_code == 403
     assert resp.json()["detail"] == "Complete onboarding first"

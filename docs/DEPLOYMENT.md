@@ -1,45 +1,34 @@
 # Deployment Guide
 
-The standalone self-host baseline is accepted in [ADR-0001](adr/0001-self-host-baseline.md) but is not implemented yet. The instructions below describe the current proxy-based deployment. They do not provide the planned standalone installation path.
+Local setup and revocable sessions are implemented. Container packaging still uses the original tunnel wiring until the deployment slice of [spec #19](https://github.com/KyleDerZweite/nashordaq/issues/19). The full standalone installation procedure is not yet delivered. No external authentication service is required by the application.
 
-## Prerequisites
+## Local account setup
 
-- A server with [Podman](https://podman.io/) and `podman-compose` installed.
-- A domain name with DNS pointing to your server (or to your Pangolin tunnel endpoint).
-- A [Riot Games API key](https://developer.riotgames.com/).
-- A running [Pangolin](https://pangolin.net/) instance (Enterprise Edition for SSO header forwarding).
+Set `NASHORDAQ_PUBLIC_URL` to the browser-visible frontend origin, such as `http://localhost:5173` for development or `https://market.example.com` behind your TLS reverse proxy. HTTPS enables Secure session cookies even when the backend receives HTTP. Proxy identity headers and forwarded scheme headers cannot grant access or weaken that policy.
 
-## 1. Environment File
+Start with a separate empty SQLite directory. Startup rejects the previous proxy database before changing its schema or WAL mode. Stop the previous installation and preserve its data, including WAL/SHM files, before selecting a fresh directory. Nothing is deleted or migrated automatically.
 
-Create a `.env` file in the project root:
+Open the setup link printed in the backend log. Choose a username and a password with at least 12 characters. Only that link creates the sole administrator. Successful setup signs you in and closes setup permanently. An unused link rotates on restart. Normal login sessions last seven days, reload preserves a valid session, and logout revokes the current session immediately.
 
-```env
-# Riot Games API
-NASHORDAQ_RIOT_API_KEY=RGAPI-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+Setup, login and administrator access do not require a Riot key. Live Riot onboarding and updates still require one. Invitation and recovery flows, administrator participation and explicit isolated demo sessions are separate implementation slices. Demo access currently fails closed.
 
-# Domain (used for CORS)
-NASHORDAQ_DOMAIN=nashordaq.example.com
+The [Architecture](ARCHITECTURE.md#authentication-and-session-trust-boundary) owns the security contract. Every state-changing API request requires `X-Nashordaq-CSRF: 1`. Browser origins are checked; native API clients may omit Origin when sending this header. All game-data endpoints require the local session cookie.
 
-# Pangolin / Newt tunnel credentials
-PANGOLIN_ENDPOINT=https://pangolin.example.com
-NEWT_ID=your-newt-id
-NEWT_SECRET=your-newt-secret
-```
+## Configuration
 
-### Optional Variables
+Copy `.env.example` to `.env`. Relevant settings for this slice:
 
 | Variable | Default | Description |
 |---|---|---|
-| `NASHORDAQ_REMOTE_EMAIL_HEADER` | `Remote-Email` | Primary identity header injected by the proxy |
-| `NASHORDAQ_REMOTE_NAME_HEADER` | `Remote-Name` | Display-name header injected by the proxy |
-| `NASHORDAQ_AUTH_HEADER` | `Remote-User` | Legacy fallback identity header |
-| `NASHORDAQ_ADMIN_REMOTE_USERS` | unset | Comma-separated authenticated email addresses that should be treated as admin/operator accounts |
-| `NASHORDAQ_STARTING_BALANCE` | `1000.0` | Initial balance for new users |
-| `NASHORDAQ_ENFORCE_TRUSTED_PROXY` | `false` | Reject auth headers from non-trusted source IPs. Strongly recommended: set to `true` in every deployment — the backend trusts `Remote-*` headers for identity, so anything that can reach the backend port directly can otherwise impersonate any user or admin. |
-| `NASHORDAQ_TRUSTED_PROXY_CIDRS` | `127.0.0.1/32,::1/128` | Allowed proxy CIDR ranges (when enforcement is on). The default is localhost-only; in the compose deployment you must add the container network subnet (`podman network inspect <network>`), otherwise all requests are rejected. |
-| `NASHORDAQ_RIOT_API_BASE_URL` | `https://europe.api.riotgames.com` | Riot account/match API region |
-| `NASHORDAQ_RIOT_API_REGION_URL` | `https://euw1.api.riotgames.com` | Riot league/summoner API region |
-| `NASHORDAQ_GAMBA_ENABLED` | `true` | Private-only side-position feature flag. Set this to `false` for any public-facing or compliance-oriented deployment. |
+| `NASHORDAQ_PUBLIC_URL` | `http://localhost:8080` | Frontend origin for setup links and HTTPS cookie policy |
+| `NASHORDAQ_CORS_ORIGINS` | `http://localhost:5173` | Explicit allowed frontend origins |
+| `NASHORDAQ_DATABASE_URL` | `sqlite+aiosqlite:///data/nashordaq.db` | SQLite path relative to the backend directory |
+| `NASHORDAQ_RIOT_API_KEY` | empty | Optional for authentication, required for live Riot data |
+| `NASHORDAQ_STARTING_BALANCE` | `1000.0` | Initial virtual balance |
+| `NASHORDAQ_RIOT_API_BASE_URL` | `https://europe.api.riotgames.com` | Riot account/match region |
+| `NASHORDAQ_RIOT_API_REGION_URL` | `https://euw1.api.riotgames.com` | Riot league/summoner region |
+
+Proxy-header and configured-admin-list settings have been removed. Exactly one administrator comes from setup.
 
 ### Market Update Cadence
 
@@ -72,99 +61,43 @@ podman-compose up --build -d
 
 The frontend is served on port 80. The backend runs internally on port 8000 with Nginx reverse-proxying `/api/` requests.
 
-## 4. Pangolin Configuration
+## 4. HTTP entry point
 
-Pangolin Enterprise Edition forwards user identity headers automatically when a resource is protected with SSO authentication. The headers Nashordaq relies on:
-
-| Pangolin Header | Used By Backend |
-|---|---|
-| `Remote-Email` | Primary identity key (recommended) |
-| `Remote-Name` | Display name |
-| `Remote-User` | Legacy fallback identity key |
-
-### 4a. Create a Site
-
-1. In the Pangolin dashboard, go to **Sites** and create a new site.
-2. Note the **Site ID** and **Site Secret** -- these become `NEWT_ID` and `NEWT_SECRET` in your `.env`.
-3. The Newt container in `podman-compose.yaml` connects to Pangolin using these credentials.
-
-### 4b. Create a Resource
-
-1. Go to **Resources** and create a new **Public** resource.
-2. Set the domain to your desired hostname (e.g., `nashordaq.example.com`).
-3. Under **Targets**, point it to the frontend container's address (`http://nashordaq-frontend:80` or as appropriate for your Newt setup).
-
-### 4c. Enable SSO Authentication
-
-This is the critical step that makes Pangolin inject the SSO identity headers Nashordaq expects.
-
-1. Open the resource you created.
-2. Go to the **Authentication** tab.
-3. Enable **Pangolin SSO** (Platform SSO). This is on by default for new public resources.
-4. Optionally restrict access to specific **Users** or **Roles** in your Pangolin organization.
-
-When SSO is active, unauthenticated visitors are redirected to the Pangolin login page. After authentication, Pangolin proxies the request with identity headers (`Remote-User`, `Remote-Email`, `Remote-Name`, `Remote-Role`) attached. Nashordaq uses `Remote-Email` as the primary identity key and `Remote-User` as a legacy fallback. See [Pangolin Forwarded Headers docs](https://docs.pangolin.net/manage/access-control/forwarded-headers) for details.
-
-### 4d. External Identity Providers (Optional)
-
-If you want users to log in with Google, Azure, or another OIDC provider instead of Pangolin-native accounts:
-
-1. Go to **Identity Providers** in the Pangolin dashboard.
-2. Add your provider (Google, Azure Entra ID, generic OIDC, etc.).
-3. The forwarded headers will still be populated from the SSO session.
-
-See [Pangolin Identity Providers docs](https://docs.pangolin.net/manage/identity-providers/add-an-idp) for setup guides per provider.
-
-### Authentication Methods That Do NOT Forward Headers
-
-The following Pangolin auth methods provide access control but do **not** inject identity headers, so they are incompatible with Nashordaq:
-
-- PIN Code
-- Password
-- Shareable Links
-
-You must use **SSO** (Platform SSO or External IdP) for Nashordaq to identify users.
+The supplied Compose file still contains its legacy Newt transport. Its replacement with a configurable LAN HTTP entry point belongs to the deployment slice. A reverse proxy may terminate public HTTPS but never establishes application identity. Configure `NASHORDAQ_PUBLIC_URL` for the visible HTTPS origin and preserve the Host header, including any external port.
 
 ## 5. Verify
 
-Once everything is running:
+Open the frontend without a session. It displays login or setup guidance and fetches only authentication metadata. Open the setup link from the operator log, create the administrator, reload, sign out and sign in again. After sign-out, direct game API requests return 401, including requests carrying forged identity headers.
 
-```bash
-# Health check (note: if the Pangolin resource is SSO-gated, this returns a
-# login redirect from outside; the container healthcheck hits the backend
-# directly and is not affected)
-curl https://nashordaq.example.com/health
+`GET /health` remains public. `/api/auth/status` contains only setup and deployment-mode information. `/api/system/status` and all game queries require login.
 
-# Authenticated request (through Pangolin SSO in a browser)
-# Navigate to https://nashordaq.example.com
-# Log in through Pangolin, and the dashboard should load with your user auto-provisioned.
-```
+## 6. Local development
 
-## 6. Local Development (Without Pangolin)
-
-For local development, the Vite dev server proxies `/api` to `http://localhost:8000`. You need to manually provide the identity header since there is no Pangolin in the loop.
-
-Start the backend:
+Start the backend with a fresh SQLite directory:
 
 ```bash
 cd backend
-NASHORDAQ_RIOT_API_KEY=your-key uv run uvicorn app.main:app --reload
+mkdir -p data
+NASHORDAQ_PUBLIC_URL=http://localhost:5173 uv run uvicorn app.main:app --reload
 ```
 
-Start the frontend:
+Start the frontend in another terminal:
 
 ```bash
 cd frontend
 pnpm run dev
 ```
 
-To simulate an authenticated user, send the headers manually:
+Open the setup URL printed by the backend, then use normal browser login. Vite proxies `/api` to `http://localhost:8000` while preserving Host. No browser header-injection extension is needed.
+
+For API clients, log in and retain the session cookie:
 
 ```bash
-curl \
-  -H "Remote-Email: kyle@example.com" \
-  -H "Remote-Name: Kyle" \
-  http://localhost:8000/api/user/me
+curl -c /tmp/nashordaq-cookies -H 'X-Nashordaq-CSRF: 1' \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"your-user","password":"your-password"}' \
+  http://localhost:8000/api/auth/login
+curl -b /tmp/nashordaq-cookies http://localhost:8000/api/user/me
 ```
 
-Or use a browser extension (e.g., ModHeader) to inject `Remote-Email` and `Remote-Name` when accessing `http://localhost:5173`. `Remote-User` remains available as a fallback for legacy testing flows.
+Use disposable credentials when running examples and keep cookie files private.

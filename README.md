@@ -1,9 +1,9 @@
 # Nashordaq
 
-The standalone self-host baseline is accepted in [ADR-0001](docs/adr/0001-self-host-baseline.md) but is not implemented yet. The instructions below describe the current proxy-based deployment. They do not provide the planned standalone installation path.
+Local setup and username/password sessions are implemented from [ADR-0001](docs/adr/0001-self-host-baseline.md). The complete standalone deployment, invitations, recovery and explicit demo sessions remain subsequent slices of [spec #19](https://github.com/KyleDerZweite/nashordaq/issues/19).
 
 > **Early Development Notice**
-> This project is in early development and subject to breaking changes. It is intended for personal use only and is **not compliant with Riot Games Production API key requirements**. Self-hosting requires technical knowledge (Identity-Aware Proxy setup, environment configuration, containerized deployment). The future production-facing path documented in this repo excludes the private-only `gamba` mechanic entirely.
+> This project is in early development and subject to breaking changes. It is intended for personal use only and is **not compliant with Riot Games Production API key requirements**. Self-hosting requires technical knowledge (environment configuration and containerized deployment). The future production-facing path documented in this repo excludes the private-only `gamba` mechanic entirely.
 
 A self-hosted virtual share market for a private League of Legends friend group.
 
@@ -11,7 +11,7 @@ Users trade shares in League of Legends players using virtual currency. Share pr
 
 ## Try It
 
-A live demo is available at **[demo-nashordaq.kylehub.dev](https://demo-nashordaq.kylehub.dev/)**. No account or API key needed -- just open the link and start trading with simulated data.
+A live demo is available at **[demo-nashordaq.kylehub.dev](https://demo-nashordaq.kylehub.dev/)**. The previously deployed demo may use older code. This development revision denies demo access until explicit isolated demo sessions are implemented.
 
 ## What's Next
 
@@ -30,7 +30,7 @@ The next areas of interest are more trackable queues as selectable shares, such 
 - **Portfolio Management** -- buy and sell orders based on player performance.
 - **Leaderboards** -- global ranking of users by total portfolio net worth.
 - **Self-Hosted** -- single-process deployment, no external database or message broker required.
-- **Proxy-Ready Auth** -- designed to sit behind an Identity-Aware Proxy for zero-friction user management.
+- **Local authentication**: username/password accounts, operator setup and revocable sessions.
 
 ## Self-Hosting Guide
 
@@ -38,8 +38,7 @@ The next areas of interest are more trackable queues as selectable shares, such 
 
 - A Linux server (or any host that runs containers)
 - A domain name pointed at your server
-- [Pangolin](https://github.com/fosrl/pangolin) (or another Identity-Aware Proxy) for authentication
-- A Riot Games API key
+- A Riot Games API key for live market data, optional for account setup and login
 
 ### 1. Clone the repository
 
@@ -54,7 +53,7 @@ cd nashordaq
 cp .env.example .env
 ```
 
-Open `.env` in your editor and fill in every value. The sections below explain each one.
+Open `.env` and configure the visible frontend origin. Leave the Riot key empty while setting up account access if needed.
 
 ### 3. Get a Riot Games API key
 
@@ -88,37 +87,15 @@ NASHORDAQ_DOMAIN=nashordaq.yourdomain.com
 NASHORDAQ_CORS_ORIGINS=https://nashordaq.yourdomain.com
 ```
 
-### 6. Set up authentication with Pangolin
+### 6. Create the administrator
 
-Nashordaq does not handle login or passwords. It expects an Identity-Aware Proxy to authenticate users and forward their identity via an HTTP header.
+Set `NASHORDAQ_PUBLIC_URL` to the externally visible frontend origin. Use HTTP for LAN access and HTTPS when your reverse proxy terminates TLS. This setting controls the setup link and Secure cookie policy. Proxy identity headers have no effect.
 
-**Using [Pangolin](https://github.com/fosrl/pangolin):**
+Start with an empty SQLite data directory. The application rejects databases from the old proxy version before changing them. Preserve old data separately; there is no migration or automatic deletion.
 
-1. Install and configure Pangolin on your server following the [Pangolin documentation](https://docs.fossorial.io/).
-2. Create a new site/resource in Pangolin pointing to your Nashordaq instance.
-3. Enable authentication on the resource. Pangolin will handle login (SSO, OIDC, etc.) and inject headers into proxied requests.
-4. Ensure SSO authentication is enabled on the resource. Pangolin will automatically forward `Remote-User`, `Remote-Email`, and `Remote-Name` headers. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for a step-by-step Pangolin setup guide.
+On fresh startup, open the one-time setup link in the backend log and choose an administrator username and password. Passwords require at least 12 characters. The link creates the sole administrator and signs you in. Later visits use local login. Logout immediately ends the current session; normal sessions expire after seven days. Account access needs no Riot key.
 
-For defense-in-depth, enable trusted-proxy enforcement so direct backend requests are rejected unless they originate from your reverse proxy network:
-
-```env
-# Primary identity header (recommended: Remote-Email)
-NASHORDAQ_REMOTE_EMAIL_HEADER=Remote-Email
-NASHORDAQ_REMOTE_NAME_HEADER=Remote-Name
-
-# Legacy fallback identity header (default: Remote-User)
-NASHORDAQ_AUTH_HEADER=Remote-User
-
-# Optional admin account list for the operator dashboard. Comma-separate
-# multiple email addresses if you want more than one admin.
-NASHORDAQ_ADMIN_REMOTE_USERS=admin@yourdomain.com
-
-# Optional hardening (recommended in production)
-NASHORDAQ_ENFORCE_TRUSTED_PROXY=true
-NASHORDAQ_TRUSTED_PROXY_CIDRS=10.89.0.0/16,127.0.0.1/32,::1/128
-```
-
-Set `NASHORDAQ_TRUSTED_PROXY_CIDRS` to the CIDR(s) used by your proxy/tunnel containers on the Podman network.
+See [Deployment](docs/DEPLOYMENT.md) for current development startup and [Architecture](docs/ARCHITECTURE.md#authentication-and-session-trust-boundary) for request protections. The supplied tunnel-based Compose packaging has not yet been replaced by the standalone deployment slice.
 
 For any public-facing, compliance-oriented, or future production-style deployment, also set:
 
@@ -135,7 +112,7 @@ NASHORDAQ_HTTP_TIMEOUT_SECONDS=10
 NASHORDAQ_HTTP_CONNECT_TIMEOUT_SECONDS=5
 ```
 
-When a user visits Nashordaq, Pangolin authenticates them first. The backend identifies users primarily from `Remote-Email`, with `Remote-User` retained as a legacy fallback. New users are automatically provisioned with the configured starting balance and then complete a one-time in-app self-onboarding step to link their Riot `game_name` and `tag_line`.
+Riot onboarding remains separate from local account access. Administrator participation and invitation registration arrive in their dedicated implementation slices.
 
 ### 7. Start the application
 
@@ -145,7 +122,7 @@ No external database or message broker to set up -- Nashordaq uses SQLite (creat
 podman-compose up -d
 ```
 
-The SQLite database file is stored at the path configured by `NASHORDAQ_DATABASE_URL` (default: `data/nashordaq.db`). Back up this file to preserve all data.
+The SQLite database file is stored at the path configured by `NASHORDAQ_DATABASE_URL` (default: `data/nashordaq.db`). Consistent live backup tooling is a separate implementation slice; copying an active SQLite file alone is insufficient.
 
 ## Development
 
@@ -153,6 +130,7 @@ The SQLite database file is stored at the path configured by `NASHORDAQ_DATABASE
 
 ```bash
 cd backend
+mkdir -p data                     # SQLite directory
 uv sync                            # Install dependencies
 uv run uvicorn app.main:app --reload  # Start dev server
 uv run pytest -v                   # Run tests

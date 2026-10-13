@@ -1,4 +1,5 @@
 import os
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 
 os.environ.setdefault("NASHORDAQ_RIOT_API_KEY", "test-api-key")
@@ -11,6 +12,7 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from app.auth import hash_password
 from app.config import settings
 from app.database import get_session
 from app.main import app
@@ -57,8 +59,12 @@ async def db_session(db_engine):
         yield session
 
 
+TEST_PASSWORD = "fixture password for tests"
+TEST_PASSWORD_HASH = hash_password(TEST_PASSWORD)
+
+
 @pytest.fixture
-async def auth_client(db_engine):
+async def account_client(db_engine):
     session_factory = async_sessionmaker(
         db_engine, class_=AsyncSession, expire_on_commit=False
     )
@@ -69,19 +75,59 @@ async def auth_client(db_engine):
 
     app.dependency_overrides[get_session] = override_get_session
     app.state.http_client = httpx.AsyncClient()
-    transport = ASGITransport(app=app)
-    async with AsyncClient(
-        transport=transport,
-        base_url="http://test",
-        headers={
-            "Remote-User": "testuser",
-            "Remote-Email": "testuser@test.dev",
-            "Remote-Name": "Test User",
-        },
-    ) as ac:
-        yield ac
+
+    @asynccontextmanager
+    async def logged_in(
+        username="testuser", *, is_admin=False, display_name="Test User"
+    ):
+        async with session_factory() as session:
+            user = await session.scalar(select(User).where(User.username == username))
+            if user is None:
+                user = User(
+                    username=username,
+                    email=f"{username}@test.dev",
+                    display_name=display_name,
+                    balance=settings.starting_balance,
+                    is_admin=is_admin,
+                )
+                session.add(user)
+            user.password_hash = TEST_PASSWORD_HASH
+            await session.commit()
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://test",
+            headers={"X-Nashordaq-CSRF": "1", "Origin": "http://test"},
+        ) as client:
+            response = await client.post(
+                "/api/auth/login",
+                json={"username": username, "password": TEST_PASSWORD},
+            )
+            assert response.status_code == 200, response.text
+            yield client
+
+    yield logged_in
     await app.state.http_client.aclose()
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+async def auth_client(account_client):
+    async with account_client() as client:
+        yield client
+
+
+@pytest.fixture
+async def admin_client(account_client):
+    async with account_client(
+        "operator", is_admin=True, display_name="Operator"
+    ) as client:
+        yield client
+
+
+@pytest.fixture
+async def second_client(account_client):
+    async with account_client("seconduser", display_name="Second User") as client:
+        yield client
 
 
 @pytest.fixture

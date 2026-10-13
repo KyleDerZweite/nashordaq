@@ -1,11 +1,9 @@
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
 
 from app.config import settings
-from app.main import app
 from app.models import HoldingLot, Order, OrderStatus, TrackedPlayer
 
 
@@ -280,22 +278,15 @@ async def test_list_orders_filter_status_reverted(auth_client, tradable_player):
 
 
 async def test_list_recent_orders_includes_all_players(
-    auth_client, seeded_player, tradable_player
+    auth_client, seeded_player, tradable_player, account_client
 ):
     await auth_client.post(
         "/api/orders",
         json={"player_id": tradable_player.id, "side": "BUY", "quantity": 1},
     )
 
-    transport = ASGITransport(app=app)
-    async with AsyncClient(
-        transport=transport,
-        base_url="http://test",
-        headers={
-            "Remote-User": "seconduser",
-            "Remote-Email": "seconduser@test.dev",
-            "Remote-Name": "Second User",
-        },
+    async with account_client(
+        "seconduser", display_name="Second User"
     ) as second_user_client:
         second_onboarding = await second_user_client.post(
             "/api/user/onboarding",
@@ -331,42 +322,28 @@ async def test_list_recent_orders_includes_all_players(
 
 
 async def test_admin_list_orders_returns_empty_list(
-    auth_client, tradable_player, monkeypatch
+    auth_client, tradable_player, admin_client
 ):
-    monkeypatch.setattr(settings, "admin_remote_users", "admin-viewer")
 
     await auth_client.post(
         "/api/orders",
         json={"player_id": tradable_player.id, "side": "BUY", "quantity": 1},
     )
 
-    transport = ASGITransport(app=app)
-    async with AsyncClient(
-        transport=transport,
-        base_url="http://test",
-        headers={"Remote-User": "admin-viewer"},
-    ) as admin_client:
-        resp = await admin_client.get("/api/orders")
+    resp = await admin_client.get("/api/orders")
 
     assert resp.status_code == 200
     assert resp.json() == []
 
 
-async def test_admin_can_view_recent_orders(auth_client, tradable_player, monkeypatch):
-    monkeypatch.setattr(settings, "admin_remote_users", "admin-viewer")
+async def test_admin_can_view_recent_orders(auth_client, tradable_player, admin_client):
 
     await auth_client.post(
         "/api/orders",
         json={"player_id": tradable_player.id, "side": "BUY", "quantity": 1},
     )
 
-    transport = ASGITransport(app=app)
-    async with AsyncClient(
-        transport=transport,
-        base_url="http://test",
-        headers={"Remote-User": "admin-viewer"},
-    ) as admin_client:
-        resp = await admin_client.get("/api/orders/recent")
+    resp = await admin_client.get("/api/orders/recent")
 
     assert resp.status_code == 200
     assert len(resp.json()) >= 1

@@ -1,45 +1,8 @@
-from httpx import ASGITransport, AsyncClient
-from sqlalchemy import select
-
 from app.config import settings
-from app.main import app
-from app.models import User
 from app.routers import user as user_router
 
 
-async def test_email_backfill_persists_for_legacy_user(auth_client, db_session):
-    del auth_client  # ensures the session override is installed
-
-    legacy_user = User(
-        username="legacyuser",
-        email=None,
-        display_name="Legacy User",
-        balance=settings.starting_balance,
-    )
-    db_session.add(legacy_user)
-    await db_session.commit()
-
-    transport = ASGITransport(app=app)
-    async with AsyncClient(
-        transport=transport,
-        base_url="http://test",
-        headers={
-            "Remote-User": "legacyuser",
-            "Remote-Email": "legacy@test.dev",
-            # Same display name as stored, so only the backfill needs a commit
-            "Remote-Name": "Legacy User",
-        },
-    ) as legacy_client:
-        resp = await legacy_client.get("/api/user/me")
-    assert resp.status_code == 200
-
-    result = await db_session.execute(select(User).where(User.username == "legacyuser"))
-    refreshed = result.scalar_one()
-    await db_session.refresh(refreshed)
-    assert refreshed.email == "legacy@test.dev"
-
-
-async def test_auto_provision_new_user(auth_client):
+async def test_authenticated_local_user(auth_client):
     resp = await auth_client.get("/api/user/me")
     assert resp.status_code == 200
     data = resp.json()
@@ -62,14 +25,6 @@ async def test_no_auth_header(client):
     assert resp.status_code == 401
 
 
-async def test_untrusted_proxy_rejected(auth_client, monkeypatch):
-    monkeypatch.setattr(settings, "enforce_trusted_proxy", True)
-    monkeypatch.setattr(settings, "trusted_proxy_cidrs", "10.0.0.0/8")
-
-    resp = await auth_client.get("/api/user/me")
-    assert resp.status_code == 403
-
-
 async def test_complete_onboarding(auth_client):
     resp = await auth_client.post(
         "/api/user/onboarding",
@@ -84,7 +39,7 @@ async def test_complete_onboarding(auth_client):
     assert data["linked_player_id"] is not None
 
 
-async def test_complete_onboarding_duplicate_player(auth_client):
+async def test_complete_onboarding_duplicate_player(auth_client, account_client):
     first = await auth_client.post(
         "/api/user/onboarding",
         json={
@@ -94,15 +49,8 @@ async def test_complete_onboarding_duplicate_player(auth_client):
     )
     assert first.status_code == 200
 
-    transport = ASGITransport(app=app)
-    async with AsyncClient(
-        transport=transport,
-        base_url="http://test",
-        headers={
-            "Remote-User": "seconduser",
-            "Remote-Email": "seconduser@test.dev",
-            "Remote-Name": "Second User",
-        },
+    async with account_client(
+        "seconduser", display_name="Second User"
     ) as second_user_client:
         second = await second_user_client.post(
             "/api/user/onboarding",
@@ -147,14 +95,13 @@ async def test_onboarding_tagline_with_hash_is_accepted(auth_client):
     assert data["onboarding_complete"] is True
 
 
-async def test_admin_user_role_and_onboarding_blocked(auth_client, monkeypatch):
-    monkeypatch.setattr(settings, "admin_remote_users", "testuser@test.dev")
+async def test_admin_user_role_and_onboarding_blocked(admin_client):
 
-    me_resp = await auth_client.get("/api/user/me")
+    me_resp = await admin_client.get("/api/user/me")
     assert me_resp.status_code == 200
     assert me_resp.json()["role"] == "admin"
 
-    onboarding_resp = await auth_client.post(
+    onboarding_resp = await admin_client.post(
         "/api/user/onboarding",
         json={
             "game_name": "viewer",
@@ -226,7 +173,7 @@ async def test_update_profile(auth_client):
     assert players[0]["display_name"] == "afterupdate"
 
 
-async def test_update_profile_duplicate_player_rejected(auth_client):
+async def test_update_profile_duplicate_player_rejected(auth_client, account_client):
     first = await auth_client.post(
         "/api/user/onboarding",
         json={
@@ -236,15 +183,8 @@ async def test_update_profile_duplicate_player_rejected(auth_client):
     )
     assert first.status_code == 200
 
-    transport = ASGITransport(app=app)
-    async with AsyncClient(
-        transport=transport,
-        base_url="http://test",
-        headers={
-            "Remote-User": "seconduser",
-            "Remote-Email": "seconduser@test.dev",
-            "Remote-Name": "Second User",
-        },
+    async with account_client(
+        "seconduser", display_name="Second User"
     ) as second_user_client:
         second = await second_user_client.post(
             "/api/user/onboarding",
@@ -266,10 +206,9 @@ async def test_update_profile_duplicate_player_rejected(auth_client):
     assert update_resp.status_code == 409
 
 
-async def test_admin_user_profile_update_blocked(auth_client, monkeypatch):
-    monkeypatch.setattr(settings, "admin_remote_users", "testuser@test.dev")
+async def test_admin_user_profile_update_blocked(admin_client):
 
-    update_resp = await auth_client.put(
+    update_resp = await admin_client.put(
         "/api/user/profile",
         json={
             "game_name": "viewer",

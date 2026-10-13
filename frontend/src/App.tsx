@@ -57,7 +57,15 @@ function getInitialAdminViewMode(): AdminViewMode {
   return storedValue === "admin" ? "admin" : "spectator";
 }
 
-export default function App() {
+export default function App({
+  onLogout,
+  isLoggingOut,
+  logoutError,
+}: {
+  onLogout: () => void;
+  isLoggingOut: boolean;
+  logoutError?: string;
+}) {
   const { isStreamerMode } = useStreamerMode();
   const [trade, setTrade] = useState<TradeTarget | null>(null);
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
@@ -199,9 +207,19 @@ export default function App() {
             current === "admin" ? "spectator" : "admin",
           )
         }
+        onLogout={onLogout}
+        isLoggingOut={isLoggingOut}
       />
 
       <main className="mx-auto w-full max-w-[88rem] flex-1 px-6 py-8">
+        {logoutError && (
+          <p
+            role="alert"
+            className="mb-6 border border-red-700 bg-red-950/40 p-4 text-red-200"
+          >
+            {logoutError}
+          </p>
+        )}
         {isDemo && <DemoBanner />}
         {showSimulation ? (
           <SimulationView onClose={() => setShowSimulation(false)} />

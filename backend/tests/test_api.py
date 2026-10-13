@@ -19,7 +19,7 @@ async def test_health(client):
     assert resp.status_code == 200
     data = resp.json()
     assert data["status"] == "ok"
-    datetime.strptime(data["update"], "%Y-%m-%d %H:%M")
+    assert data == {"status": "ok"}
 
 
 async def test_system_status_is_idle_without_tracked_players(auth_client, monkeypatch):
