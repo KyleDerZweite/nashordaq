@@ -72,7 +72,7 @@ export default function AdminDashboard({
         ))}
       </section>
 
-      <div className="grid gap-6 xl:grid-cols-[1.15fr_1.85fr]">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1.85fr)]">
         <section className="border-2 border-hex-gold-dim bg-hex-panel">
           <div className="border-b-2 border-hex-gold-dim px-5 py-3">
             <h2 className="font-serif text-xl font-bold text-hex-gold">

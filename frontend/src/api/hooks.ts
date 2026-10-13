@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { get, post, put, del } from "./client";
 import type {
+  GameIntervention,
   AdminOverviewResponse,
   AdminPlayerInsightResponse,
   AdminUserPortfolioResponse,
@@ -35,6 +36,7 @@ import type {
 // ---- Keys ----
 
 export const queryKeys = {
+  activity: ["activity"] as const,
   user: ["user"] as const,
   players: ["players"] as const,
   player: (id: number, limit?: number | null) =>
@@ -453,6 +455,9 @@ export function useRestoreAdminRescue(userId: number | null) {
         {},
       ),
     onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.activity });
+      void qc.invalidateQueries({ queryKey: queryKeys.bank });
+      void qc.invalidateQueries({ queryKey: queryKeys.portfolio });
       void qc.invalidateQueries({ queryKey: queryKeys.adminUsers });
       void qc.invalidateQueries({ queryKey: queryKeys.adminOverview });
       if (userId !== null) {
@@ -506,5 +511,13 @@ export function useSimulationPlayerMatches(
 export function useRunSimulation() {
   return useMutation<SimulationResponse, Error, SimulationRequest>({
     mutationFn: (body) => post<SimulationResponse>("/simulate", body),
+  });
+}
+
+export function useGameActivity() {
+  return useQuery<GameIntervention[]>({
+    queryKey: queryKeys.activity,
+    queryFn: () => get<GameIntervention[]>("/activity"),
+    refetchInterval: 30_000,
   });
 }

@@ -14,7 +14,7 @@ A closed, trusted friend group. Public registration and email verification are o
 
 Public registration, a mail-server requirement, OAuth/OIDC, additional administrators and hosted multi-room operation are outside this baseline. The first standalone release starts with fresh data; subsequent standalone releases establish the supported update path.
 
-Local setup, invitation registration, sessions and explicit isolated demo sessions are implemented. Recovery and administrator participation remain later slices of the accepted baseline.
+Local setup, invitation registration, sessions, isolated demo sessions, administrator participation and member-visible game interventions are implemented. Recovery remains a later slice of the accepted baseline.
 
 ## Current core user flows
 
@@ -37,7 +37,7 @@ Local setup, invitation registration, sessions and explicit isolated demo sessio
 - **Long only:** Users cannot short sell. Selling requires owning sufficient shares (accounting for pending sell orders).
 - **Whole shares only:** Fractional share quantities are not supported.
 - **Market orders only:** No limit orders or other order types.
-- **Self-onboarding players:** Each user links their own Riot account on first access by submitting `game_name` and `tag_line`. Linked players become tracked in the market. Deletion is out of scope.
+- **Self-onboarding players:** Each user, including the administrator, can link their own Riot account by submitting `game_name` and `tag_line`. Linked players become tracked in the market. Deletion is out of scope.
 - **Production-compliant product path:** Any future Riot-compliant production application excludes the private-only `gamba` mechanic entirely and frames Nashordaq as a virtual investing and social market product.
 
 ## System Requirements
@@ -51,3 +51,5 @@ Local setup, invitation registration, sessions and explicit isolated demo sessio
 4. **Transaction Ledger:** Every executed order produces an immutable transaction record. Balances and holdings are updated atomically within the same database transaction as price updates.
 
 5. **Bank Debt Ledger:** Borrowing, interest capitalization, and repayments are stored as immutable bank-ledger entries. Outstanding debt is account-level and is not represented as a trade order.
+
+Administrator and participant views are available through the account menu. Onboarded administrators use ordinary trading, portfolio, bank and profile actions under the same economy rules. Linking can be dismissed, preserving account administration when Riot is unavailable. The game activity list shows successful rescue-access restorations with actor, affected member, time and the change in remaining uses. Failed interventions and account access operations do not create activity entries.

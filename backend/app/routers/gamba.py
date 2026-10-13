@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import CurrentOnboardedUser, CurrentUser, is_admin_user
+from app.auth import CurrentOnboardedUser, CurrentUser
 from app.banking import round_currency
 from app.config import settings
 from app.database import get_session
@@ -165,7 +165,7 @@ async def list_gamba_positions(
         return []
     if not settings.gamba_enabled:
         raise HTTPException(status_code=404, detail="Gamba feature disabled")
-    if is_admin_user(user) or user.linked_player_id is None:
+    if user.linked_player_id is None:
         return []
 
     result = await session.execute(

@@ -40,6 +40,7 @@ Current SQLAlchemy tables:
 | `users` | Local usernames, password verifiers, sole administrator flag and personal game state. |
 | `auth_sessions` | Hashed revocable session tokens and seven-day expiry. |
 | `access_tokens` | Hashed one-time setup and invitation tokens with lifecycle state. |
+| `game_interventions` | Atomic administrator game changes with actor, affected member and concrete values. |
 | `instance_metadata` | Supported standalone database schema version. |
 | `tracked_players` | Riot accounts whose prices are tracked in the market. |
 | `holdings` | Aggregate user-player share positions. |
@@ -87,6 +88,7 @@ Core endpoints:
 | GET | `/api/orders/{id}` | Yes | Order detail with execution breakdown |
 | DELETE | `/api/orders/{id}` | Yes | Cancel or revert an eligible order |
 | GET | `/api/portfolio` | Yes | Current holdings, balance, debt, and total net worth |
+| GET | `/api/activity` | Yes | Administrator game interventions, newest first |
 | GET | `/api/leaderboard` | Yes | Ranked user leaderboard |
 
 Additional optional/admin endpoints exist for bank, poro, simulation, admin dashboards, and the private-only `gamba` feature.
@@ -97,7 +99,7 @@ The accepted direction is recorded in [ADR-0001](adr/0001-self-host-baseline.md)
 
 The application owns identity, authentication, invite access and administrator permissions. A deployment's reverse proxy owns public TLS termination and does not establish application identity. Game data requires an authenticated session. Demo operation is explicit and isolates each visitor's temporary game state.
 
-Setup, invitations, local login, logout, isolated demo sessions and the private game-data gate are implemented. Password recovery is a later slice of [spec #19](https://github.com/KyleDerZweite/nashordaq/issues/19). Standalone packaging uses the shared Docker Compose and Podman Compose manifest described in [Deployment](DEPLOYMENT.md). Administrator participation remains restricted until its dedicated slice. This distinction does not change the accepted requirements.
+Setup, invitations, local login, logout, isolated demo sessions and the private game-data gate are implemented. Password recovery is a later slice of [spec #19](https://github.com/KyleDerZweite/nashordaq/issues/19). Standalone packaging uses the shared Docker Compose and Podman Compose manifest described in [Deployment](DEPLOYMENT.md). The administrator can participate after the same Riot onboarding as members.
 
 ## Authentication and session trust boundary
 
@@ -180,3 +182,11 @@ backend/
     test_poro.py                # Poro reward tests
     test_scheduler.py           # Market update and ledger processing tests
 ```
+
+## Administrator participation and intervention boundary
+
+Administrator permissions add access to account management and game administration. They do not restrict ordinary participant functions. `CurrentOnboardedUser` applies the same Riot-link requirement to members and the administrator. The frontend offers a dismissible linking flow and separate participant and administrator views, so account management remains available without Riot.
+
+`app/interventions.py` owns rescue-access restoration. A conditional SQLite update changes the affected account's remaining uses from zero to one and inserts a typed `game_interventions` record in the same transaction. The administrator router builds its response before committing; failure rolls back both writes. Already available access returns 409 without an event. The economy and loan eligibility checks remain in the bank module.
+
+`GET /api/activity` requires a session and exposes the actor and affected member through stable user IDs, usernames and optional linked Riot identity, UTC timestamp, intervention kind and previous/new values. It does not expose credentials, access tokens or email. The frontend renders this list for every member. Read-only administration and access management produce no intervention records. Demo visitors receive an empty activity list, preserving normal-market privacy if the operator changes deployment mode. Permanent alias rendering belongs to the identity presentation slice.

@@ -6,9 +6,10 @@ from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import CurrentAdminUser, get_user_role
-from app.banking import build_account_snapshot, restore_rescue_loan_use
+from app.banking import build_account_snapshot
 from app.config import settings
 from app.database import get_session
+from app.interventions import restore_rescue_access
 from app.models import (
     GambaPosition,
     GambaStatus,
@@ -500,16 +501,14 @@ async def restore_admin_user_rescue_unlock(
     admin_user: CurrentAdminUser,
     session: SessionDep,
 ) -> AdminUserPortfolioResponse:
-    del admin_user
-
     user = await session.get(User, user_id)
-    if user is None:
+    if user is None or user.is_demo:
         raise HTTPException(status_code=404, detail="User not found")
 
-    restore_rescue_loan_use(user)
+    await restore_rescue_access(session, admin_user, user)
+    response = await _build_admin_user_portfolio_response(session, user)
     await session.commit()
-    await session.refresh(user)
-    return await _build_admin_user_portfolio_response(session, user)
+    return response
 
 
 @router.get("/system/status", response_model=SystemStatusResponse)

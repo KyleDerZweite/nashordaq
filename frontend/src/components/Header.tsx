@@ -11,7 +11,7 @@ export default function Header({
   playerGameName,
   canEditProfile = false,
   canToggleAdminView = false,
-  adminViewMode = "spectator",
+  adminViewMode = "participant",
   isDemo = false,
   showSimulation = false,
   onOpenBalanceInsights,
@@ -28,7 +28,7 @@ export default function Header({
   playerGameName?: string;
   canEditProfile?: boolean;
   canToggleAdminView?: boolean;
-  adminViewMode?: "spectator" | "admin";
+  adminViewMode?: "participant" | "admin";
   isDemo?: boolean;
   showSimulation?: boolean;
   onOpenBalanceInsights?: () => void;
@@ -49,10 +49,10 @@ export default function Header({
 
   return (
     <header className="border-b-4 border-hex-gold bg-hex-bg-alt">
-      <div className="mx-auto flex max-w-[88rem] items-center justify-between px-6 py-4">
+      <div className="mx-auto flex max-w-[88rem] flex-col items-start gap-4 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
         {/* Brand */}
         <div className="flex items-baseline gap-3">
-          <h1 className="font-serif text-4xl font-black tracking-tight text-hex-gold">
+          <h1 className="font-serif text-3xl font-black sm:text-4xl tracking-tight text-hex-gold">
             NASHORDAQ
           </h1>
           <span className="hidden text-xs font-medium uppercase tracking-[0.3em] text-hex-bronze sm:inline">
@@ -66,7 +66,7 @@ export default function Header({
         </div>
 
         {/* Account bar */}
-        <div className="flex items-center gap-6">
+        <div className="flex w-full items-center justify-between gap-4 lg:w-auto lg:gap-6">
           <div className="flex items-center gap-3">
             <button
               type="button"
@@ -91,7 +91,7 @@ export default function Header({
               onClick={() => setMenuOpen((current) => !current)}
               aria-label="Account menu"
               aria-expanded={menuOpen}
-              className="h-10 w-10 border-2 border-hex-gold bg-hex-panel text-center font-serif text-lg leading-9 font-bold text-hex-gold transition-colors hover:bg-hex-gold hover:text-hex-bg"
+              className="h-10 w-10 shrink-0 border-2 border-hex-gold bg-hex-panel text-center font-serif text-lg leading-9 font-bold text-hex-gold transition-colors hover:bg-hex-gold hover:text-hex-bg"
             >
               {initial}
             </button>
@@ -126,11 +126,14 @@ export default function Header({
                 {canToggleAdminView && (
                   <button
                     type="button"
-                    onClick={onToggleAdminView}
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onToggleAdminView?.();
+                    }}
                     className="mt-3 w-full border border-hex-border px-3 py-2 text-left font-mono text-xs font-bold uppercase tracking-wider text-hex-bronze transition-colors hover:border-hex-gold hover:text-hex-gold"
                   >
                     View Mode:{" "}
-                    {adminViewMode === "admin" ? "Admin" : "Spectator"}
+                    {adminViewMode === "admin" ? "Admin" : "Participant"}
                   </button>
                 )}
 

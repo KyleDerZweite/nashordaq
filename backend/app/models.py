@@ -477,3 +477,15 @@ class AccessToken(Base):
     expires_at: Mapped[datetime | None] = mapped_column(default=None)
     consumed_at: Mapped[datetime | None] = mapped_column(default=None)
     revoked_at: Mapped[datetime | None] = mapped_column(default=None)
+
+
+class GameIntervention(Base):
+    __tablename__ = "game_interventions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    actor_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    affected_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    kind: Mapped[str] = mapped_column(String(64))
+    previous_uses: Mapped[int] = mapped_column(Integer)
+    new_uses: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(index=True)

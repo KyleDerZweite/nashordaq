@@ -602,7 +602,3 @@ def apply_repayment(user: User, amount: float, *, at: datetime) -> BankLedgerEnt
         outstanding_debt=current_outstanding_debt(user),
         created_at=normalize_datetime(at),
     )
-
-
-def restore_rescue_loan_use(user: User) -> None:
-    user.rescue_loan_uses_remaining = 1

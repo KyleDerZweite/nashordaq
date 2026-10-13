@@ -25,6 +25,7 @@ from app.riot import (
     integration_status,
 )
 from app.routers import (
+    activity,
     admin,
     bank,
     gamba,
@@ -112,6 +113,7 @@ app.add_middleware(
 app.add_middleware(SessionRequestProtection)
 
 app.include_router(auth_router, prefix="/api")
+app.include_router(activity.router, prefix="/api")
 
 app.include_router(user.router, prefix="/api", dependencies=[Depends(get_current_user)])
 app.include_router(

@@ -490,3 +490,21 @@ export interface SimulationPlayerMatchResponse {
   price_after: number;
   completed_at: string;
 }
+
+export interface ActivityIdentity {
+  user_id: number;
+  username: string;
+  linked_player_id: number | null;
+  game_name: string | null;
+  tag_line: string | null;
+}
+
+export interface GameIntervention {
+  id: number;
+  actor: ActivityIdentity;
+  affected: ActivityIdentity;
+  kind: "rescue_access_restored";
+  previous_uses: number;
+  new_uses: number;
+  created_at: string;
+}

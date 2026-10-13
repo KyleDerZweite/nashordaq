@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import CurrentOnboardedUser, CurrentUser, is_admin_user
+from app.auth import CurrentOnboardedUser, CurrentUser
 from app.banking import round_currency
 from app.config import settings
 from app.database import get_session
@@ -448,9 +448,6 @@ async def list_orders(
     session: SessionDep,
     status: OrderStatus | None = Query(default=None),  # noqa: B008
 ) -> list[OrderResponse]:
-    if is_admin_user(user):
-        return []
-
     if user.linked_player_id is None and not user.is_demo:
         return []
 
