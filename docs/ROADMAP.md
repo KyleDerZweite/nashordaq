@@ -103,37 +103,11 @@ es.onmessage = async (e) => {
 
 ---
 
-### 8. Built-In Auth Mode
+### 8. Standalone self-host baseline
 
-Add a self-contained authentication layer so the app can run standalone without any reverse proxy or external auth provider. This is the default for self-hosters who just want `docker compose up`.
+The accepted contract for [#16](https://github.com/KyleDerZweite/nashordaq/issues/16) and [#17](https://github.com/KyleDerZweite/nashordaq/issues/17) is [ADR-0001](adr/0001-self-host-baseline.md). It replaces the previous dual-mode proposal. Proxy auth is removed; local auth is the only normal mode. Demo is an explicit deployment mode.
 
-**Two auth modes, auto-detected:**
-
-- `proxy` - current behavior. Reads `Remote-Email` / `Remote-Name` headers injected by a reverse proxy (Pangolin, Authelia, Caddy forward_auth, etc.). Unchanged.
-- `builtin` - the app handles registration, login, and sessions directly. No proxy required.
-
-The mode is configured via `NASHORDAQ_AUTH_MODE` (default: `builtin`). When both are available (proxy headers present AND a builtin session exists), proxy headers take precedence.
-
-**Registration flow (builtin mode):**
-
-1. User visits the app, sees a registration/login page.
-2. Registration collects: email, display name, password, game name, tag line.
-3. Backend creates the `User`, hashes the password, resolves the Riot PUUID, creates the `TrackedPlayer`, and links them - combining current auto-provisioning and onboarding into one step.
-4. Login via email + password returns a signed session cookie.
-
-**Implementation notes:**
-
-- Password hashing: argon2id (via `argon2-cffi`).
-- Sessions: signed cookies using a `NASHORDAQ_SECRET_KEY` env var.
-- New columns on `User`: `password_hash` (nullable, only set in builtin mode).
-- The existing `_get_current_user` dependency in `auth.py` gains a second code path: check session cookie if no proxy headers are present.
-- Frontend: a login/register page that only renders when `auth_mode == builtin` (detected via a public `/api/auth/info` endpoint).
-
-**What this enables:**
-
-- `docker compose up` with just `NASHORDAQ_RIOT_API_KEY` and `NASHORDAQ_SECRET_KEY` gives a working instance. No Zitadel, no Pangolin, no reverse proxy.
-- Self-hosters who prefer an IAP can set `NASHORDAQ_AUTH_MODE=proxy` and use their existing setup.
-- The maintainer's own deployment continues using Pangolin exactly as it does today.
+Implementation is pending. The previous automatic mode detection, proxy-header precedence and combined registration/Riot onboarding proposal are withdrawn. Implementation slices are not Ready until their component responsibilities, interfaces, dependency directions and acceptance evidence have been reviewed.
 
 ## Future (v2+)
 
@@ -151,7 +125,7 @@ Each friend group runs their own instance with their own Riot Personal API key. 
 - Rate limit (100 req/2min) is sufficient for 5-50 tracked players.
 - Each instance is independent. This is NOT the "BYOK" violation Riot prohibits (that refers to one application pooling multiple keys).
 - `gamba` can remain a private/self-hosted-only feature. It should not be part of any production-facing build submitted for Riot review.
-- The built-in auth mode (item 8) removes the need for any external auth stack, making deployment trivial.
+- The built-in auth mode (item 8) removes the need for any external auth stack, supporting the accepted standalone deployment path once implemented.
 
 ### Selectable Queues
 

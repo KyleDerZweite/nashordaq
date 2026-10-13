@@ -1,5 +1,7 @@
 # Nashordaq
 
+The standalone self-host baseline is accepted in [ADR-0001](docs/adr/0001-self-host-baseline.md) but is not implemented yet. The instructions below describe the current proxy-based deployment. They do not provide the planned standalone installation path.
+
 > **Early Development Notice**
 > This project is in early development and subject to breaking changes. It is intended for personal use only and is **not compliant with Riot Games Production API key requirements**. Self-hosting requires technical knowledge (Identity-Aware Proxy setup, environment configuration, containerized deployment). The future production-facing path documented in this repo excludes the private-only `gamba` mechanic entirely.
 

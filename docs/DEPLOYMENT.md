@@ -1,5 +1,7 @@
 # Deployment Guide
 
+The standalone self-host baseline is accepted in [ADR-0001](adr/0001-self-host-baseline.md) but is not implemented yet. The instructions below describe the current proxy-based deployment. They do not provide the planned standalone installation path.
+
 ## Prerequisites
 
 - A server with [Podman](https://podman.io/) and `podman-compose` installed.

@@ -8,7 +8,15 @@ Create a private, web-based platform where users can virtually invest in the ran
 
 A closed, trusted friend group. Public registration and email verification are out of scope.
 
-## Core User Flows
+## Accepted self-host baseline
+
+[ADR-0001](adr/0001-self-host-baseline.md) defines the accepted requirements for [issue #16](https://github.com/KyleDerZweite/nashordaq/issues/16) and [issue #17](https://github.com/KyleDerZweite/nashordaq/issues/17). Local invite-based access replaces proxy authentication. One administrator may also participate in the market. Game-changing administrative actions are visible to members. Demo access and Streamer Mode follow the same decision.
+
+Public registration, a mail-server requirement, OAuth/OIDC, additional administrators and hosted multi-room operation are outside this baseline. The first standalone release starts with fresh data; subsequent standalone releases establish the supported update path.
+
+The flows below describe current behavior. Their proxy authentication is superseded as a product requirement by ADR-0001 and remains implemented only until the standalone work is delivered.
+
+## Current core user flows
 
 1. **Authentication:** User access is gated by an external Identity-Aware Proxy (e.g., Zitadel/Pangolin). Upon successful proxy authentication, the user is seamlessly passed to the Nashordaq interface. The backend automatically provisions a configured starting balance the first time it detects a new `Remote-Email` header, with `Remote-User` retained as a fallback for legacy setups.
 

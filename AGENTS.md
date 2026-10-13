@@ -16,10 +16,10 @@ This is the primary instruction file for contributors and coding agents. Follow 
 - Never use `npm` or `yarn`.
 
 ### Authentication / Security Model
-- Authentication is external (IAP + reverse proxy).
-- Never implement JWT issuance, password hashing, sessions, or login forms.
-- Backend identity source is `Remote-Email` (stable key), with `Remote-Name` for display name and `Remote-User` as fallback (matching Pangolin's forwarded headers).
-- Keep security assumptions aligned with `docs/ARCHITECTURE.md` (trust boundary and hardening settings).
+- Implement standalone local authentication with username, password and revocable sessions.
+- Remove proxy-header authentication. OAuth/OIDC is outside the accepted baseline.
+- Follow the accepted decision in `docs/adr/0001-self-host-baseline.md` and the security boundary in `docs/ARCHITECTURE.md`.
+- The current code still uses proxy auth. Reconcile implementation and tests with the accepted contract before claiming standalone support.
 
 ## 2) Canonical References
 

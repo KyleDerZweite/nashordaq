@@ -9,6 +9,10 @@ It does not change the current implementation scope. It exists to answer two que
 1. What kind of product Nashordaq could become.
 2. In what order that product should be built.
 
+## Accepted baseline
+
+[ADR-0001](adr/0001-self-host-baseline.md) records the accepted scope for the first standalone self-host release. It governs Track 1 when older recommendations differ. Hosted service remains exploratory. Implementation is pending.
+
 ## Summary
 
 Nashordaq should remain a **private League of Legends market game for friend groups**, not a public trading network.
@@ -127,7 +131,7 @@ Definition:
 Required product changes:
 
 - built-in authentication as the default mode
-- proxy auth retained as an advanced option
+- remove proxy auth; OAuth/OIDC remains a future option
 - cleaner onboarding and deployment docs
 - feature flags for non-core mechanics
 - stronger operator UX around setup and admin controls
@@ -141,7 +145,7 @@ Why this goes first:
 
 Success criteria for Track 1:
 
-- non-technical users can deploy it with minimal infrastructure knowledge
+- Linux-server operators with basic container knowledge can deploy using Docker Compose or Podman Compose
 - friend groups can onboard without custom proxy/header setup
 - groups continue using it for multiple ranked sessions
 

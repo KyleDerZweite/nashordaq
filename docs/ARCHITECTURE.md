@@ -99,11 +99,19 @@ Core endpoints:
 
 Additional optional/admin endpoints exist for bank, poro, simulation, demo helpers, admin dashboards, and the private-only `gamba` feature.
 
-## Authentication
+## Accepted self-host target
+
+The accepted direction is recorded in [ADR-0001](adr/0001-self-host-baseline.md). It replaces proxy authentication with standalone local accounts and sessions in the existing single-process, SQLite architecture. OAuth/OIDC and hosted multi-room operation are outside this baseline.
+
+The application owns identity, authentication, invite access and administrator permissions. A deployment's reverse proxy owns public TLS termination and does not establish application identity. Game data requires an authenticated session. Demo operation is explicit and isolates each visitor's temporary game state.
+
+The implementation and deployment descriptions below still describe the current proxy-based version. They are not evidence that the accepted target has shipped. Auth, session, demo and deployment boundaries require a reviewed design contract before implementation slices are Ready.
+
+## Current authentication
 
 Authentication is handled by Pangolin, which acts as an Identity-Aware Proxy. When SSO authentication is configured, Pangolin forwards identity headers to downstream services (`Remote-User`, `Remote-Email`, `Remote-Name`, `Remote-Role`). The backend identifies users primarily from `Remote-Email` (configurable via `NASHORDAQ_REMOTE_EMAIL_HEADER`), with `Remote-User` retained as a legacy fallback (`NASHORDAQ_AUTH_HEADER`). New users are auto-provisioned with the starting balance and then complete a one-time self-onboarding step to link their Riot account. In demo mode, the backend can also create temporary cookie-backed demo users when no auth headers are present.
 
-## Security Boundary and Hardening
+## Current security boundary and hardening
 
 - **Primary trust boundary:** The backend is intended to be reachable only through Pangolin/Newt + IAP.
 - **Identity source:** The application identifies users primarily from `NASHORDAQ_REMOTE_EMAIL_HEADER` (`Remote-Email` by default), with `NASHORDAQ_AUTH_HEADER` (`Remote-User`) as a legacy fallback.
