@@ -19,6 +19,11 @@ from app.models import (
 from app.riot import RankData
 
 
+@pytest.fixture(autouse=True)
+def enable_private_gamba(monkeypatch):
+    monkeypatch.setattr(settings, "gamba_enabled", True)
+
+
 async def test_create_gamba_returns_404_when_disabled(
     auth_client,
     tradable_player,

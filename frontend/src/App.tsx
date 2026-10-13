@@ -108,7 +108,7 @@ export default function App({
   }, [adminViewMode]);
 
   const balance = user?.balance ?? 0;
-  const gambaEnabled = systemStatus?.gamba_enabled ?? true;
+  const gambaEnabled = systemStatus?.gamba_enabled ?? false;
   const canTrade =
     Boolean(user) && user?.role === "player" && (onboardingComplete || isDemo);
   const canManageBank = canTrade && !isDemo;

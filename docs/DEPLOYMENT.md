@@ -1,18 +1,43 @@
-# Deployment Guide
+# Deployment guide
 
-Local setup, invitations and revocable sessions are implemented. Container packaging still uses the original tunnel wiring until the deployment slice of [spec #19](https://github.com/KyleDerZweite/nashordaq/issues/19). The full standalone installation procedure is not yet delivered. No external authentication service is required by the application.
+One installation runs one private market. Docker Compose and Podman Compose use the same `podman-compose.yaml` and build application images locally. No external authentication service, tunnel, database server or Riot key is required for account setup and login. The [Architecture](ARCHITECTURE.md#authentication-and-session-trust-boundary) owns the authentication and security contract.
 
-## Local account setup
+## Fresh installation
 
-Set `NASHORDAQ_PUBLIC_URL` to the browser-visible frontend origin, such as `http://localhost:5173` for development or `https://market.example.com` behind your TLS reverse proxy. HTTPS enables Secure session cookies even when the backend receives HTTP. Proxy identity headers and forwarded scheme headers cannot grant access or weaken that policy.
+Install either Docker Engine with the Compose plugin, or Podman with `podman-compose`, through your Linux distribution. The verified Podman versions are 5.8.4 and podman-compose 1.5.0. A `docker` command that emulates Podman does not establish Docker Engine compatibility.
 
-Start with a separate empty SQLite directory. Startup rejects the previous proxy database before changing its schema or WAL mode. Stop the previous installation and preserve its data, including WAL/SHM files, before selecting a fresh directory. Nothing is deleted or migrated automatically.
+Choose a published standalone release tag from [Releases](https://github.com/KyleDerZweite/nashordaq/releases). This implementation has not published a standalone release yet. Until one exists, a checkout of the implementation branch is development verification rather than a released installation. Replace `RELEASE_TAG` below with the actual selected tag; do not use a moving branch for a release installation.
 
-Open the setup link printed in the backend log. Choose a username and a password with at least 12 characters. Only that link creates the sole administrator. Successful setup signs you in and closes setup permanently. An unused link rotates on restart. Normal login sessions last seven days, reload preserves a valid session, and logout revokes the current session immediately.
+```bash
+git clone --branch RELEASE_TAG --depth 1 https://github.com/KyleDerZweite/nashordaq.git
+cd nashordaq
+cp .env.example .env
+chmod 600 .env
+mkdir -p data
+chmod 700 data
+```
 
-Setup, login and administrator access do not require a Riot key. Live Riot onboarding and updates still require one. Recovery flows and administrator participation are separate implementation slices. Explicit demo mode loads its seeds without Riot and requires demo/demo login. Visitors have separate temporary personal state, deleted immediately on logout or automatically after 30 minutes of inactivity. Background polling does not extend sessions.
+Edit `.env` before starting. For LAN access, set `NASHORDAQ_PUBLIC_URL=http://your-server:8080` to the exact origin you will open in your browser. Leave `NASHORDAQ_RIOT_API_KEY` empty when live Riot data is unavailable. Keep `.env`, database files, backup files and setup links private. Git ignores instance configuration and `data/`; image build contexts exclude environment files and local caches.
 
-The [Architecture](ARCHITECTURE.md#authentication-and-session-trust-boundary) owns the security contract. Every state-changing API request requires `X-Nashordaq-CSRF: 1`. Browser origins are checked; native API clients may omit Origin when sending this header. All game-data endpoints require the local session cookie.
+Start with your selected runtime:
+
+```bash
+# Docker Engine and Docker Compose
+docker compose -f podman-compose.yaml up --build -d
+docker compose -f podman-compose.yaml ps
+docker compose -f podman-compose.yaml logs backend
+
+# Podman and podman-compose
+podman-compose -f podman-compose.yaml up --build -d
+podman-compose -f podman-compose.yaml ps
+podman-compose -f podman-compose.yaml logs backend
+```
+
+The frontend alone publishes the configured host HTTP port. Nginx re-resolves the backend service through the container runtime's DNS so restart does not retain an old container address. Nginx serves the application and forwards `/api/` and `/health` to the internal backend. Both services have startup health checks; the frontend starts after the backend becomes healthy. Verify the entry point with `curl -f http://your-server:8080/health`, which returns `{"status":"ok"}`. Open the same origin in a browser.
+
+On a fresh normal installation, open the one-time setup link from the backend log and choose a username and a password with at least 12 characters. The link creates the sole administrator and signs you in. Setup stays closed after restart. An unused setup link rotates on restart. Reload preserves a valid session; logout revokes it immediately. Normal sessions last seven days. A missing Riot key does not block local account access; live Riot linking and market updates require a valid key.
+
+Verify setup, reload, logout and login in the browser. Without a session, game queries return 401 even when a request carries forged proxy identity headers. `/health` and `/api/auth/status` remain public and contain no game data.
 
 ## Riot configuration and recovery
 
@@ -20,7 +45,7 @@ Local setup, login and administrator access work with an empty or rejected Riot 
 
 New player links require a successful account and ranked Solo Queue lookup. A failed lookup leaves the local account usable and creates no linked tracked player. Retry the same player after recovery. Real refreshes roll back their entire transaction when Riot authentication, rate limits or network availability fail. Existing prices and history remain unchanged. Demo uses its own simulated market and requires no key.
 
-For a missing or rejected key, replace `NASHORDAQ_RIOT_API_KEY` in the protected environment file and restart the backend process with that environment. Container environments are fixed at creation: recreate the stack after editing the file, rather than using a Compose `restart` that retains its old environment. Use `podman-compose up -d --force-recreate` or the corresponding `docker compose` command. Keep the existing data bind mount and database. Do not repeat setup or create another administrator.
+For a missing or rejected key, replace `NASHORDAQ_RIOT_API_KEY` in the protected environment file and restart the backend process with that environment. Container environments are fixed at creation: recreate the stack after editing the file, rather than using a Compose `restart` that retains its old environment. Use `podman-compose -f podman-compose.yaml up -d --force-recreate` or `docker compose -f podman-compose.yaml up -d --force-recreate`. Keep the existing data bind mount and database. Do not repeat setup or create another administrator.
 
 Sign in again if needed, retry player setup, and check authenticated system status and the next due market refresh. A rate limit needs a later retry; a Riot outage needs upstream recovery. No reinstall is required. Controlled-response tests verify failure handling and retry behavior. Live linking and refresh recovery require an operator-owned valid Riot key and a separately recorded check; they have not been verified for the no-key local installation.
 
@@ -32,90 +57,57 @@ Each invitation expires after seven days and admits one member. The invited memb
 
 Member invitations lists active, consumed, revoked and expired links. Select Revoke beside an active invitation to withdraw access. An invalid, expired, revoked or consumed link cannot create an account. Ask the administrator for a new link when registration reports that the invitation is unavailable. A validation error or taken username leaves the invitation usable for another attempt.
 
-## Configuration
+## Configuration and persistence
 
-Copy `.env.example` to `.env`. Relevant settings for this slice:
-
-| Variable | Default | Description |
+| Variable | Example default | Purpose |
 |---|---|---|
-| `NASHORDAQ_PUBLIC_URL` | `http://localhost:8080` | Frontend origin for setup/invitation links and HTTPS cookie policy |
-| `NASHORDAQ_CORS_ORIGINS` | `http://localhost:5173` | Explicit allowed frontend origins |
-| `NASHORDAQ_DATABASE_URL` | `sqlite+aiosqlite:///data/nashordaq.db` | SQLite path relative to the backend directory |
-| `NASHORDAQ_RIOT_API_KEY` | empty | Optional for authentication, required for live Riot data |
+| `NASHORDAQ_PUBLIC_URL` | `http://localhost:8080` | Exact browser-visible origin for access links and Secure cookies |
+| `NASHORDAQ_HTTP_BIND` | `0.0.0.0` | Host interface for the sole HTTP entry point |
+| `NASHORDAQ_HTTP_PORT` | `8080` | Host HTTP port |
+| `NASHORDAQ_CORS_ORIGINS` | empty | Optional comma-separated additional browser origins; same-origin traffic needs none |
+| `NASHORDAQ_RIOT_API_KEY` | empty | Optional for local accounts, required for live Riot data |
+| `NASHORDAQ_DEMO_MODE_ENABLED` | `false` | Explicit demo deployment selection |
+| `NASHORDAQ_GAMBA_ENABLED` | `false` | Explicit private-use Gamba opt-in |
 | `NASHORDAQ_STARTING_BALANCE` | `1000.0` | Initial virtual balance |
-| `NASHORDAQ_RIOT_API_BASE_URL` | `https://europe.api.riotgames.com` | Riot account/match region |
-| `NASHORDAQ_RIOT_API_REGION_URL` | `https://euw1.api.riotgames.com` | Riot league/summoner region |
+| `NASHORDAQ_RIOT_API_BASE_URL` | `https://europe.api.riotgames.com` | Riot account and match region |
+| `NASHORDAQ_RIOT_API_REGION_URL` | `https://euw1.api.riotgames.com` | Riot league and summoner region |
 
-Proxy-header and configured-admin-list settings have been removed. Exactly one administrator comes from setup.
+Compose fixes `NASHORDAQ_DATABASE_URL` to `sqlite+aiosqlite:////app/data/nashordaq.db`. The four slashes identify the absolute container path `/app/data/nashordaq.db`. The host directory `./data` binds to `/app/data` with shared SELinux relabeling. This is a directory bind, not a named volume. Keep the same checkout directory and bind when replacing containers. Ensure the operator can write the directory; rootless Podman uses the operator's user namespace.
 
-### Market Update Cadence
+Container restart or recreation preserves accounts, consumed setup, sessions and game state. Use your selected runtime's `restart`, or `up -d --force-recreate`, with the same manifest and working directory. `down` removes containers and the project network while retaining `./data`. Do not delete this directory. Copying an active SQLite main file alone is not a consistent backup because committed data may remain in its WAL. Use the operator backup procedure when that slice is available.
 
-Market updates are dynamic:
+Both Containerfiles pin their base-image tags and immutable manifest digests. The backend copies uv 0.10.12 and installs the committed `uv.lock` with `--frozen`. The frontend uses pnpm 10.34.7, also declared in `packageManager`, and installs the committed `pnpm-lock.yaml` with `--frozen-lockfile`. Release updates deliberately review these inputs together.
 
-- The scheduler wakes every 30 seconds and runs a full Riot fetch only when the required interval is due.
-- The interval derives from the trackable player count and the Riot rate-limit budget. See `ARCHITECTURE.md` for the calculation.
+## LAN HTTP and public HTTPS
 
-The scheduler wakes every 30 seconds internally and runs immediately on startup, but only performs a full Riot fetch/order execution cycle when the dynamic interval is due.
+For LAN HTTP, use an HTTP public URL with the actual hostname and port. Browsers then use an HttpOnly, SameSite=Strict session cookie without Secure. Change the example `localhost` URL for other machines; their `localhost` refers to themselves.
 
-## 2. Tracked Players
+For public HTTPS, the operator's existing reverse proxy must terminate TLS and forward traffic to the frontend HTTP entry point. Set `NASHORDAQ_PUBLIC_URL=https://market.example.com` and usually set `NASHORDAQ_HTTP_BIND=127.0.0.1` for a proxy on the same host. A proxy on another host requires a reachable bind and appropriate host firewall rules. Preserve the original Host header, including any nonstandard external port. Proxy `/api/` to this same frontend entry point, not to a separately published backend. Public certificate and domain provisioning belongs to the operator.
 
-Tracked players are created through user self-onboarding. On first authenticated visit, each user must enter their own Riot `game_name` and `tag_line`. After submission, their linked Riot account is added to the tracked player set.
+The explicit HTTPS public URL sets Secure cookies even though the containers receive HTTP. Forwarded scheme and identity headers do not change authentication. Access the configured HTTPS origin for setup and login; Secure cookies will not authenticate over plain HTTP. Same-origin browser traffic needs no extra CORS entry. Configure additional origins only when deliberately serving a separate frontend. State-changing API requests require `X-Nashordaq-CSRF: 1` and a trusted browser origin. An HTTP-only check does not verify public TLS integration.
 
-Players cannot be bought until they have received their first successful market update. This avoids trading against the placeholder pre-update price.
+## Demo and optional Gamba
 
-This replaces static player seeding and does not require editing JSON files during deployment.
+Use a separate checkout and empty `data/` directory for demo operation, with its own port and public URL. Set `NASHORDAQ_DEMO_MODE_ENABLED=true` in `.env`. The shared manifest already mounts the seed directory at `/demo` read-only, so explicit demo mode loads its simulated market without a Riot key. Sign in with `demo/demo`. Each browser session receives separate personal game state in the shared simulated market. Reload preserves a valid session. Logout deletes personal state immediately. Sessions expire after 30 minutes of inactivity, and cleanup runs every minute. Closing the browser does not delete state immediately. Background polling does not renew inactivity.
 
-If you are preparing a public-facing, compliance-oriented, or future production-style deployment, set:
+If running normal and demo installations on the same host, use distinct project names with `-p nashordaq-demo` for all demo Compose commands. Keep their directories and published ports separate. Use different browser-visible hostnames or separate browser profiles, because session cookies are scoped to the hostname and do not isolate ports.
 
-```env
-NASHORDAQ_GAMBA_ENABLED=false
-```
-
-## 3. Build and Run
+The existing `demo.podman-compose.yaml` is an optional override that enables the same flag. It must be combined with the shared manifest:
 
 ```bash
-podman-compose up --build -d
+podman-compose -f podman-compose.yaml -f demo.podman-compose.yaml up --build -d
+# Equivalent Docker command:
+docker compose -f podman-compose.yaml -f demo.podman-compose.yaml up --build -d
 ```
 
-The frontend is served on port 80. The backend runs internally on port 8000 with Nginx reverse-proxying `/api/` requests.
+Gamba is disabled by default in both the application and environment example. Its API returns 404 and its UI is hidden. To opt in for a private installation, set `NASHORDAQ_GAMBA_ENABLED=true` and recreate the stack with `podman-compose -f podman-compose.yaml up -d --force-recreate`, or `docker compose -f podman-compose.yaml up -d --force-recreate`. A plain restart retains the container's old environment. It is outside the production-facing product path.
 
-## 4. HTTP entry point
+## Transition from proxy installations
 
-The supplied Compose file still contains its legacy Newt transport. Its replacement with a configurable LAN HTTP entry point belongs to the deployment slice. A reverse proxy may terminate public HTTPS but never establishes application identity. Configure `NASHORDAQ_PUBLIC_URL` for the visible HTTPS origin and preserve the Host header, including any external port.
+The previous proxy version is incompatible with standalone account storage. Before switching, stop the old installation and preserve its data directory, including any WAL and SHM files. Choose a fresh, separate directory for this installation. Startup rejects a legacy or unsupported database before modifying its schema or persistent WAL mode. It does not migrate, overwrite or delete old data. Keep the old release and its data for recovery; this transition does not authorize deletion.
 
-## 5. Verify
+## Local development
 
-Open the frontend without a session. It displays login or setup guidance and fetches only authentication metadata. Open the setup link from the operator log, create the administrator, reload, sign out and sign in again. After sign-out, direct game API requests return 401, including requests carrying forged identity headers.
+From `backend/`, create `data/`, run `uv sync --locked --dev`, then run `NASHORDAQ_PUBLIC_URL=http://localhost:5173 uv run uvicorn app.main:app --reload`. The development SQLite path is backend-relative unless explicitly overridden. From `frontend/`, run `corepack pnpm@10.34.7 install --frozen-lockfile`, then `corepack pnpm@10.34.7 run dev`. Vite proxies `/api` to the backend and preserves Host. Open the setup link printed by the backend. No header-injection extension is required.
 
-`GET /health` remains public. `/api/auth/status` contains only setup and deployment-mode information. `/api/system/status` and all game queries require login.
-
-## 6. Local development
-
-Start the backend with a fresh SQLite directory:
-
-```bash
-cd backend
-mkdir -p data
-NASHORDAQ_PUBLIC_URL=http://localhost:5173 uv run uvicorn app.main:app --reload
-```
-
-Start the frontend in another terminal:
-
-```bash
-cd frontend
-pnpm run dev
-```
-
-Open the setup URL printed by the backend, then use normal browser login. Vite proxies `/api` to `http://localhost:8000` while preserving Host. No browser header-injection extension is needed.
-
-For API clients, log in and retain the session cookie:
-
-```bash
-curl -c /tmp/nashordaq-cookies -H 'X-Nashordaq-CSRF: 1' \
-  -H 'Content-Type: application/json' \
-  -d '{"username":"your-user","password":"your-password"}' \
-  http://localhost:8000/api/auth/login
-curl -b /tmp/nashordaq-cookies http://localhost:8000/api/user/me
-```
-
-Use disposable credentials when running examples and keep cookie files private.
+Tracked players enter through Riot onboarding rather than editing deployment seed files. A new player cannot be traded until its first successful market update. The scheduler wakes every 30 seconds and fetches Riot only when the dynamic interval is due. The [Architecture](ARCHITECTURE.md) owns that calculation and [Economy mechanics](ECONOMY_MECHANICS.md) owns pricing formulas.

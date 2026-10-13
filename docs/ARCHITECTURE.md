@@ -97,7 +97,7 @@ The accepted direction is recorded in [ADR-0001](adr/0001-self-host-baseline.md)
 
 The application owns identity, authentication, invite access and administrator permissions. A deployment's reverse proxy owns public TLS termination and does not establish application identity. Game data requires an authenticated session. Demo operation is explicit and isolates each visitor's temporary game state.
 
-Setup, invitations, local login, logout, isolated demo sessions and the private game-data gate are implemented. Password recovery and the new deployment packaging are later slices of [spec #19](https://github.com/KyleDerZweite/nashordaq/issues/19). Administrator participation remains restricted until its dedicated slice. This distinction does not change the accepted requirements.
+Setup, invitations, local login, logout, isolated demo sessions and the private game-data gate are implemented. Password recovery is a later slice of [spec #19](https://github.com/KyleDerZweite/nashordaq/issues/19). Standalone packaging uses the shared Docker Compose and Podman Compose manifest described in [Deployment](DEPLOYMENT.md). Administrator participation remains restricted until its dedicated slice. This distinction does not change the accepted requirements.
 
 ## Authentication and session trust boundary
 

@@ -39,7 +39,7 @@ async def test_system_status_is_idle_without_tracked_players(auth_client, monkey
         "tracked_player_count": 0,
         "expected_update_interval_minutes": 1,
         "last_market_update_at": None,
-        "gamba_enabled": True,
+        "gamba_enabled": False,
         "demo_mode_enabled": False,
     }
 
@@ -307,3 +307,10 @@ async def test_balance_insights_includes_poro_rewards(auth_client, db_session):
     data = resp.json()
     assert data["playing_income_last_24h"] == 12.0
     assert data["playing_income_lifetime_total"] == 18.0
+
+
+async def test_default_deployment_disables_gamba(auth_client):
+    status = await auth_client.get("/api/system/status")
+    assert status.json()["gamba_enabled"] is False
+    response = await auth_client.get("/api/gamba")
+    assert response.status_code == 404
