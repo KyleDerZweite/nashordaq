@@ -54,3 +54,20 @@ If checks fail, fix issues autonomously before concluding.
 - Follow: KISS, YAGNI, DRY, SOLID.
 - Keep comments and docs concise. No emojis.
 - Do not add features beyond the requested scope.
+
+## Agent skills
+
+### Issue tracker
+
+Track issues and specs in GitHub Issues for `KyleDerZweite/nashordaq`.
+Before reading or publishing tickets, read `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Use the five default triage labels.
+Before triaging issues, read `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Use a single-context layout with root `GLOSSARY.md` and `docs/adr/`.
+Before exploring domain terms or decisions, read `docs/agents/domain.md`.
