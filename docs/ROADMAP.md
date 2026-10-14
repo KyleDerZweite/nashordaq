@@ -1,144 +1,31 @@
 # Roadmap
 
-Feature history and open items for the Nashordaq economy system.
+The current product is one self-hosted private market per group. [PRD](PRD.md) owns behavior, [ADR-0001](adr/0001-self-host-baseline.md) owns the standalone decision, and [self-host acceptance](SELF_HOST_ACCEPTANCE.md) owns implementation evidence and remaining checks.
 
-## Completed
+## Implemented standalone baseline
 
-### 1. Per-Match LP Tracking (Match-Driven Pricing)
+[Spec #19](https://github.com/KyleDerZweite/nashordaq/issues/19) and slices #20 through #30 implement local username/password authentication, one-time administrator setup, member invitations, password recovery, revocable sessions and the private game-data gate. Proxy identity and automatic anonymous demo fallback are removed. OAuth/OIDC is outside the baseline.
 
-The scheduler detects individual ranked matches via Match-V5, attributes LP deltas to each game, and applies streak + price updates per-match in chronological order. A `PlayerMatch` model stores the full audit trail. Single-game polls get `OBSERVED` attribution; multi-game polls use stored LP averages for `ESTIMATED` splits. See `ECONOMY_MECHANICS.md` section 3.
+The sole administrator can trade after normal Riot onboarding. Successful game interventions produce an atomic activity record visible to authenticated members. Normal views show username and linked RiotName. Streamer Mode uses permanent aliases and hides personal names, tags and identifying links.
 
-### 2. Inactivity Pressure
+Explicit demo deployment requires `demo/demo` login and gives each browser session separate temporary state in a shared simulated market. Logout deletes personal state immediately; thirty minutes of inactivity ends access, and automatic cleanup preserves shared market data.
 
-When a tracked player has no LP change for 48+ hours, the price decays toward the IPO price at `0.075%` per hour (time-based, consistent regardless of cycle frequency). Prices above fair value drift down; prices below drift up. Normal pricing resumes the moment LP changes. See `ECONOMY_MECHANICS.md` section 3.
+Docker Compose and Podman Compose build locally from pinned inputs and retain SQLite in a host bind directory. Gamba is disabled by default. Operator commands provide administrator recovery, consistent live backup, fresh restore and supported-schema preflight. The initial complete schema is version 1; partial development schemas and old proxy data are unsupported.
 
-### 3. Minimum Holding Period
+The implementation is unreleased. Final acceptance must distinguish current-revision checks, live Riot, operator public HTTPS, release-tag installation and owner judgment. The first standalone release has no released predecessor. The following release must verify its advertised predecessor update and matching-backup recovery.
 
-Shares cannot be sold for 4 hours after purchase (configurable via `min_hold_period_hours`). The lock is per-lot (FIFO). Sells execute at the current market price with no fee or bonus. Buy-revert grace period is 120 seconds. See `ECONOMY_MECHANICS.md` section 4.
+## Existing economy
 
-### 4a. Market Impact (Trade-Driven Pricing)
+The completed economy includes per-match LP attribution, match-driven pricing, inactivity pressure, FIFO holding locks, buy reverts, trade impact, loss-side streak amplification, low-price loss dampening, playing income, bank rescue loans and optional duration-based Gamba settlement. [Economy mechanics](ECONOMY_MECHANICS.md) remains the canonical source for formulas and defaults. The standalone baseline changes none of them.
 
-Every manual trade moves the market price: buying pushes price up, selling pushes it down. Impact scales linearly with order size (`impact_pct = quantity / liquidity_depth`, default depth `1000`). Gamba orders are exempt. Round-trips always lose money to slippage. See `ECONOMY_MECHANICS.md` section 4.
+The former proxy-email identity direction is superseded by local usernames and sessions. Its identity headers and role matching are not supported runtime configuration.
 
-### 5. Negative Streak Amplification
+## Unselected work
 
-Negative streaks amplify loss-side price movement using a separate beta (`pricing_beta_negative = 0.06`, max 1.6x at streak -10), milder than the positive-streak beta (`BETA = 0.10`, max 2.0x at streak 10). See `ECONOMY_MECHANICS.md` section 3.
+Limited share supply and player-to-player trading remain possible ideas. They would need decisions on supply, positions, pricing and the order interface before implementation. Current trading remains whole-share market orders under the existing economy rules.
 
-### 5b. Low-Price Loss Dampening
+Poro automation resistance remains an open product concern. The previous coordinate-validation idea is a proposal, and browser-supplied coordinates alone would not prove human input. No Poro redesign belongs to the standalone baseline.
 
-When a stock's price is below `pricing_low_price_threshold` (default `15.0 P`), negative price moves are scaled by `price / threshold`. Gains are unaffected so recovery remains full-speed. See `ECONOMY_MECHANICS.md` section 3.
+Additional queues, including Ranked Flex, TFT Ranked and TFT Double Up, are possible later slices. Their separate APIs, rank handling and product contracts need review before implementation.
 
-### 6. Gamba: Scale Multiplier with Hold Duration
-
-Settlement multiplier scales linearly with the random hold duration: 2.0x at 24h to 4.0x at 168h. Both player and duration remain fully random. See `ECONOMY_MECHANICS.md` section 7.
-
-### 7. Auth Identity: Switch from Username to Email
-
-User identity is now based on `Remote-Email` (stable) instead of `Remote-User` (mutable). The `User` model has `email` (identity key) and `display_name` (from Zitadel's `Remote-Name`, updated on each login). Admin role matching uses email. Onboarding only asks for game name and tag line; `TrackedPlayer.display_name` is auto-set from the game name.
-
-### 8. Gamba Feature Flag
-
-All current `gamba` functionality is gated behind `NASHORDAQ_GAMBA_ENABLED`.
-
-- Backend: the Gamba router returns `404` when disabled.
-- Scheduler: settlement is skipped when disabled.
-- Frontend: the system status endpoint exposes `gamba_enabled`, and the UI hides Gamba surfaces when the flag is off.
-
-This is already implemented. For the future production-compliant product path, `gamba` should remain disabled and excluded entirely.
-
-## Open (v1)
-
-### 4b. Limited Share Supply + Player-to-Player Trading
-
-Market impact (4a) is live as the first step. Supply cap and P2P trading remain as potential future additions if the group wants more scarcity/FOMO.
-
-**Open questions:**
-
-- Fixed vs dynamic supply cap, and migration for existing holdings
-- P2P order book vs house market maker
-- Position limits to prevent cornering
-- UI for order book without overwhelming casual users
-
-**Complexity:** High. Only pursue if the group outgrows market impact alone.
-
----
-
-## Next Up
-
-### SECURITY: Poro Auto-Claim Bot Vulnerability
-
-**Severity:** Critical. The poro claim system is trivially automatable via browser JS.
-
-**Problem:** The SSE stream (`/api/poro/stream`) pushes `active_spawn` including `spawn_id` the instant a poro spawns. The claim endpoint (`POST /api/poro/claim`) only requires `spawn_id` — no proof of interaction. A user can paste ~5 lines of JS into their browser console to claim every poro within milliseconds of spawning with 100% success rate, bypassing the intended gameplay entirely.
-
-```js
-// exploit — claims every poro automatically
-const es = new EventSource("/api/poro/stream");
-es.onmessage = async (e) => {
-  const data = JSON.parse(e.data);
-  if (data.active_spawn?.spawn_id) {
-    await fetch("/api/poro/claim", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ spawn_id: data.active_spawn.spawn_id }),
-    });
-  }
-};
-```
-
-**Fix plan (click-coordinate validation):**
-
-1. Extend `PoroClaimRequest` schema with optional `click_x` and `click_y` (float, 0-1 range, fraction of viewport).
-2. In `claim_poro_spawn`, after existing validation, compute the poro's position at claim time using `spawned_at`, `expires_at`, `start_x/y`, `end_x/y`. Reject if the click position is more than 0.15 (15% of viewport) from the actual poro position.
-3. Make `click_x`/`click_y` required after a grace period (or immediately since the frontend already has this data).
-4. Frontend: pass the click event's normalized viewport position in the claim request.
-5. Optional hardening: add a short-lived nonce (obtained from `GET /api/poro`) that must be included in the claim, to prevent stale claims and add a round-trip cost.
-
-**Why this approach:** The server already knows the poro's exact position at every millisecond (it has `spawned_at`, `expires_at`, `start/end x/y`). Requiring the click position is a zero-cost UX change that completely defeats the listener-based exploit. A determined attacker could reverse-engineer the position math, but that raises the bar significantly from "paste 5 lines of JS."
-
-**Files to modify:**
-- `backend/app/schemas.py` — add `click_x`, `click_y` to `PoroClaimRequest`
-- `backend/app/poro.py` — add position validation in `claim_poro_spawn`
-- `frontend/src/components/FlyingPoro.tsx` — pass click coordinates to claim mutation
-
----
-
-### 8. Standalone self-host baseline
-
-The accepted contract for [#16](https://github.com/KyleDerZweite/nashordaq/issues/16) and [#17](https://github.com/KyleDerZweite/nashordaq/issues/17) is [ADR-0001](adr/0001-self-host-baseline.md). It replaces the previous dual-mode proposal. Proxy auth is removed; local auth is the only normal mode. Demo is an explicit deployment mode.
-
-Implementation is pending. The previous automatic mode detection, proxy-header precedence and combined registration/Riot onboarding proposal are withdrawn. Implementation slices are not Ready until their component responsibilities, interfaces, dependency directions and acceptance evidence have been reviewed.
-
-## Future (v2+)
-
-The items below are not on the current roadmap. Nashordaq is currently self-hosted only; hosted multi-room operation, Riot Sign-On, and monetization concepts are kept as exploratory side-notes for a future revisit rather than active goals.
-
-The canonical strategy document for market research is [PRODUCTIZATION_PLAN.md](PRODUCTIZATION_PLAN.md). This roadmap section stays focused on future implementation directions.
-
-### Distribution Strategy
-
-**Model: self-hosted open source (single-tenant).**
-
-Each friend group runs their own instance with their own Riot Personal API key. One instance = one friend group = one market. This is the standard self-hosted software model (same as Jellyfin, Gitea, Uptime Kuma, etc.) and does not violate any Riot policies.
-
-- Personal API keys are free and instant to obtain at developer.riotgames.com.
-- Rate limit (100 req/2min) is sufficient for 5-50 tracked players.
-- Each instance is independent. This is NOT the "BYOK" violation Riot prohibits (that refers to one application pooling multiple keys).
-- `gamba` can remain a private/self-hosted-only feature. It should not be part of any production-facing build submitted for Riot review.
-- The built-in auth mode (item 8) removes the need for any external auth stack, supporting the accepted standalone deployment path once implemented.
-
-### Selectable Queues
-
-Planned as separate GitHub issues rather than a single roadmap item:
-
-- Ranked Flex shares alongside Ranked Solo, using the same League and Match APIs.
-- TFT Ranked and TFT Double Up shares, which need separate TFT APIs and rating handling.
-
-### Market Sizing Reality Check
-
-- LoL has ~150M monthly players. Fantasy esports exists (DraftKings, Fantasy LCS) but focuses on pro play.
-- Zero direct competitors do "ranked LP virtual market game for friend groups."
-- The niche is real but small: LoL friend groups who want a meta-game on top of ranked.
-- Conversion from "plays LoL" to "would use a private LP market meta-game" is low.
-- The product's strength is personal and social - trading your friends' performance is fun because they're your friends. This doesn't scale to strangers.
-- Global markets, federation, and multi-exchange designs don't serve the core use case and should not be pursued.
+Hosted multi-room operation, Riot Sign-On, OAuth/OIDC, seasons and monetization remain exploratory. [Productization plan](PRODUCTIZATION_PLAN.md) records those ideas and research assumptions. They are not current delivery goals or implicit architecture requirements.

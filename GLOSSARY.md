@@ -9,7 +9,7 @@ A group's shared game environment with tradable players, portfolios and a leader
 _Avoid_: Public exchange, global market
 
 **User**:
-A participant with a Nashordaq account and personal game state.
+A participant with a local Nashordaq account and personal game state.
 _Avoid_: Riot account, tracked player
 
 **Tracked player**:
@@ -21,5 +21,5 @@ A temporary demo participant with personal game state in the shared simulated ma
 _Avoid_: Shared demo account
 
 **Streamer alias**:
-A permanently assigned League of Legends name that replaces a user's identity in Streamer Mode. Champion names form the initial pool; item and ability names extend it. Unlinked tracked players also have a permanent alias.
+A permanent League of Legends name that replaces a participant's identity in Streamer Mode. Champion, item and ability names form the pool for users and unlinked tracked players.
 _Avoid_: Username, RiotName

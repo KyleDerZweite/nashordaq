@@ -4,7 +4,7 @@ One installation runs one private market. Docker Compose and Podman Compose use 
 
 ## Fresh installation
 
-Install either Docker Engine with the Compose plugin, or Podman with `podman-compose`, through your Linux distribution. The verified Podman versions are 5.8.4 and podman-compose 1.5.0. A `docker` command that emulates Podman does not establish Docker Engine compatibility.
+Install either Docker Engine with the Compose plugin, or Podman with `podman-compose`, through your Linux distribution. Development verification used Docker Engine 29.9.0 with Compose 5.6.0 and Podman 5.8.4 with podman-compose 1.5.0. See [self-host acceptance](SELF_HOST_ACCEPTANCE.md) for exact revisions, scenarios and limits. A `docker` command that emulates Podman does not establish Docker Engine compatibility.
 
 Choose a published standalone release tag from [Releases](https://github.com/KyleDerZweite/nashordaq/releases). This implementation has not published a standalone release yet. Until one exists, a checkout of the implementation branch is development verification rather than a released installation. Replace `RELEASE_TAG` below with the actual selected tag; do not use a moving branch for a release installation.
 
@@ -17,7 +17,7 @@ mkdir -p data
 chmod 700 data
 ```
 
-Edit `.env` before starting. For LAN access, set `NASHORDAQ_PUBLIC_URL=http://your-server:8080` to the exact origin you will open in your browser. Leave `NASHORDAQ_RIOT_API_KEY` empty when live Riot data is unavailable. Keep `.env`, database files, backup files and setup links private. Git ignores instance configuration and `data/`; image build contexts exclude environment files and local caches.
+Edit `.env` before starting. For LAN access, set `NASHORDAQ_PUBLIC_URL=http://your-server:8080` to the exact origin you will open in your browser. Keep the normal and demo modes in separate installations. Leave `NASHORDAQ_RIOT_API_KEY` empty when live Riot data is unavailable. Keep `.env`, database files, backup files and setup links private. Git ignores instance configuration and `data/`; image build contexts exclude environment files and local caches.
 
 Start with your selected runtime:
 
@@ -45,7 +45,7 @@ Local setup, login and administrator access work with an empty or rejected Riot 
 
 New player links require a successful account and ranked Solo Queue lookup. A failed lookup leaves the local account usable and creates no linked tracked player. Retry the same player after recovery. Real refreshes roll back their entire transaction when Riot authentication, rate limits or network availability fail. Existing prices and history remain unchanged. Demo uses its own simulated market and requires no key.
 
-For a missing or rejected key, replace `NASHORDAQ_RIOT_API_KEY` in the protected environment file and restart the backend process with that environment. Container environments are fixed at creation: recreate the stack after editing the file, rather than using a Compose `restart` that retains its old environment. Use `podman-compose -f podman-compose.yaml up -d --force-recreate` or `docker compose -f podman-compose.yaml up -d --force-recreate`. Keep the existing data bind mount and database. Do not repeat setup or create another administrator.
+For a missing or rejected key, replace `NASHORDAQ_RIOT_API_KEY` in the protected environment file. Recreate the full Compose stack to load the changed environment. A Compose `restart` retains its old environment. Use `podman-compose -f podman-compose.yaml up -d --force-recreate` or `docker compose -f podman-compose.yaml up -d --force-recreate`. Keep the existing data bind mount and database. Do not repeat setup or create another administrator.
 
 Sign in again if needed, retry player setup, and check authenticated system status and the next due market refresh. A rate limit needs a later retry; a Riot outage needs upstream recovery. No reinstall is required. Controlled-response tests verify failure handling and retry behavior. Live linking and refresh recovery require an operator-owned valid Riot key and a separately recorded check; they have not been verified for the no-key local installation.
 
@@ -59,7 +59,7 @@ Member invitations lists active, consumed, revoked and expired links. Select Rev
 
 ## Change and recover passwords
 
-Open Change password in your account view. Enter your current password and a new password with at least 12 characters. A successful change ends every session of your account, including the current browser. Sign in again with your new password. Other users retain their sessions.
+Open the Change password panel below the account header. Enter your current password and a new password with at least 12 characters. A successful change ends every session of your account, including the current browser. Sign in again with your new password. Other users retain their sessions.
 
 As administrator, open Password recovery in Admin View. Choose the account and select Create reset link. Copy the generated link and share it privately with that account's owner. The link is delivered only at creation. It expires after one hour and works once. Select Revoke beside an active link to withdraw it.
 
@@ -203,7 +203,7 @@ This is the first, unreleased standalone baseline. Its initial schema version is
 
 Startup and the shared operator commands inspect required table/column definitions, uniqueness and reference protections, the sole-administrator constraint, SQLite integrity and foreign-key consistency. They also reject invalid administrator/demo flags or existing normal members/completed setup without the sole administrator. They preserve additional stored tables and columns. They never repair an incomplete database by silently creating missing tables. Normal supported startup preserves credentials, administrator identity, completed setup, unexpired sessions, access-link lifecycle, aliases and game records. Expiry, scheduled market operations and demo cleanup retain their normal behavior.
 
-Before updating, retain the exact old release tag or commit, its locally built images and protected configuration. Make a consistent backup with that old code using [the backup procedure](#back-up-and-restore). Name or record the snapshot together with the old revision and deployment mode. Keep it outside the live data directory. A snapshot taken after an unsuccessful schema change is not the matching pre-update backup.
+Before updating, retain the exact old release tag or commit, its locally built images and protected configuration. Make a consistent backup with that old code using [the backup procedure](#live-backup-and-fresh-restore). Name or record the snapshot together with the old revision and deployment mode. Keep it outside the live data directory. A snapshot taken after an unsuccessful schema change is not the matching pre-update backup.
 
 1. Read the candidate release's advertised supported source versions. This baseline supports complete schema version 1 only; it does not establish compatibility with a released predecessor.
 2. Create and export the matching consistent backup while the old installation is running. Confirm both commands succeed. Stop its stack with the runtime's `down`; retain the data directory and configuration.
@@ -225,7 +225,7 @@ For a source checkout, run from `backend/` with `uv run python -m app.operator c
 
 4. If preflight succeeds, build both candidate images and start the stack with `up --build -d`. Normal startup performs the supported version 1 restart; there is no separate migration command. Check `/health`, backend logs and existing administrator/member logins. Confirm the same administrator ID, completed setup, balances, holdings, orders, history, aliases and access-link lifecycle. Check retained unexpired sessions. A healthy process alone does not prove account/game preservation.
 5. If preflight or startup fails, stop the candidate stack. Preserve its database, sidecars and logs. Do not change its version marker, delete tables, retry setup or run old code against possibly changed data.
-6. Recover in a separate fresh checkout/data directory using the exact old release and its pre-update matching snapshot. Restore its protected configuration with the intended origin and deployment mode. Use [fresh restore](#back-up-and-restore) with that old code, then start the old stack. Verify existing credentials, administrator identity, setup closure and coherent game state before returning users to it. Keep both the failed installation and original snapshot intact. Writes after the snapshot are outside the recovered state.
+6. Recover in a separate fresh checkout/data directory using the exact old release and its pre-update matching snapshot. Restore its protected configuration with the intended origin and deployment mode. Use [fresh restore](#live-backup-and-fresh-restore) with that old code, then start the old stack. Verify existing credentials, administrator identity, setup closure and coherent game state before returning users to it. Keep both the failed installation and original snapshot intact. Writes after the snapshot are outside the recovered state.
 
 The previous-standalone-release update acceptance check is **unexecuted** for the first release because no such release exists. Current-schema restart and synthetic unsupported-version recovery establish only those scenarios. Before the following release, its release owner must advertise an explicit supported transition and verify update from the actual released predecessor on a populated Compose instance, plus recovery using that predecessor and its matching backup. Any future schema change must define its compatibility/version transition before implementation; this baseline adds no speculative migration framework.
 

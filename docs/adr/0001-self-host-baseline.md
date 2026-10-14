@@ -6,7 +6,7 @@ status: accepted
 
 Nashordaq must be installable by an external operator with a Linux server and basic container knowledge. One installation runs one private market for one group. Local accounts in the existing SQLite database become the standard, removing the need for an external authentication service. Both Docker Compose and Podman Compose are supported.
 
-This decision replaces the requirement for external proxy authentication. Proxy authentication is removed from the target contract. OAuth and native OIDC remain future options outside this baseline. Local users register through time-limited administrator invitations. Open registration and a required mail server are excluded.
+This decision replaces external proxy authentication with application-owned local identity. Identity headers grant no account or administrator access. OAuth and native OIDC remain future options outside this baseline. Local users register through time-limited administrator invitations. Open registration and a required mail server are excluded.
 
 The deployment flow is `git clone`, `cp .env.example .env`, environment configuration and `podman-compose up -d`, with an equivalent Docker Compose flow. Images build locally from a specified release tag. Published application images are not a prerequisite. Gamba is disabled by default and can be enabled explicitly for private installations.
 
@@ -18,7 +18,7 @@ Compose publishes a configurable HTTP port for LAN access or an existing reverse
 
 The baseline has exactly one administrator and no management of additional administrator roles. The administrator creates single-use password-reset links valid for one hour. A CLI recovery command with access to SQLite restores an inaccessible administrator account. Invitations are single-use and valid for seven days. Unused invitation and reset links can be revoked. Local login sessions last seven days; logout ends the current session immediately. Password changes and resets end all sessions belonging to that user.
 
-Transitioning from the previous proxy installation starts with a fresh database and discards its previous data. Existing proxy accounts and game state are not migrated. Import remains a future option. The tested update contract begins between the new standalone releases. This transition decision does not authorize immediate deletion of an existing database.
+Transitioning from the previous proxy installation starts with a fresh, separate database. Existing proxy accounts and game state are not migrated. Preserve the old installation and its data for recovery. Import remains a future option. The tested update contract begins between the new standalone releases. This transition decision does not authorize immediate deletion of an existing database.
 
 Operational acceptance covers fresh installation under Docker Compose and Podman Compose, persistence after restart, consistent live backup, restore and an update from the previous supported release. Recovery after a failed update uses the old release and a matching backup.
 
@@ -26,9 +26,9 @@ Demo deployment is selected explicitly through environment configuration and loa
 
 Each user receives a permanent champion-based streamer alias. The same alias appears across all views, including the leaderboard and activity log. Username, RiotName, Riot tag and identifying links are hidden in Streamer Mode. Item and ability names may extend the alias pool if champion names are exhausted.
 
-A missing or invalid Riot key does not prevent local login or administration. The UI displays the configuration error. New Riot links and market updates require a valid key; failed updates do not change prices. Operators replace the key in the environment configuration and restart the containers. Demo mode requires no Riot key.
+A missing or invalid Riot key does not prevent local login or administration. The UI displays the configuration error. New Riot links and market updates require a valid key; failed updates do not change prices. Operators replace the key in protected environment configuration and recreate the full Compose stack to load the changed environment. Demo mode requires no Riot key.
 
-The overall contract was approved on 2026-10-13. Repository rules and canonical documents refer to this target contract. The implementation remains proxy-based until code and tests are changed. This ADR records accepted requirements, not delivered functionality.
+The overall contract was approved on 2026-10-13. Local authentication and the standalone baseline are now implemented but unreleased. This ADR owns the decision; [self-host acceptance](../SELF_HOST_ACCEPTANCE.md) owns evidence and remaining verification. The first standalone release has no released predecessor. Its initial schema is the complete version 1 model; partial development checkpoints are unsupported. The following release must verify its actual supported predecessor update and matching-backup recovery.
 
 A hosted service remains a future option. Multi-room operation is outside this baseline. [PRODUCTIZATION_PLAN.md](../PRODUCTIZATION_PLAN.md) remains the strategy reference for that future direction.
 

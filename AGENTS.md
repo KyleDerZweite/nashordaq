@@ -16,16 +16,18 @@ This is the primary instruction file for contributors and coding agents. Follow 
 - Never use `npm` or `yarn`.
 
 ### Authentication / Security Model
-- Implement standalone local authentication with username, password and revocable sessions.
-- Remove proxy-header authentication. OAuth/OIDC is outside the accepted baseline.
+- Preserve standalone local authentication with username, password and revocable sessions.
+- Identity headers grant no authentication or administrator permissions. OAuth/OIDC is outside the accepted baseline.
 - Follow the accepted decision in `docs/adr/0001-self-host-baseline.md` and the security boundary in `docs/ARCHITECTURE.md`.
-- The current code still uses proxy auth. Reconcile implementation and tests with the accepted contract before claiming standalone support.
+- Local authentication, explicit isolated demo sessions and operator recovery are implemented. Keep code and tests aligned with the accepted contract.
 
 ## 2) Canonical References
 
 - Architecture and security boundary: `docs/ARCHITECTURE.md`
 - Pricing model and formulas: `docs/ECONOMY_MECHANICS.md`
 - Product scope and behavior: `docs/PRD.md`
+- Operator procedures: `docs/DEPLOYMENT.md`
+- Self-host acceptance evidence and remaining checks: `docs/SELF_HOST_ACCEPTANCE.md`
 
 Do not duplicate complex formula or architecture details in multiple places; reference canonical docs instead.
 
