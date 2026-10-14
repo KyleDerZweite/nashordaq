@@ -52,7 +52,6 @@ export const queryKeys = {
   systemStatus: ["systemStatus"] as const,
   adminOverview: ["adminOverview"] as const,
   adminUsers: ["adminUsers"] as const,
-  adminSystemStatus: ["adminSystemStatus"] as const,
   adminPlayerInsights: ["adminPlayerInsights"] as const,
   adminUserPortfolio: (userId: number) =>
     ["adminUserPortfolio", userId] as const,
@@ -252,15 +251,6 @@ export function useAdminUsers(enabled = true) {
   return useQuery<AdminUserSummaryResponse[]>({
     queryKey: queryKeys.adminUsers,
     queryFn: () => get<AdminUserSummaryResponse[]>("/admin/users"),
-    enabled,
-    refetchInterval: 30_000,
-  });
-}
-
-export function useAdminSystemStatus(enabled = true) {
-  return useQuery<SystemStatusResponse>({
-    queryKey: queryKeys.adminSystemStatus,
-    queryFn: () => get<SystemStatusResponse>("/admin/system/status"),
     enabled,
     refetchInterval: 30_000,
   });
