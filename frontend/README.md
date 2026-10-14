@@ -12,7 +12,9 @@ corepack pnpm@10.34.7 run dev
 corepack pnpm@10.34.7 run lint
 corepack pnpm@10.34.7 run format
 corepack pnpm@10.34.7 run build
-node --test tests/identityPresentation.test.ts
+corepack pnpm@10.34.7 run test
 ```
+
+`pnpm run test` runs the three existing identity presentation tests with Node's built-in test runner. CI runs them on Node 22 alongside lint, format checks and the build.
 
 [Architecture](../docs/ARCHITECTURE.md) owns component and security boundaries. [Self-host acceptance](../docs/SELF_HOST_ACCEPTANCE.md) records rendered browser checks and remaining verification.
