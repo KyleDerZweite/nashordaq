@@ -131,6 +131,10 @@ Demo sessions retain the same seven-day browser cookie, but the persisted deadli
 
 Persistence checks the database marker before schema creation, alteration or switching SQLite to WAL. A database from the proxy version fails startup with instructions to preserve it and select a separate empty data directory. There is no automatic migration or deletion. Supported standalone databases preserve users, sessions and completed setup across restart.
 
+## Operator persistence boundary
+
+`app.operator` owns explicit-path maintenance commands. `app.persistence` creates live SQLite online backups and restores into absent database paths. A read transaction pins a consistent WAL snapshot while members continue writing. Snapshot checks require the matching release's complete schema, SQLite integrity and consistent foreign keys. The entire database is included, so later supported persisted state uses the same backup path. Private temporary files and exclusive publication prevent overwriting existing databases or sidecars. Restore does not run setup, credential recovery, Riot or the scheduler. See [Deployment](DEPLOYMENT.md#live-backup-and-fresh-restore) for storage and recovery commands.
+
 ## Riot availability boundary
 
 `app/riot.py` owns configuration checks and safe upstream failure reports. Authenticated system status exposes its availability and operator instructions without credentials. Authentication and administration never call Riot to establish access. New links require successful ranked data; failed onboarding rolls back the player and link together. A real scheduler refresh rolls back its complete transaction on authentication, rate-limit or upstream availability failures, preserving existing prices and history. The simulated demo market remains independent.

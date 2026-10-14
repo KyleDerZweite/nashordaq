@@ -17,6 +17,7 @@ from app.auth import NewPassword, hash_password, is_admin_user, replace_password
 from app.config import settings
 from app.database import validate_existing_database
 from app.models import User
+from app.persistence import backup_database, restore_database
 
 
 def read_password(from_stdin: bool) -> str:
@@ -99,7 +100,56 @@ def main() -> int:
         action="store_true",
         help="Read one password line from protected stdin instead of getpass",
     )
+    backup = commands.add_parser(
+        "backup", help="Create a consistent live SQLite snapshot"
+    )
+    backup.add_argument(
+        "--database", required=True, type=Path, help="Absolute source SQLite path"
+    )
+    backup.add_argument(
+        "--output", required=True, type=Path, help="Absolute new snapshot path"
+    )
+    restore = commands.add_parser(
+        "restore", help="Restore into a fresh stopped installation"
+    )
+    restore.add_argument(
+        "--backup", required=True, type=Path, help="Absolute supported backup path"
+    )
+    restore.add_argument(
+        "--database", required=True, type=Path, help="Absolute new database path"
+    )
     args = parser.parse_args()
+    if args.command in {"backup", "restore"}:
+        try:
+            if args.command == "backup":
+                backup_database(args.database, args.output)
+            else:
+                restore_database(args.backup, args.database)
+        except RuntimeError as error:
+            print(str(error), file=sys.stderr)
+            return 1
+        except (OSError, sqlite3.Error):
+            print(
+                "Cannot create snapshot. Check source compatibility, "
+                "directory permissions, "
+                "free space and hard-link support; retry with a fresh destination.",
+                file=sys.stderr,
+            )
+            return 1
+        except KeyboardInterrupt:
+            print(
+                "Snapshot interrupted. Inspect the destination before retrying.",
+                file=sys.stderr,
+            )
+            return 1
+        if args.command == "backup":
+            print(f"Backup created: {args.output}")
+        else:
+            print(
+                f"Restore completed: {args.database}. "
+                "Start the installation and verify login and game state."
+            )
+        return 0
     try:
         validate_existing_database(args.database)
         password = read_password(args.password_stdin)
