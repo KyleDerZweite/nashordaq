@@ -348,3 +348,280 @@ async def test_open_game_stream_closes_after_logout(auth_client, seeded_player):
         finally:
             stream.cancel()
             await asyncio.gather(stream, return_exceptions=True)
+
+
+async def test_admin_creates_invitation_and_member_joins_without_riot(local_instance):
+    client, logs, _ = local_instance
+    await register_operator(client, logs)
+    response = await client.post("/api/auth/invites")
+    assert response.status_code == 201
+    invitation = response.json()
+    assert invitation["status"] == "active"
+    token = re.search(r"/invite\?token=([A-Za-z0-9_-]+)", invitation["url"])[1]
+    lifecycle = (await client.get("/api/auth/invites")).json()
+    assert lifecycle[0]["id"] == invitation["id"]
+    assert token not in str(lifecycle)
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app),
+        base_url="http://test",
+        headers={"X-Nashordaq-CSRF": "1"},
+    ) as member:
+        joined = await member.post(
+            "/api/auth/register",
+            json={
+                "token": token,
+                "username": "friend",
+                "password": "my own secure password",
+            },
+        )
+        assert joined.status_code == 201
+        me = (await member.get("/api/user/me")).json()
+        assert me["display_name"] == "friend"
+        assert me["role"] == "player"
+        assert me["onboarding_complete"] is False
+        assert (await member.get("/api/market/players")).json() == []
+        assert (await member.post("/api/auth/logout")).status_code == 200
+        assert (
+            await member.post(
+                "/api/auth/login",
+                json={"username": "friend", "password": "my own secure password"},
+            )
+        ).status_code == 200
+    assert (await client.get("/api/auth/invites")).json()[0]["status"] == "consumed"
+
+
+async def test_administrator_revokes_unused_invitation_and_replay_creates_no_account(
+    local_instance,
+):
+    client, logs, _ = local_instance
+    await register_operator(client, logs)
+    invitation = (await client.post("/api/auth/invites")).json()
+    assert (
+        await client.delete(f"/api/auth/invites/{invitation['id']}")
+    ).status_code == 200
+    assert (await client.get("/api/auth/invites")).json()[0]["status"] == "revoked"
+    token = re.search(r"/invite\?token=([A-Za-z0-9_-]+)", invitation["url"])[1]
+    rejected = await client.post(
+        "/api/auth/register",
+        json={
+            "token": token,
+            "username": "blocked",
+            "password": "my own secure password",
+        },
+    )
+    assert rejected.status_code == 400
+    assert len((await client.get("/api/admin/users")).json()) == 1
+    assert (
+        await client.delete(f"/api/auth/invites/{invitation['id']}")
+    ).status_code == 409
+    assert (await client.delete("/api/auth/invites/9999")).status_code == 409
+
+
+async def test_invitation_controls_reject_members_and_anonymous_visitors(
+    local_instance,
+):
+    client, logs, _ = local_instance
+    await register_operator(client, logs)
+    invitation = (await client.post("/api/auth/invites")).json()
+    token = re.search(r"/invite\?token=([A-Za-z0-9_-]+)", invitation["url"])[1]
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app),
+        base_url="http://test",
+        headers={"X-Nashordaq-CSRF": "1"},
+    ) as member:
+        for method, path in [
+            ("GET", "/api/auth/invites"),
+            ("POST", "/api/auth/invites"),
+            ("DELETE", f"/api/auth/invites/{invitation['id']}"),
+        ]:
+            assert (await member.request(method, path)).status_code == 401
+        assert (
+            await member.post(
+                "/api/auth/register",
+                json={
+                    "token": token,
+                    "username": "friend",
+                    "password": "my own secure password",
+                },
+            )
+        ).status_code == 201
+        for method, path in [
+            ("GET", "/api/auth/invites"),
+            ("POST", "/api/auth/invites"),
+            ("DELETE", f"/api/auth/invites/{invitation['id']}"),
+        ]:
+            assert (
+                await member.request(method, path, headers={"Remote-Role": "admin"})
+            ).status_code == 403
+    assert (
+        await client.delete(f"/api/auth/invites/{invitation['id']}")
+    ).status_code == 409
+
+
+async def test_expired_invitation_does_not_create_account(local_instance, monkeypatch):
+    from datetime import UTC, datetime, timedelta
+
+    from app import auth
+
+    client, logs, _ = local_instance
+    now = datetime(2026, 10, 13, tzinfo=UTC)
+    monkeypatch.setattr(auth, "utc_now", lambda: now)
+    await register_operator(client, logs)
+    invitation = (await client.post("/api/auth/invites")).json()
+    assert invitation["expires_at"] == "2026-10-20T00:00:00Z"
+    token = re.search(r"/invite\?token=([A-Za-z0-9_-]+)", invitation["url"])[1]
+    now += timedelta(days=7)
+    assert (
+        await client.post(
+            "/api/auth/register",
+            json={
+                "token": token,
+                "username": "late",
+                "password": "my own secure password",
+            },
+        )
+    ).status_code == 400
+    assert (
+        await client.post(
+            "/api/auth/login",
+            json={"username": "operator", "password": "a secure password"},
+        )
+    ).status_code == 200
+    assert (await client.get("/api/auth/invites")).json()[0]["status"] == "expired"
+    assert len((await client.get("/api/admin/users")).json()) == 1
+    assert (
+        await client.delete(f"/api/auth/invites/{invitation['id']}")
+    ).status_code == 409
+
+
+async def test_bad_credentials_leave_invitation_usable(local_instance):
+    client, logs, _ = local_instance
+    await register_operator(client, logs)
+    invitation = (await client.post("/api/auth/invites")).json()
+    token = re.search(r"/invite\?token=([A-Za-z0-9_-]+)", invitation["url"])[1]
+    for username, password, status in [
+        ("", "my own secure password", 422),
+        ("friend", "private", 422),
+        ("\n\x01", "my own secure password", 422),
+        (" operator ", "my own secure password", 409),
+    ]:
+        rejected = await client.post(
+            "/api/auth/register",
+            json={"token": token, "username": username, "password": password},
+        )
+        assert rejected.status_code == status
+        assert token not in rejected.text
+        assert password not in rejected.text
+        assert (await client.get("/api/auth/invites")).json()[0]["status"] == "active"
+        assert len((await client.get("/api/admin/users")).json()) == 1
+    assert (
+        await client.post(
+            "/api/auth/register",
+            json={
+                "token": token,
+                "username": " friend ",
+                "password": "my own secure password",
+            },
+        )
+    ).status_code == 201
+    assert (await client.get("/api/user/me")).json()["display_name"] == "friend"
+
+
+async def test_concurrent_invitation_redemption_has_one_member_and_survives_restart(
+    local_instance,
+):
+    import asyncio
+
+    client, logs, _ = local_instance
+    setup_token = await register_operator(client, logs)
+    invitation = (await client.post("/api/auth/invites")).json()
+    token = re.search(r"/invite\?token=([A-Za-z0-9_-]+)", invitation["url"])[1]
+    async with (
+        httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app),
+            base_url="http://test",
+            headers={"X-Nashordaq-CSRF": "1"},
+        ) as first,
+        httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app),
+            base_url="http://test",
+            headers={"X-Nashordaq-CSRF": "1"},
+        ) as second,
+    ):
+        responses = await asyncio.gather(
+            *[
+                browser.post(
+                    "/api/auth/register",
+                    json={
+                        "token": token,
+                        "username": name,
+                        "password": "my own secure password",
+                    },
+                )
+                for browser, name in [(first, "first"), (second, "second")]
+            ]
+        )
+        assert sorted(response.status_code for response in responses) == [201, 400]
+        winner, loser = (
+            (first, second) if responses[0].status_code == 201 else (second, first)
+        )
+        assert (await loser.get("/api/auth/session")).status_code == 401
+        assert len((await client.get("/api/admin/users")).json()) == 2
+        await database.engine.dispose()
+        await main.initialize_instance()
+        assert (await winner.get("/api/user/me")).json()["role"] == "player"
+        assert (await client.get("/api/auth/invites")).json()[0]["status"] == "consumed"
+        for invalid_token in [token, setup_token, "unknown"]:
+            assert (
+                await loser.post(
+                    "/api/auth/register",
+                    json={
+                        "token": invalid_token,
+                        "username": "replay",
+                        "password": "my own secure password",
+                    },
+                )
+            ).status_code == 400
+        assert len((await client.get("/api/admin/users")).json()) == 2
+        assert (
+            await loser.post(
+                "/api/auth/register",
+                json={"username": "open", "password": "my own secure password"},
+            )
+        ).status_code == 422
+
+
+async def test_invitation_mutations_enforce_csrf_and_do_not_log_tokens(
+    local_instance, caplog
+):
+    client, logs, _ = local_instance
+    await register_operator(client, logs)
+    caplog.clear()
+    invitation = (await client.post("/api/auth/invites")).json()
+    token = re.search(r"/invite\?token=([A-Za-z0-9_-]+)", invitation["url"])[1]
+    assert token not in caplog.text
+    for method, path, body in [
+        ("POST", "/api/auth/invites", None),
+        ("DELETE", f"/api/auth/invites/{invitation['id']}", None),
+        (
+            "POST",
+            "/api/auth/register",
+            {
+                "token": token,
+                "username": "blocked",
+                "password": "my own secure password",
+            },
+        ),
+    ]:
+        assert (
+            await client.request(
+                method, path, json=body, headers={"Origin": "https://evil.example"}
+            )
+        ).status_code == 403
+        assert (
+            await client.request(
+                method, path, json=body, headers={"X-Nashordaq-CSRF": ""}
+            )
+        ).status_code == 403
+    assert (await client.get("/api/auth/invites")).json()[0]["status"] == "active"
+    assert len((await client.get("/api/admin/users")).json()) == 1

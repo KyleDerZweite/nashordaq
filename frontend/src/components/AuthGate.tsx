@@ -40,12 +40,14 @@ function SignInForm({
   message?: string;
   onAuthenticated: () => void;
 }) {
-  const [setupToken] = useState(() =>
-    window.location.pathname === "/setup"
+  const [registrationToken] = useState(() =>
+    ["/setup", "/invite"].includes(window.location.pathname)
       ? new URLSearchParams(window.location.search).get("token")
       : null,
   );
   const isSetup = window.location.pathname === "/setup";
+  const isInvitation = window.location.pathname === "/invite";
+  const isRegistration = isSetup || isInvitation;
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string>();
@@ -58,12 +60,16 @@ function SignInForm({
     setIsPending(true);
     try {
       await post<{ status: "ok" }>(
-        isSetup ? "/auth/setup" : "/auth/login",
         isSetup
-          ? { token: setupToken, username, password }
+          ? "/auth/setup"
+          : isInvitation
+            ? "/auth/register"
+            : "/auth/login",
+        isRegistration
+          ? { token: registrationToken, username, password }
           : { username, password },
       );
-      if (isSetup) {
+      if (isRegistration) {
         window.history.replaceState(null, "", "/");
       }
       await get<{ authenticated: true }>("/auth/session");
@@ -92,7 +98,7 @@ function SignInForm({
     );
   }
 
-  if (isSetup && (!setupToken || !status.setup_required)) {
+  if (isSetup && (!registrationToken || !status.setup_required)) {
     return (
       <AuthPage>
         <h2 className="font-serif text-2xl font-bold text-hex-white">
@@ -110,15 +116,41 @@ function SignInForm({
     );
   }
 
+  if (isInvitation && !registrationToken) {
+    return (
+      <AuthPage>
+        <h2 className="font-serif text-2xl font-bold text-hex-white">
+          Invitation unavailable
+        </h2>
+        <p role="alert" className="mt-4 text-sm text-hex-bronze">
+          This invitation is missing its token. Ask the administrator for a
+          complete invitation link.
+        </p>
+        <a href="/" className="mt-6 inline-block text-hex-gold underline">
+          Go to sign in
+        </a>
+      </AuthPage>
+    );
+  }
+
   return (
     <AuthPage>
       <h2 className="font-serif text-2xl font-bold text-hex-white">
-        {isSetup ? "Create administrator account" : "Sign in"}
+        {isSetup
+          ? "Create administrator account"
+          : isInvitation
+            ? "Join the private market"
+            : "Sign in"}
       </h2>
       {isSetup ? (
         <p className="mt-3 text-sm text-hex-bronze">
           Create the sole administrator for this private market. You can link
           your Riot account separately.
+        </p>
+      ) : isInvitation ? (
+        <p className="mt-3 text-sm text-hex-bronze">
+          Choose your username and password. No email is required. You can link
+          your Riot account after joining.
         </p>
       ) : status.setup_required ? (
         <p className="mt-3 text-sm text-hex-bronze">
@@ -165,17 +197,17 @@ function SignInForm({
             id="password"
             name="password"
             type="password"
-            autoComplete={isSetup ? "new-password" : "current-password"}
+            autoComplete={isRegistration ? "new-password" : "current-password"}
             required
-            minLength={isSetup ? 12 : undefined}
+            minLength={isRegistration ? 12 : undefined}
             maxLength={1024}
-            aria-describedby={isSetup ? "password-help" : undefined}
+            aria-describedby={isRegistration ? "password-help" : undefined}
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             disabled={isPending}
             className="mt-2 w-full border-2 border-hex-border bg-hex-bg px-3 py-2 text-hex-white outline-none focus:border-hex-gold disabled:opacity-50"
           />
-          {isSetup && (
+          {isRegistration && (
             <p id="password-help" className="mt-2 text-xs text-hex-bronze">
               Use at least 12 characters.
             </p>
@@ -193,11 +225,19 @@ function SignInForm({
         >
           {isPending
             ? "Please wait..."
-            : isSetup
+            : isRegistration
               ? "Create account"
               : "Sign in"}
         </button>
       </form>
+      {isInvitation && (
+        <a
+          href="/"
+          className="mt-6 inline-block text-sm text-hex-gold underline"
+        >
+          Already have an account? Sign in
+        </a>
+      )}
     </AuthPage>
   );
 }
@@ -277,6 +317,37 @@ export default function AuthGate() {
     }
   }
 
+  if (state.kind === "signedIn" && window.location.pathname === "/invite") {
+    return (
+      <AuthPage>
+        <h2 className="font-serif text-2xl font-bold text-hex-white">
+          Already signed in
+        </h2>
+        <p className="mt-4 text-sm text-hex-bronze">
+          Sign out before using this invitation to create another account.
+        </p>
+        {logoutError && (
+          <p role="alert" className="mt-4 text-sm text-red-300">
+            {logoutError}
+          </p>
+        )}
+        <button
+          type="button"
+          disabled={isLoggingOut}
+          onClick={() => void logout()}
+          className="mt-6 w-full border-2 border-hex-gold bg-hex-gold px-4 py-3 text-hex-bg disabled:opacity-50"
+        >
+          {isLoggingOut ? "Signing out..." : "Sign out"}
+        </button>
+        <a
+          href="/"
+          className="mt-6 inline-block text-sm text-hex-gold underline"
+        >
+          Return to the market
+        </a>
+      </AuthPage>
+    );
+  }
   if (state.kind === "signedIn") {
     return (
       <App

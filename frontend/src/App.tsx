@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import BalanceInsightsModal from "./components/BalanceInsightsModal";
 import AdminDashboard from "./components/admin/AdminDashboard";
+import AdminAccessManagement from "./components/admin/AdminAccessManagement";
 import Header from "./components/Header";
 import BankModal from "./components/BankModal";
 import DemoBanner from "./components/DemoBanner";
@@ -371,6 +372,7 @@ export default function App({
                 </>
               ) : (
                 <div className="space-y-8">
+                  <AdminAccessManagement />
                   <AdminDashboard
                     overview={adminOverview}
                     users={adminUsers ?? []}

@@ -39,7 +39,7 @@ Current SQLAlchemy tables:
 |---|---|
 | `users` | Local usernames, password verifiers, sole administrator flag and personal game state. |
 | `auth_sessions` | Hashed revocable session tokens and seven-day expiry. |
-| `access_tokens` | Hashed one-time setup tokens and lifecycle state. |
+| `access_tokens` | Hashed one-time setup and invitation tokens with lifecycle state. |
 | `instance_metadata` | Supported standalone database schema version. |
 | `tracked_players` | Riot accounts whose prices are tracked in the market. |
 | `holdings` | Aggregate user-player share positions. |
@@ -67,6 +67,10 @@ Core endpoints:
 | GET | `/api/auth/status` | No | Setup-required and deployment-mode metadata only |
 | POST | `/api/auth/setup` | Setup token | Create the sole administrator and a session |
 | POST | `/api/auth/login` | Credentials | Issue a local session |
+| POST | `/api/auth/register` | Invitation token | Create a member account and session |
+| POST | `/api/auth/invites` | Admin | Create and deliver a seven-day invitation link |
+| GET | `/api/auth/invites` | Admin | Inspect invitation lifecycle metadata |
+| DELETE | `/api/auth/invites/{id}` | Admin | Revoke an unused active invitation |
 | GET | `/api/auth/session` | Yes | Verify the current session |
 | POST | `/api/auth/logout` | Yes | Revoke the current session |
 | GET | `/api/system/status` | Yes | Scheduler, market, demo, and feature-flag status |
@@ -93,13 +97,15 @@ The accepted direction is recorded in [ADR-0001](adr/0001-self-host-baseline.md)
 
 The application owns identity, authentication, invite access and administrator permissions. A deployment's reverse proxy owns public TLS termination and does not establish application identity. Game data requires an authenticated session. Demo operation is explicit and isolates each visitor's temporary game state.
 
-Setup, local login, logout and the private game-data gate are implemented. Invitations, password recovery, isolated demo sessions and the new deployment packaging are later slices of [spec #19](https://github.com/KyleDerZweite/nashordaq/issues/19). Administrator participation remains restricted until its dedicated slice. This distinction does not change the accepted requirements.
+Setup, invitations, local login, logout and the private game-data gate are implemented. Password recovery, isolated demo sessions and the new deployment packaging are later slices of [spec #19](https://github.com/KyleDerZweite/nashordaq/issues/19). Administrator participation remains restricted until its dedicated slice. This distinction does not change the accepted requirements.
 
 ## Authentication and session trust boundary
 
-`app/auth.py` owns credential verification, setup-token consumption, sessions and administrator authorization. Routers consume `CurrentUser`, `CurrentOnboardedUser` and `CurrentAdminUser`. The application startup calls persistence initialization before authentication setup. Authentication depends on persistence and does not call Riot or game services.
+`app/auth.py` owns credential verification, setup and invitation lifecycles, sessions and administrator authorization. Routers consume `CurrentUser`, `CurrentOnboardedUser` and `CurrentAdminUser`. The application startup calls persistence initialization before authentication setup. Authentication depends on persistence and does not call Riot or game services.
 
 Fresh startup logs a setup link using `NASHORDAQ_PUBLIC_URL`. Only its 256-bit random token permits administrator creation. SQLite conditionally consumes the token and creates the administrator and initial session in one transaction. A unique partial index permits only one administrator. Restart rotates an unused setup link; completed setup stays closed.
+
+Only the administrator creates, lists and revokes invitations. Creation delivers the usable link once; later listing contains only its ID, expiry, consumption, revocation and lifecycle status. Invitation tokens use 256 bits of randomness and only SHA-256 hashes enter SQLite. Registration conditionally consumes an unexpired, unused, unrevoked invitation and creates the member and session in one transaction. Invalid credentials and duplicate usernames preserve the invitation. Members have no administrator permissions and can register without Riot or email.
 
 Passwords use salted scrypt verifiers with N=131072, r=8 and p=1. Two simultaneous derivations bound memory use. Normal session tokens have 256 bits of randomness and only their SHA-256 hashes enter SQLite. Sessions expire seven days after creation. Logout deletes the current session; each request validates its persisted session. The poro stream also validates its session before each protected event. Validation responses omit submitted values so they cannot echo credentials or access tokens.
 
@@ -107,7 +113,7 @@ The browser session cookie is `HttpOnly`, `SameSite=Strict`, scoped to `/`, and 
 
 Every state-changing `/api` request requires `X-Nashordaq-CSRF: 1`, including setup, login and logout. Browser `Origin` must match the request origin, configured public URL or an explicit CORS origin. `Origin: null` and cross-site Fetch Metadata are rejected. Native/API tools may omit Origin if they supply the custom header. CORS allows explicit origins and this header, so an unrelated browser origin cannot send an authorized mutation. Public endpoints contain only health and login/setup metadata. Market, leaderboard, history, simulation, system status and administrator data require a valid session.
 
-API responses use `Cache-Control: no-store`. Responses and the frontend use `Referrer-Policy: no-referrer` to avoid disclosing setup URLs. The frontend mounts game components after session validation and clears cached game queries when login ends. No proxy header creates a user, and no anonymous request creates demo state. Demo access fails closed until the explicit demo-session slice lands.
+API responses use `Cache-Control: no-store`. Responses and the frontend use `Referrer-Policy: no-referrer` to avoid disclosing setup or invitation URLs. Frontend access logs omit query strings and referrers. The frontend mounts game components after session validation and clears cached game queries when login ends. No proxy header creates a user, and no anonymous request creates demo state. Demo access fails closed until the explicit demo-session slice lands.
 
 Persistence checks the database marker before schema creation, alteration or switching SQLite to WAL. A database from the proxy version fails startup with instructions to preserve it and select a separate empty data directory. There is no automatic migration or deletion. Supported standalone databases preserve users, sessions and completed setup across restart.
 
