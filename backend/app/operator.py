@@ -17,7 +17,7 @@ from app.auth import NewPassword, hash_password, is_admin_user, replace_password
 from app.config import settings
 from app.database import validate_existing_database
 from app.models import User
-from app.persistence import backup_database, restore_database
+from app.persistence import backup_database, require_absolute, restore_database
 
 
 def read_password(from_stdin: bool) -> str:
@@ -118,7 +118,32 @@ def main() -> int:
     restore.add_argument(
         "--database", required=True, type=Path, help="Absolute new database path"
     )
+    preflight = commands.add_parser(
+        "check-update", help="Check this code's supported schema without changing data"
+    )
+    preflight.add_argument(
+        "--database", required=True, type=Path, help="Absolute existing SQLite path"
+    )
     args = parser.parse_args()
+    if args.command == "check-update":
+        try:
+            require_absolute(args.database)
+            validate_existing_database(args.database)
+        except RuntimeError as error:
+            print(str(error), file=sys.stderr)
+            return 1
+        except (OSError, sqlite3.Error):
+            print(
+                "Cannot inspect a supported standalone database. "
+                "Preserve it and use the matching release and a healthy backup.",
+                file=sys.stderr,
+            )
+            return 1
+        print(
+            "Compatible standalone schema version 1. No database changes made. "
+            "Keep the old code and its matching backup before updating."
+        )
+        return 0
     if args.command in {"backup", "restore"}:
         try:
             if args.command == "backup":
