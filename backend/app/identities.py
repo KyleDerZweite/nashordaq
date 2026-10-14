@@ -62,7 +62,7 @@ def assign_created_identity_aliases(session: Session, _context, _instances) -> N
 
 
 async def backfill_aliases(session: AsyncSession) -> None:
-    """Populate existing unreleased standalone instances without altering user data."""
+    """Populate existing standalone instances without altering user data."""
     # Lock before reading targets so no concurrent registration can intervene.
     await session.execute(text("UPDATE identity_aliases SET id=id WHERE 0"))
     users = list(await session.scalars(select(User).order_by(User.id)))

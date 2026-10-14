@@ -47,7 +47,7 @@ def validate_schema_version(tables: set[str], version: int | None) -> None:
     if "instance_metadata" in tables and version != 1:
         raise RuntimeError(
             "Unsupported standalone database version; "
-            "use the matching release and backup."
+            "use the matching code revision and backup."
         )
 
 
@@ -75,13 +75,14 @@ def validate_standalone_schema(
         validate_schema_version(tables, versions[0][1] if len(versions) == 1 else None)
         if versions[0][0] != 1:
             raise RuntimeError(
-                "Invalid standalone schema marker; use the matching release and backup."
+                "Invalid standalone schema marker; "
+                "use the matching code revision and backup."
             )
 
         def incompatible(detail: str) -> None:
             raise RuntimeError(
                 f"Standalone schema is incomplete or malformed: {detail}. "
-                "Preserve the database and use the matching release and backup."
+                "Preserve the database and use the matching code revision and backup."
             )
 
         sqlite_dialect = dialect()
@@ -191,8 +192,8 @@ def validate_standalone_schema(
             )
     except (sqlite3.DatabaseError, DBAPIError):
         raise RuntimeError(
-            "Malformed standalone database. Preserve it and use the matching release "
-            "and a healthy backup."
+            "Malformed standalone database. Preserve it and use the matching code "
+            "revision and a healthy backup."
         ) from None
     return True
 

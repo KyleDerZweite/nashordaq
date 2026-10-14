@@ -12,9 +12,9 @@ A closed, trusted friend group. Public registration and email verification are o
 
 [ADR-0001](adr/0001-self-host-baseline.md) defines the accepted requirements for [issue #16](https://github.com/KyleDerZweite/nashordaq/issues/16) and [issue #17](https://github.com/KyleDerZweite/nashordaq/issues/17). Local invite-based access replaces proxy authentication. One administrator may also participate in the market. Game-changing administrative actions are visible to members. Demo access and Streamer Mode follow the same decision.
 
-Public registration, a mail-server requirement, OAuth/OIDC, additional administrators and hosted multi-room operation are outside this baseline. The first standalone release starts with fresh data; subsequent standalone releases establish the supported update path.
+Public registration, a mail-server requirement, OAuth/OIDC, additional administrators and hosted multi-room operation are outside this baseline. A fresh installation starts with empty data. Supported updates preserve complete standalone schema version 1 between compatible commits; recovery uses the old commit and its matching backup.
 
-Local setup, invitation registration, password recovery, sessions, isolated demo sessions, stable identity presentation, administrator participation and member-visible game interventions are implemented. Compose packaging and operator backup, restore and update preflight are implemented. This baseline is unreleased. [Self-host acceptance](SELF_HOST_ACCEPTANCE.md) separates technical verification, unexecuted integration checks and pending owner acceptance.
+Local setup, invitation registration, password recovery, sessions, isolated demo sessions, stable identity presentation, administrator participation and member-visible game interventions are implemented. Compose packaging and operator backup, restore and update preflight are implemented. The baseline is merged and installable through a git clone of `main`, supplied environment configuration and Compose. [Self-host acceptance](SELF_HOST_ACCEPTANCE.md) separates commit-specific technical verification, live integration evidence and owner acceptance.
 
 ## Current core user flows
 

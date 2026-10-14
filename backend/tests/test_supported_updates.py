@@ -23,7 +23,7 @@ async def test_startup_rejects_incomplete_standalone_before_creating_or_changing
     monkeypatch.setattr(database, "engine", engine)
     monkeypatch.setattr(database, "SessionLocal", async_sessionmaker(engine))
     try:
-        with pytest.raises(RuntimeError, match="matching release"):
+        with pytest.raises(RuntimeError, match="matching code revision"):
             await database.init_db()
     finally:
         await engine.dispose()
@@ -50,7 +50,7 @@ async def test_startup_refuses_missing_sole_administrator_protection(
     monkeypatch.setattr(database, "engine", engine)
     monkeypatch.setattr(database, "SessionLocal", async_sessionmaker(engine))
     try:
-        with pytest.raises(RuntimeError, match="matching release"):
+        with pytest.raises(RuntimeError, match="matching code revision"):
             await database.init_db()
     finally:
         await engine.dispose()

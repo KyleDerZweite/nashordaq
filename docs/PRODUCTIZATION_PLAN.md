@@ -6,7 +6,7 @@ Nashordaq's accepted product is a self-hosted private market for a League of Leg
 
 One deployment has one market and exactly one administrator. Local account access, invitations, password recovery, isolated demo sessions, permanent streamer aliases and member-visible game interventions are implemented. Docker Compose and Podman Compose build local images. Operator commands provide live backup, fresh restore and supported-schema update preflight.
 
-The baseline is unreleased. [Self-host acceptance](SELF_HOST_ACCEPTANCE.md) records technical evidence separately from owner acceptance, public HTTPS, live Riot and release-tag installation. The first standalone release has no predecessor; the next release needs an actual supported predecessor update and matching-backup recovery check.
+The baseline is merged and installed through a git clone of `main`, supplied environment configuration and Compose. Updates and recovery use exact commits and matching backups. [Self-host acceptance](SELF_HOST_ACCEPTANCE.md) records technical evidence separately from live Riot verification and owner acceptance.
 
 Local account access works without Riot. Live play requires a valid operator-owned key. Gamba remains an explicit private-use option, disabled by default. A future production-facing application would exclude Gamba and require its own policy review. This document claims no approval or compliance with current Riot policies.
 

@@ -135,7 +135,7 @@ def main() -> int:
         except (OSError, sqlite3.Error):
             print(
                 "Cannot inspect a supported standalone database. "
-                "Preserve it and use the matching release and a healthy backup.",
+                "Preserve it and use the matching code revision and a healthy backup.",
                 file=sys.stderr,
             )
             return 1

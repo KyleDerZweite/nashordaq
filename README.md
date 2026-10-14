@@ -4,7 +4,7 @@ Nashordaq is a self-hosted virtual share market for a private League of Legends 
 
 One installation runs one private market with one administrator. Local username/password accounts, invitation access, revocable sessions and password recovery require no external identity provider. The administrator can participate after ordinary Riot onboarding. Members can inspect game interventions, and Streamer Mode uses permanent League aliases across views.
 
-The standalone baseline is implemented but unreleased. [Self-host acceptance](docs/SELF_HOST_ACCEPTANCE.md) records development verification and the remaining release, live Riot, public HTTPS and owner checks. This implementation does not claim Riot production-key approval. Future hosted service and OAuth/OIDC ideas are outside the accepted baseline.
+The standalone baseline is implemented and merged. Install it from a clone of `main` using the supplied environment example and Compose instructions. [Self-host acceptance](docs/SELF_HOST_ACCEPTANCE.md) records commit-specific technical evidence, live Riot verification and owner acceptance separately. This implementation does not claim Riot production-key approval. Future hosted service and OAuth/OIDC ideas are outside the accepted baseline.
 
 ## Try the demo
 
@@ -16,9 +16,9 @@ Reload preserves a valid demo session. Sign out to delete personal state immedia
 
 Follow the [deployment guide](docs/DEPLOYMENT.md) to install, create the administrator, invite members, recover passwords, back up, restore and update. Docker Compose and Podman Compose use the same manifest and build locally from pinned inputs. Only the frontend HTTP entry point is published. SQLite persists in the host directory `./data`.
 
-Set `NASHORDAQ_PUBLIC_URL` to the exact LAN HTTP or operator-provided HTTPS origin before setup. No domain or tunnel is required for LAN access. Login and administration work without a Riot key; live onboarding and updates require one. Gamba is disabled by default and requires an explicit private-use choice.
+Set `NASHORDAQ_PUBLIC_URL` to the exact browser origin, including its scheme, hostname and port, before setup. LAN HTTP needs no domain or tunnel. Login and administration work without a Riot key; live onboarding and updates require one. Gamba is disabled by default and requires an explicit private-use choice.
 
-Start with a separate empty data directory when leaving the previous proxy installation. Startup rejects its database without migrating or deleting it. Preserve the old installation and data. No standalone release tag has been published from this implementation; an implementation-branch checkout establishes development verification only.
+Start with a separate empty data directory when leaving the previous proxy installation. Startup rejects its database without migrating or deleting it. Preserve the old installation and data.
 
 ## Development
 
