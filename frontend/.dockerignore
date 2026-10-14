@@ -1,6 +1,7 @@
 node_modules/
 dist/
 dist-ssr/
+browser-results/
 *.local
 *.log
 pnpm-debug.log*

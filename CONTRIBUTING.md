@@ -29,7 +29,7 @@ Run a focused backend file with `uv run pytest -v tests/test_local_auth.py` from
 
 The autouse `stub_initial_player_refresh` fixture in `conftest.py` replaces onboarding's `_initialize_player_market_state` with a no-op. `test_riot_recovery.py` and `test_admin_participation.py` override that fixture to retain real initialization and control upstream HTTP responses. Follow that pattern when testing onboarding failures rather than accidentally skipping the behavior under test. `test_riot_restart.py` launches real server processes against a file database and a controlled HTTP provider. It proves environment replacement and restart behavior, not live Riot access.
 
-Frontend identity tests check the shared name renderer. For rendered flows and browser integration, follow [Self-host acceptance](docs/SELF_HOST_ACCEPTANCE.md) and record the evidence there. Backend HTTP tests and the frontend build do not establish browser behavior.
+Frontend identity tests check the shared name renderer. The opt-in [local demo browser regression](frontend/README.md#local-demo-browser-regression) checks two demo visitors through the real Compose entry point. For broader rendered flows and browser integration, follow [Self-host acceptance](docs/SELF_HOST_ACCEPTANCE.md) and record the evidence there. Backend HTTP tests and the frontend build do not establish browser behavior.
 
 ## Pull requests
 
