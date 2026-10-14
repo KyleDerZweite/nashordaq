@@ -18,6 +18,7 @@ def _origin(url: str) -> str:
 
 class SessionRequestProtection(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next) -> Response:
+        response: Response | None = None
         if request.url.path.startswith("/api/") and request.method not in {
             "GET",
             "HEAD",
@@ -36,11 +37,12 @@ class SessionRequestProtection(BaseHTTPMiddleware):
                 or request.headers.get("Sec-Fetch-Site") == "cross-site"
                 or (origin is not None and origin not in allowed)
             ):
-                return JSONResponse(
+                response = JSONResponse(
                     status_code=403,
                     content={"detail": "Untrusted state-changing request"},
                 )
-        response = await call_next(request)
+        if response is None:
+            response = await call_next(request)
         response.headers["Referrer-Policy"] = "no-referrer"
         if request.url.path.startswith("/api/"):
             response.headers["Cache-Control"] = "no-store"

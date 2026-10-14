@@ -1,8 +1,67 @@
 from datetime import UTC, datetime
-from typing import Literal
+from typing import Annotated, Literal
 
 import httpx
-from pydantic import BaseModel
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, TypeAdapter
+
+NonemptyString = Annotated[str, Field(min_length=1)]
+
+
+class _RiotPayload(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+
+class _AccountPayload(_RiotPayload):
+    puuid: NonemptyString
+    gameName: NonemptyString | None = None
+    tagLine: NonemptyString | None = None
+
+
+class _LeagueEntry(_RiotPayload):
+    queueType: NonemptyString
+    summonerId: NonemptyString | None = None
+    tier: Literal[
+        "IRON",
+        "BRONZE",
+        "SILVER",
+        "GOLD",
+        "PLATINUM",
+        "EMERALD",
+        "DIAMOND",
+        "MASTER",
+        "GRANDMASTER",
+        "CHALLENGER",
+    ]
+    rank: Literal["I", "II", "III", "IV"]
+    leaguePoints: int
+    wins: int = Field(default=0, ge=0)
+    losses: int = Field(default=0, ge=0)
+    hotStreak: bool = False
+    inactive: bool = False
+
+
+class _MatchParticipant(_RiotPayload):
+    puuid: NonemptyString
+    win: bool
+    gameEndTimestamp: int | None = Field(default=None, gt=0)
+
+
+class _MatchInfo(_RiotPayload):
+    queueId: int = Field(ge=0)
+    gameDuration: int = Field(
+        ge=0, validation_alias=AliasChoices("gameDuration", "gameDurationSeconds")
+    )
+    gameEndTimestamp: int | None = Field(default=None, gt=0)
+    participants: list[_MatchParticipant] = Field(min_length=1)
+
+
+class _MatchMetadata(_RiotPayload):
+    matchId: NonemptyString | None = None
+
+
+class _MatchPayload(_RiotPayload):
+    metadata: _MatchMetadata = Field(default_factory=_MatchMetadata)
+    info: _MatchInfo
 
 
 class AccountData(BaseModel):
@@ -62,6 +121,18 @@ _last_failure: RiotIntegrationError | None = None
 _verified = False
 
 
+def _invalid_response() -> RiotIntegrationError:
+    global _last_failure, _verified
+    _last_failure = RiotIntegrationError(
+        "unavailable",
+        "Riot returned an invalid response. Retry later. "
+        "Local account access remains available.",
+        502,
+    )
+    _verified = False
+    return _last_failure
+
+
 def integration_status(api_key: str, demo: bool = False) -> tuple[RiotStatus, str]:
     if demo:
         return "demo", "Demo uses a simulated market and does not require Riot."
@@ -69,7 +140,8 @@ def integration_status(api_key: str, demo: bool = False) -> tuple[RiotStatus, st
         return (
             "missing_key",
             "Riot is not configured. Ask the operator to set "
-            "NASHORDAQ_RIOT_API_KEY and restart the backend. "
+            "NASHORDAQ_RIOT_API_KEY in the protected environment configuration "
+            "and recreate the full Compose stack. "
             "Local account access remains available.",
         )
     if _last_failure is not None:
@@ -79,13 +151,14 @@ def integration_status(api_key: str, demo: bool = False) -> tuple[RiotStatus, st
     return "unchecked", "Riot is configured but has not been verified yet."
 
 
-async def _request(
+async def _request[T](
     client: httpx.AsyncClient,
     url: str,
     api_key: str,
     *,
+    payload_type: TypeAdapter[T],
     params: dict[str, int | str] | None = None,
-) -> httpx.Response:
+) -> T:
     global _last_failure, _verified
     try:
         if not api_key.strip():
@@ -94,6 +167,10 @@ async def _request(
             url, headers={"X-Riot-Token": api_key}, params=params
         )
         _check_response(response)
+        try:
+            payload = payload_type.validate_json(response.content)
+        except ValueError:
+            raise _invalid_response() from None
     except RiotIntegrationError as error:
         _last_failure = error
         raise
@@ -107,7 +184,7 @@ async def _request(
         raise error from None
     _last_failure = None
     _verified = True
-    return response
+    return payload
 
 
 def _timestamp_seconds(value: datetime) -> int:
@@ -124,7 +201,8 @@ def _check_response(response: httpx.Response) -> None:
         raise RiotIntegrationError(
             "invalid_key",
             "Riot rejected the API key. Ask the operator to replace "
-            "NASHORDAQ_RIOT_API_KEY and restart the backend. "
+            "NASHORDAQ_RIOT_API_KEY in the protected environment configuration "
+            "and recreate the full Compose stack. "
             "Local account access remains available.",
         )
     if response.status_code >= 500:
@@ -143,30 +221,26 @@ async def get_account_by_riot_id(
     game_name: str,
     tag_line: str,
 ) -> AccountData:
-    account_resp = await _request(
+    account = await _request(
         client,
         f"{base_url}/riot/account/v1/accounts/by-riot-id/{game_name}/{tag_line}",
         api_key=api_key,
+        payload_type=TypeAdapter(_AccountPayload),
     )
-    account_payload = account_resp.json()
-    puuid = account_payload.get("puuid")
-    if not puuid:
-        raise PlayerNotFoundError(f"No account data for {game_name}#{tag_line}")
-
     return AccountData(
-        puuid=puuid,
-        game_name=account_payload.get("gameName") or game_name,
-        tag_line=account_payload.get("tagLine") or tag_line,
+        puuid=account.puuid,
+        game_name=account.gameName or game_name,
+        tag_line=account.tagLine or tag_line,
     )
 
 
 def _extract_solo_queue_rank(
     puuid: str,
-    entries: list[dict],
+    entries: list[_LeagueEntry],
     display_hint: str = "",
 ) -> RankData:
     solo_queue = next(
-        (e for e in entries if e["queueType"] == "RANKED_SOLO_5x5"),
+        (e for e in entries if e.queueType == "RANKED_SOLO_5x5"),
         None,
     )
     if solo_queue is None:
@@ -175,14 +249,14 @@ def _extract_solo_queue_rank(
 
     return RankData(
         puuid=puuid,
-        summoner_id=solo_queue.get("summonerId") or puuid,
-        tier=solo_queue["tier"],
-        rank=solo_queue["rank"],
-        league_points=solo_queue["leaguePoints"],
-        wins=solo_queue.get("wins", 0),
-        losses=solo_queue.get("losses", 0),
-        hot_streak=solo_queue.get("hotStreak", False),
-        inactive=solo_queue.get("inactive", False),
+        summoner_id=solo_queue.summonerId or puuid,
+        tier=solo_queue.tier,
+        rank=solo_queue.rank,
+        league_points=solo_queue.leaguePoints,
+        wins=solo_queue.wins,
+        losses=solo_queue.losses,
+        hot_streak=solo_queue.hotStreak,
+        inactive=solo_queue.inactive,
     )
 
 
@@ -191,13 +265,13 @@ async def _fetch_league_entries(
     region_url: str,
     api_key: str,
     puuid: str,
-) -> list[dict]:
-    resp = await _request(
+) -> list[_LeagueEntry]:
+    return await _request(
         client,
         f"{region_url}/lol/league/v4/entries/by-puuid/{puuid}",
         api_key=api_key,
+        payload_type=TypeAdapter(list[_LeagueEntry]),
     )
-    return resp.json()
 
 
 async def get_rank_by_puuid(
@@ -251,14 +325,13 @@ async def get_recent_match_ids(
     if type is not None:
         params["type"] = type
 
-    response = await _request(
+    return await _request(
         client,
         f"{base_url}/lol/match/v5/matches/by-puuid/{puuid}/ids",
         api_key=api_key,
+        payload_type=TypeAdapter(list[NonemptyString]),
         params=params,
     )
-    payload = response.json()
-    return [str(match_id) for match_id in payload]
 
 
 async def get_match_summary(
@@ -268,32 +341,28 @@ async def get_match_summary(
     puuid: str,
     match_id: str,
 ) -> MatchSummary:
-    response = await _request(
+    payload = await _request(
         client,
         f"{base_url}/lol/match/v5/matches/{match_id}",
         api_key=api_key,
+        payload_type=TypeAdapter(_MatchPayload),
     )
-    payload = response.json()
-    metadata = payload.get("metadata") or {}
-    info = payload.get("info") or {}
-    participants = info.get("participants") or []
+    info = payload.info
 
     participant = next(
-        (item for item in participants if item.get("puuid") == puuid),
+        (item for item in info.participants if item.puuid == puuid),
         None,
     )
     if participant is None:
-        raise PlayerNotFoundError(f"No match participant data for {match_id}")
-
-    duration = int(info.get("gameDuration") or info.get("gameDurationSeconds") or 0)
-    end_timestamp = int(
-        info.get("gameEndTimestamp") or participant.get("gameEndTimestamp") or 0
-    )
+        raise _invalid_response()
+    end_timestamp = info.gameEndTimestamp or participant.gameEndTimestamp
+    if end_timestamp is None:
+        raise _invalid_response()
 
     return MatchSummary(
-        match_id=metadata.get("matchId") or match_id,
-        queue_id=int(info.get("queueId") or 0),
-        win=bool(participant.get("win", False)),
-        game_duration_seconds=duration,
+        match_id=payload.metadata.matchId or match_id,
+        queue_id=info.queueId,
+        win=participant.win,
+        game_duration_seconds=info.gameDuration,
         game_end_timestamp=end_timestamp,
     )

@@ -3,6 +3,7 @@ import { useId, useState } from "react";
 
 import { ApiError, getMarketAccount, useSystemStatus } from "../api";
 import type { MarketAccountResponse, UserOnboardingCreate } from "../types";
+import { isRiotUnavailable } from "../utils/riotStatus";
 
 interface Props {
   title: string;
@@ -119,17 +120,11 @@ export default function PlayerProfileModal({
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4 px-5 py-4">
-            {systemStatus &&
-              [
-                "missing_key",
-                "invalid_key",
-                "unavailable",
-                "rate_limited",
-              ].includes(systemStatus.riot_status) && (
-                <p role="status" className="font-mono text-xs text-hex-gold">
-                  {systemStatus.riot_status_detail}
-                </p>
-              )}
+            {systemStatus && isRiotUnavailable(systemStatus.riot_status) && (
+              <p role="status" className="font-mono text-xs text-hex-gold">
+                {systemStatus.riot_status_detail}
+              </p>
+            )}
             <div>
               <label
                 htmlFor={`${fieldId}-game-name`}

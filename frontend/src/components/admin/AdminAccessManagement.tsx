@@ -1,5 +1,6 @@
 import { useState } from "react";
 import AdminPasswordResets from "./AdminPasswordResets";
+import SecretLinkDelivery from "./SecretLinkDelivery";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { del, get, post } from "../../api/client";
 import { formatLocalDateTime } from "../../utils/format";
@@ -23,7 +24,6 @@ const buttonClass =
 function MemberInvitations() {
   const queryClient = useQueryClient();
   const [latestInvitation, setLatestInvitation] = useState<CreatedInvitation>();
-  const [copyMessage, setCopyMessage] = useState<string>();
   const invitations = useQuery({
     queryKey,
     queryFn: () => get<Invitation[]>("/auth/invites"),
@@ -32,7 +32,6 @@ function MemberInvitations() {
     mutationFn: () => post<CreatedInvitation>("/auth/invites", {}),
     onSuccess: (invitation) => {
       setLatestInvitation(invitation);
-      setCopyMessage(undefined);
       void queryClient.invalidateQueries({ queryKey });
     },
   });
@@ -46,18 +45,6 @@ function MemberInvitations() {
       void queryClient.invalidateQueries({ queryKey });
     },
   });
-
-  async function copyLink() {
-    if (!latestInvitation) return;
-    try {
-      await navigator.clipboard.writeText(latestInvitation.url);
-      setCopyMessage("Invitation link copied.");
-    } catch {
-      setCopyMessage(
-        "Select and copy the link above. Clipboard access is unavailable.",
-      );
-    }
-  }
 
   return (
     <section
@@ -92,42 +79,18 @@ function MemberInvitations() {
         </p>
       )}
       {latestInvitation && (
-        <div className="mt-5 border border-hex-gold-dim bg-hex-bg p-4">
-          <p role="status" className="text-sm text-hex-white">
-            Invitation #{latestInvitation.id} created. Share this link privately
-            with the invited member.
-          </p>
-          <label
-            htmlFor="invitation-link"
-            className="mt-3 block text-sm font-bold text-hex-white"
-          >
-            Invitation link
-          </label>
-          <input
-            id="invitation-link"
-            type="text"
-            readOnly
-            value={latestInvitation.url}
-            onFocus={(event) => event.target.select()}
-            className="mt-2 w-full min-w-0 border-2 border-hex-border bg-hex-bg-alt px-3 py-2 text-sm text-hex-white focus:border-hex-gold focus:outline-none"
-          />
-          <p className="mt-2 text-xs text-hex-bronze">
-            Save this link now. It is shown only after creation and cannot be
-            retrieved after leaving this page.
-          </p>
-          <button
-            type="button"
-            onClick={() => void copyLink()}
-            className={`${buttonClass} mt-3`}
-          >
-            Copy invitation link
-          </button>
-          {copyMessage && (
-            <p role="status" className="mt-3 text-sm text-hex-bronze">
-              {copyMessage}
-            </p>
-          )}
-        </div>
+        <SecretLinkDelivery
+          key={latestInvitation.id}
+          id="invitation-link"
+          label="Invitation link"
+          url={latestInvitation.url}
+          copyLabel="Copy invitation link"
+          copySuccess="Invitation link copied."
+          buttonClass={buttonClass}
+        >
+          Invitation #{latestInvitation.id} created. Share this link privately
+          with the invited member.
+        </SecretLinkDelivery>
       )}
       {invitations.isPending && (
         <p role="status" className="mt-5 text-sm text-hex-bronze">

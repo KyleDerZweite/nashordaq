@@ -1,6 +1,6 @@
-# Market Simulation Lab
+# Market simulation lab
 
-The Simulation Lab is an admin-only tool for exploring how pricing parameter changes affect share price trajectories. It runs the same pricing formula used in production but lets you override any parameter and compare results side by side -- without touching real market state.
+The Simulation Lab is available through the administrator's account menu to explore how pricing parameter changes affect share price trajectories. It runs the same pricing formula used in production but lets you override any parameter and compare results side by side without changing real market state.
 
 ## Access
 
@@ -13,27 +13,27 @@ The simulation view replaces the main content area while active. It does not aff
 
 ## Concepts
 
-### Scenario Modes
+### Scenario modes
 
 The simulator needs a sequence of matches (LP deltas) to process. There are two ways to provide them:
 
-**Synthetic** -- Type a comma-separated list of LP deltas directly. Positive values are wins, negative values are losses. Example: `20, 18, -15, 22, -20, -18, -16, 25, 20, -14`. You also set the starting price and starting streak manually. This mode is useful for testing specific edge cases ("what happens after 5 consecutive +30 LP wins?") or exploring hypothetical sequences.
+**Synthetic.** Type a comma-separated list of LP deltas directly. Positive values are wins, negative values are losses. Example: `20, 18, -15, 22, -20, -18, -16, 25, 20, -14`. You also set the starting price and starting streak manually. This mode is useful for testing specific edge cases ("what happens after 5 consecutive +30 LP wins?") or exploring hypothetical sequences.
 
-**Replay** -- Select a tracked player from the dropdown. The simulator fetches that player's entire `PlayerMatch` history and replays it from the first recorded match. Starting price and streak are taken from the first match in the database. This mode shows how a player's actual match history would have played out under different pricing parameters.
+**Replay.** Select a tracked player from the dropdown. The simulator fetches that player's entire `PlayerMatch` history and replays it from the first recorded match. Starting price and streak are taken from the first match in the database. This mode shows how a player's actual match history would have played out under different pricing parameters.
 
-### Parameter Sets
+### Parameter sets
 
 Each simulation run processes the match sequence through two independent parameter sets, labeled **Baseline** and **Comparison**. Both start with the server's current production defaults (fetched from `GET /api/simulate/defaults`). You can then edit any parameter in either set.
 
 When you leave a field empty, the server fills it with the current production default. This means you only need to change the parameters you want to test.
 
-The eight configurable parameters and what they control:
+The UI exposes these eight parameter overrides. The API also accepts `pricing_low_price_threshold` and `pricing_beta_negative`. Defaults come from the running server; the examples below use repository defaults.
 
 | Parameter | Description | Production Default |
 |---|---|---|
 | Alpha (base volatility) | Scales every price move. Higher = more volatile market. | `0.12` |
 | Loss move multiplier | Extra multiplier applied only to negative price moves. `1.10` means losses hit 10% harder than equivalent gains. | `1.10` |
-| Max effective streak | Cap on how high the streak multiplier can go. Does not cap the internal streak counter, just its effect on price. | `10` |
+| Max effective streak | Caps the streak state and the effective streak used for price movement. | `10` |
 | Positive LP soft cap | LP gains above this threshold have reduced efficiency. | `20` |
 | Negative LP soft cap | LP losses beyond this threshold have reduced efficiency. | `24` |
 | Positive LP excess efficiency | How much of the LP above the positive soft cap actually counts. `0.25` = 25% efficiency on excess. | `0.25` |
@@ -42,13 +42,13 @@ The eight configurable parameters and what they control:
 
 For full formula details, see [ECONOMY_MECHANICS.md](ECONOMY_MECHANICS.md) section 3.
 
-### Simulation Output
+### Simulation output
 
 After clicking **Run Simulation**, results appear in two tabs:
 
-**Chart** -- An overlay line chart showing the price trajectory for each parameter set. The baseline is drawn as a solid gold line; the comparison as a dashed cyan line. Hover over any point to see the match number, LP delta, and win/loss status.
+**Chart.** An overlay line chart showing the price trajectory for each parameter set. The baseline is drawn as a solid gold line; the comparison as a dashed cyan line. Hover over any point to see the match number, LP delta, and win/loss status.
 
-**Step Data** -- A per-match table showing every intermediate value the pricing engine computed. Use the set selector buttons at the top to switch between Baseline and Comparison data.
+**Step Data.** A per-match table showing every intermediate value the pricing engine computed. Use the set selector buttons at the top to switch between Baseline and Comparison data.
 
 | Column | Meaning |
 |---|---|
@@ -57,12 +57,12 @@ After clicking **Run Simulation**, results appear in two tabs:
 | W/L | Win or Loss |
 | Streak | Streak value before and after this match |
 | Eff LP | Effective LP after soft cap taper and gain dampener |
-| Streak Mult | `1 + (0.1 * EffectiveStreak)` |
+| Streak Mult | Sign-dependent multiplier using the positive or negative streak coefficient. See [Economy mechanics](ECONOMY_MECHANICS.md). |
 | Price Before | Share price entering this match |
 | Price After | Share price after this match's move |
 | Move | `Price After - Price Before` |
 
-## Typical Workflows
+## Typical workflows
 
 ### "What if alpha was higher?"
 
@@ -86,11 +86,11 @@ After clicking **Run Simulation**, results appear in two tabs:
 
 1. Use **Replay** mode with a player who has many wins.
 2. Set Comparison's **Gain dampener default** to `1.0` (no dampening).
-3. Run and compare -- the Comparison line will show how much higher prices would go without the dampener.
+3. Run and compare. The Comparison line shows the effect of removing the dampener.
 
-## API Reference
+## API reference
 
-The simulation backend lives at `/api/simulate` and does not require admin auth (it is read-only and stateless). Three endpoints:
+The simulation backend lives at `/api/simulate`. Every endpoint requires a valid local session through the shared router mount. It does not require administrator permission because it is read-only and stateless. The UI menu remains administrator-only. The POST endpoint also requires the shared CSRF header. See [Architecture](ARCHITECTURE.md#authentication-and-session-trust-boundary). Three endpoints:
 
 ### `GET /api/simulate/defaults`
 
@@ -100,6 +100,8 @@ Returns the current production pricing parameters. The frontend uses this to pre
 {
   "pricing_alpha": 0.12,
   "pricing_loss_move_multiplier": 1.10,
+  "pricing_low_price_threshold": 15.0,
+  "pricing_beta_negative": 0.06,
   "pricing_max_effective_streak": 10,
   "pricing_positive_lp_soft_cap": 20,
   "pricing_negative_lp_soft_cap": 24,
@@ -151,10 +153,11 @@ Runs one or more simulation trajectories. Provide either `matches` (synthetic) o
 When using `player_id`, the server overrides `starting_price` and `starting_streak` with the values from the player's first recorded match.
 
 **Constraints:**
-- Cannot provide both `matches` and `player_id`.
-- Maximum 500 matches per simulation.
 
-**Response:** An array of trajectories, one per parameter set. Each trajectory contains the resolved parameters and a step-by-step breakdown.
+- Cannot provide both `matches` and `player_id`.
+- Maximum 500 matches and 20 parameter sets per simulation.
+
+**Response:** An object with a `results` array of trajectories, one per parameter set. Each trajectory contains the resolved parameters and a step-by-step breakdown.
 
 ## Implementation
 
@@ -167,4 +170,4 @@ When using `player_id`, the server overrides `starting_price` and `starting_stre
 | TypeScript types | `frontend/src/types.ts` (Simulation* interfaces) |
 | App wiring | `frontend/src/App.tsx` (state + conditional render), `frontend/src/components/Header.tsx` (menu button) |
 
-The simulation engine reimplements the pricing formula independently from `app/pricing.py` so that each parameter set can use its own overrides without mutating global settings. The formulas are identical; see `_lp_efficiency`, `_update_streak`, and `_compute_step` in `simulation.py`.
+The simulation engine reimplements the pricing formula independently from `app/pricing.py` so that each parameter set can use its own overrides without mutating global settings. See `_lp_efficiency`, `_update_streak`, and `_compute_step` in `simulation.py`. The simulator uses a fixed gain dampener rather than the live per-player ratio and does not mutate production settings. [Economy mechanics](ECONOMY_MECHANICS.md) owns the pricing formula.

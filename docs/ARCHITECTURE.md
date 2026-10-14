@@ -16,7 +16,6 @@ Browser -> HTTP entry point -> FastAPI routers
 Scheduler -> Riot client -> existing pricing engine -> SQLite
 ```
 
-
 ## Frontend
 
 - **Vite + TypeScript:** Build toolchain.
@@ -28,10 +27,10 @@ Scheduler -> Riot client -> existing pricing engine -> SQLite
 - **FastAPI:** Async Python web framework. Hosts all REST endpoints and the scheduler in a single process.
 - **SQLAlchemy 2.0:** ORM layer using the `Mapped`/`mapped_column` declarative style. No SQLModel.
 - **SQLite (aiosqlite):** Embedded database with WAL mode enabled for concurrent read/write access.
-- **APScheduler v3:** In-process `AsyncIOScheduler` that wakes every 30 seconds and runs a full market update when the dynamic interval (derived from tracked-player count and the Riot rate-limit budget) is due. See [DEPLOYMENT.md](DEPLOYMENT.md) "Market Update Cadence".
+- **APScheduler v3:** In-process `AsyncIOScheduler` that wakes every 30 seconds and runs a full market update when the dynamic interval (derived from tracked-player count and the Riot rate-limit budget) is due. See [the scheduler pipeline](#scheduler-pipeline).
 - **httpx:** Async HTTP client for Riot Games API calls.
 
-## Data Model
+## Data model
 
 Current SQLAlchemy tables:
 
@@ -57,7 +56,7 @@ Current SQLAlchemy tables:
 | `poro_spawns` | Server-side poro reward spawns and claims. |
 | `user_poro_states` | Per-user poro scheduling state. |
 
-## API Surface
+## API routes
 
 All endpoints are prefixed with `/api` except the health check.
 
@@ -99,13 +98,13 @@ Core endpoints:
 
 Additional optional/admin endpoints exist for bank, poro, simulation, admin dashboards, and the private-only `gamba` feature.
 
-## Accepted self-host target
+## Standalone self-host baseline
 
-The accepted direction is recorded in [ADR-0001](adr/0001-self-host-baseline.md). It replaces proxy authentication with standalone local accounts and sessions in the existing single-process, SQLite architecture. OAuth/OIDC and hosted multi-room operation are outside this baseline.
+The accepted direction is recorded in [ADR-0001](adr/0001-self-host-baseline.md). It uses standalone local accounts and sessions in the existing single-process, SQLite architecture. OAuth/OIDC and hosted multi-room operation are outside this baseline.
 
 The application owns identity, authentication, invite access and administrator permissions. A deployment's reverse proxy owns public TLS termination and does not establish application identity. Game data requires an authenticated session. Demo operation is explicit and isolates each visitor's temporary game state.
 
-Setup, invitations, password recovery, local login, logout, isolated demo sessions, standalone Compose packaging, administrator participation, member-visible game interventions and the private game-data gate are implemented. These follow [spec #19](https://github.com/KyleDerZweite/nashordaq/issues/19).
+Setup, invitations, password recovery, local login, logout, isolated demo sessions, standalone Compose packaging, administrator participation, member-visible game interventions and the private game-data gate are implemented. These follow [spec #19](https://github.com/KyleDerZweite/nashordaq/issues/19). Implementation is unreleased; [self-host acceptance](SELF_HOST_ACCEPTANCE.md) records technical evidence and remaining checks.
 
 ## Authentication and session trust boundary
 
@@ -139,9 +138,9 @@ Persistence checks the database marker before schema creation, alteration or swi
 
 ## Riot availability boundary
 
-`app/riot.py` owns configuration checks and safe upstream failure reports. Authenticated system status exposes its availability and operator instructions without credentials. Authentication and administration never call Riot to establish access. New links require successful ranked data; failed onboarding rolls back the player and link together. A real scheduler refresh rolls back its complete transaction on authentication, rate-limit or upstream availability failures, preserving existing prices and history. The simulated demo market remains independent.
+`app/riot.py` owns configuration checks, response validation and safe upstream failure reports. Authenticated system status exposes its availability and operator instructions without credentials. Authentication and administration never call Riot to establish access. New links require successful ranked data; failed onboarding rolls back the player and link together. A real scheduler refresh rolls back its complete transaction on authentication, rate-limit, malformed-response or upstream availability failures, preserving existing prices and history. Valid empty match history retains the existing aggregate-pricing behavior. The simulated demo market remains independent. Its status uses the configured simulation cadence and records a successful refresh only after a simulation tick commits.
 
-## Scheduler Pipeline
+## Scheduler pipeline
 
 The market update job runs as a single atomic operation:
 
@@ -152,10 +151,10 @@ The market update job runs as a single atomic operation:
 
 ## Infrastructure
 
-- **Podman-compose:** Manages containers for the frontend and backend.
+- **Docker Compose and Podman Compose:** Build and manage the frontend and backend through the shared `podman-compose.yaml`.
 - **No external services:** No Redis, no PostgreSQL, no separate worker process. SQLite and APScheduler keep the deployment minimal.
 
-## File Structure
+## File structure
 
 ```
 backend/
@@ -165,7 +164,11 @@ backend/
     database.py                 # Async SQLAlchemy engine, session factory, init_db
     models.py                   # ORM models for market, debt, poro, income, and audit state
     schemas.py                  # Pydantic request/response models
-    auth.py                     # Local credentials, setup, sessions and permissions
+    auth.py                     # Local credentials, access tokens, sessions and demo cleanup
+    identities.py               # Permanent League alias allocation
+    interventions.py            # Atomic game intervention and activity record
+    operator.py                 # Admin recovery, backup, restore and update preflight
+    persistence.py              # Consistent online snapshots and fresh restore
     pricing.py                  # Pure pricing functions (LP_abs, IPO, dynamic price, streak, market impact)
     riot.py                     # Riot Games API client (httpx)
     banking.py                  # Rescue-loan and wealth snapshot helpers
@@ -207,10 +210,9 @@ Administrator permissions add access to account management and game administrati
 
 `GET /api/activity` requires a session and exposes the actor and affected member through stable user IDs, usernames and optional linked Riot identity, UTC timestamp, intervention kind and previous/new values. It does not expose credentials, access tokens or email. The frontend renders this list for every member. Read-only administration and access management produce no intervention records. Demo visitors receive an empty activity list, preserving normal-market privacy if the operator changes deployment mode. The shared identity presentation interface renders its actor and affected member consistently with the other participant views.
 
-
 ## Identity presentation and alias persistence
 
-`app/identities.py` owns permanent League alias allocation through a shared SQLAlchemy creation invariant. New administrator, member, demo-user and tracked-player records receive unique aliases in the same transaction as their creation. Allocation takes SQLite's writer lock before selecting an unused name. A pinned champion pool is followed by item and ability names; exhausting the complete pool rejects creation without consuming an invitation or saving a partial account. Existing aliases remain unchanged after Riot linking, renaming and restart. Startup adds the alias table and backfills existing unreleased standalone data without deleting accounts, game state or sessions. This is not a released-version migration contract.
+`app/identities.py` owns permanent League alias allocation through a shared SQLAlchemy creation invariant. New administrator, member, demo-user and tracked-player records receive unique aliases in the same transaction as their creation. Allocation takes SQLite's writer lock before selecting an unused name. A pinned champion pool is followed by item and ability names; exhausting the complete pool rejects creation without consuming an invitation or saving a partial account. Existing aliases remain unchanged after Riot linking, renaming and restart. The initial complete version 1 schema includes the alias table. Startup assigns missing aliases within an otherwise compatible complete schema and retains existing assignments. It rejects partial development schemas; it does not add missing tables to a marked database.
 
 Authenticated `GET /api/identities` provides the presentation directory. Linked tracked players resolve to their user's alias; unlinked tracked players retain their own alias. Normal requests exclude demo users. Demo requests expose only the requesting temporary user and mask linked identities belonging to excluded users. Shared market aliases remain available.
 

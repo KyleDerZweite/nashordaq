@@ -4,7 +4,7 @@ import logging
 import secrets
 from datetime import UTC, datetime, timedelta
 from threading import BoundedSemaphore
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field, field_validator
@@ -511,25 +511,37 @@ async def register_member(
     return {"status": "ok"}
 
 
+async def _revoke_active_access_token(
+    session: AsyncSession,
+    token_id: int,
+    kind: Literal["invite", "reset"],
+    conflict_detail: str,
+) -> None:
+    now = utc_now()
+    revoked = await session.execute(
+        update(AccessToken)
+        .where(
+            AccessToken.id == token_id,
+            AccessToken.kind == kind,
+            AccessToken.expires_at > now,
+            AccessToken.consumed_at.is_(None),
+            AccessToken.revoked_at.is_(None),
+        )
+        .values(revoked_at=now)
+        .returning(AccessToken.id)
+    )
+    if revoked.scalar_one_or_none() is None:
+        raise HTTPException(status_code=409, detail=conflict_detail)
+    await session.commit()
+
+
 @router.delete("/invites/{invitation_id}")
 async def revoke_invitation(
     invitation_id: int, administrator: CurrentAdminUser, session: SessionDep
 ) -> dict[str, str]:
-    revoked = await session.execute(
-        update(AccessToken)
-        .where(
-            AccessToken.id == invitation_id,
-            AccessToken.kind == "invite",
-            AccessToken.expires_at > utc_now(),
-            AccessToken.consumed_at.is_(None),
-            AccessToken.revoked_at.is_(None),
-        )
-        .values(revoked_at=utc_now())
-        .returning(AccessToken.id)
+    await _revoke_active_access_token(
+        session, invitation_id, "invite", "Invitation is no longer active"
     )
-    if revoked.scalar_one_or_none() is None:
-        raise HTTPException(status_code=409, detail="Invitation is no longer active")
-    await session.commit()
     return {"status": "ok"}
 
 
@@ -708,21 +720,9 @@ async def revoke_reset(
     session: SessionDep,
 ) -> dict[str, str]:
     require_password_mode()
-    revoked = await session.execute(
-        update(AccessToken)
-        .where(
-            AccessToken.id == reset_id,
-            AccessToken.kind == "reset",
-            AccessToken.expires_at > utc_now(),
-            AccessToken.consumed_at.is_(None),
-            AccessToken.revoked_at.is_(None),
-        )
-        .values(revoked_at=utc_now())
-        .returning(AccessToken.id)
+    await _revoke_active_access_token(
+        session, reset_id, "reset", "Reset link is no longer active"
     )
-    if revoked.scalar_one_or_none() is None:
-        raise HTTPException(status_code=409, detail="Reset link is no longer active")
-    await session.commit()
     return {"status": "ok"}
 
 

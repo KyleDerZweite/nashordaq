@@ -69,6 +69,24 @@ async def test_demo_market_tick_updates_shared_prices_and_creates_history(
         assert history_after["price_history"][0]["price"] == after[0]["current_price"]
 
 
+async def test_demo_status_reports_simulation_cadence_and_committed_tick(
+    demo_instance, monkeypatch
+):
+    monkeypatch.setattr(settings, "demo_sim_interval_seconds", 121)
+    monkeypatch.setattr(scheduler, "_last_market_update_at", None)
+    async with demo_instance() as client:
+        await demo_login(client)
+        before = (await client.get("/api/system/status")).json()
+        assert before["expected_update_interval_minutes"] == 3
+        assert before["last_market_update_at"] is None
+        tick_started_at = datetime.now(UTC)
+        await scheduler.demo_market_tick_job()
+        after = (await client.get("/api/system/status")).json()
+        assert after["riot_status"] == "demo"
+        assert after["expected_update_interval_minutes"] == 3
+        assert datetime.fromisoformat(after["last_market_update_at"]) >= tick_started_at
+
+
 @pytest.fixture
 async def demo_instance(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "demo_mode_enabled", True)

@@ -22,6 +22,7 @@ import OnboardingModal from "./components/OnboardingModal";
 import { useIdentityPresentation } from "./contexts/useIdentityPresentation";
 import type { OrderSide } from "./types";
 import { formatAmount, formatLocalDateTime } from "./utils/format";
+import { isRiotUnavailable } from "./utils/riotStatus";
 
 import {
   useBankSummary,
@@ -180,7 +181,12 @@ export default function App({
 
   let marketStatusDetail = "Checking market service...";
   if (resolvedSystemStatus) {
-    if (resolvedSystemStatus.last_market_update_at) {
+    if (isDemo) {
+      const cadence = resolvedSystemStatus.expected_update_interval_minutes;
+      marketStatusDetail = resolvedSystemStatus.last_market_update_at
+        ? `Last simulated market refresh ${formatLocalDateTime(resolvedSystemStatus.last_market_update_at)}. Prices change about every ${cadence} min.`
+        : `Demo prices change automatically about every ${cadence} min. Awaiting the first simulated market refresh.`;
+    } else if (resolvedSystemStatus.last_market_update_at) {
       marketStatusDetail = `Last successful market refresh ${formatLocalDateTime(resolvedSystemStatus.last_market_update_at)}. Expected cadence about every ${resolvedSystemStatus.expected_update_interval_minutes} min.`;
     } else if (resolvedSystemStatus.tracked_player_count === 0) {
       marketStatusDetail =
@@ -228,20 +234,14 @@ export default function App({
           </p>
         )}
         {!isDemo && user && <AccountPassword />}
-        {systemStatus &&
-          [
-            "missing_key",
-            "invalid_key",
-            "unavailable",
-            "rate_limited",
-          ].includes(systemStatus.riot_status) && (
-            <p
-              role="status"
-              className="mb-6 border border-hex-gold p-4 font-mono text-sm text-hex-gold"
-            >
-              {systemStatus.riot_status_detail}
-            </p>
-          )}
+        {systemStatus && isRiotUnavailable(systemStatus.riot_status) && (
+          <p
+            role="status"
+            className="mb-6 border border-hex-gold p-4 font-mono text-sm text-hex-gold"
+          >
+            {systemStatus.riot_status_detail}
+          </p>
+        )}
         {isDemo && <DemoBanner />}
         {user && !onboardingComplete && !isDemo && (
           <section className="mb-6 border-2 border-hex-gold-dim bg-hex-panel p-4">

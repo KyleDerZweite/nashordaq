@@ -85,7 +85,10 @@ def get_required_market_update_interval(trackable_player_count: int) -> timedelt
     Uses the Riot API rate-limit budget (default 100 req / 2 min) and estimated
     per-player API cost to compute the fastest safe polling interval.  Only
     players with actual LP data (lp_abs > 0) should be counted.
+    Demo status uses the configured simulation interval instead.
     """
+    if settings.demo_mode_enabled:
+        return timedelta(seconds=settings.demo_sim_interval_seconds)
     if trackable_player_count <= 0:
         return timedelta(seconds=MIN_UPDATE_INTERVAL_SECONDS)
 
@@ -767,11 +770,13 @@ async def market_update_job() -> None:
                     return
                 except Exception:
                     logger.exception(
-                        "Error fetching matches for %s#%s",
+                        "Unexpected match response for %s#%s; "
+                        "rolling back the market update",
                         player.game_name,
                         player.tag_line,
                     )
-                    all_summaries = []
+                    await session.rollback()
+                    return
 
                 _learn_player_lp_averages(
                     player,
@@ -902,10 +907,13 @@ async def market_update_job() -> None:
                     return
                 except Exception:
                     logger.exception(
-                        "Error applying playing income for %s#%s",
+                        "Error applying playing income for %s#%s; "
+                        "rolling back the market update",
                         player.game_name,
                         player.tag_line,
                     )
+                    await session.rollback()
+                    return
 
             if should_record_market_update:
                 player.last_updated = datetime.now(UTC)
@@ -1075,6 +1083,8 @@ async def demo_market_tick_job() -> None:
     """Simulate market movements for demo mode using random LP deltas."""
     import random
 
+    global _last_market_update_at
+
     async with SessionLocal() as session:
         result = await session.execute(select(TrackedPlayer))
         players = result.scalars().all()
@@ -1114,6 +1124,8 @@ async def demo_market_tick_job() -> None:
             )
 
         await session.commit()
+        if players:
+            _last_market_update_at = datetime.now(UTC)
         logger.info("Demo market tick: updated %d players", len(players))
 
 

@@ -1,10 +1,10 @@
-# Product Requirements Document
+# Product requirements
 
 ## Objective
 
 Create a private, web-based platform where users can virtually invest in the ranked progression of a defined list of League of Legends accounts.
 
-## Target Audience
+## Target audience
 
 A closed, trusted friend group. Public registration and email verification are out of scope.
 
@@ -14,7 +14,7 @@ A closed, trusted friend group. Public registration and email verification are o
 
 Public registration, a mail-server requirement, OAuth/OIDC, additional administrators and hosted multi-room operation are outside this baseline. The first standalone release starts with fresh data; subsequent standalone releases establish the supported update path.
 
-Local setup, invitation registration, password recovery, sessions, isolated demo sessions, administrator participation and member-visible game interventions are implemented.
+Local setup, invitation registration, password recovery, sessions, isolated demo sessions, stable identity presentation, administrator participation and member-visible game interventions are implemented. Compose packaging and operator backup, restore and update preflight are implemented. This baseline is unreleased. [Self-host acceptance](SELF_HOST_ACCEPTANCE.md) separates technical verification, unexecuted integration checks and pending owner acceptance.
 
 ## Current core user flows
 
@@ -30,7 +30,7 @@ Local setup, invitation registration, password recovery, sessions, isolated demo
 
 6. **Bank Failsafe:** Clicking the balance card opens a bank modal where onboarded player accounts can claim a fixed rescue loan only after falling under the configured debt-adjusted net-worth threshold. The rescue adds cash immediately, adds an immediate opening interest charge, rolls forward every 120 hours at a low fixed rate, can be repaid at any time, and is single-use until an admin restores access.
 
-7. **Playing Income:** Onboarded player accounts earn a small direct cash reward when the system detects that their linked Riot account completed a new Ranked Solo 5v5 match. Rewards are credited once per completed match, use the player's current share price as the base, and ignore remakes/short games.
+7. **Playing income:** Onboarded player accounts earn a small direct cash reward when the system detects that their linked Riot account completed a new Ranked Solo 5v5 match. Rewards are credited once per completed match, use the player's current share price as the base, and ignore remakes/short games.
 
 ## Constraints
 
@@ -40,9 +40,9 @@ Local setup, invitation registration, password recovery, sessions, isolated demo
 - **Self-onboarding players:** Each user, including the administrator, can link their own Riot account by submitting `game_name` and `tag_line`. Linked players become tracked in the market. Deletion is out of scope.
 - **Production-compliant product path:** Any future Riot-compliant production application excludes the private-only `gamba` mechanic entirely and frames Nashordaq as a virtual investing and social market product.
 
-## System Requirements
+## System requirements
 
-1. **Riot API Integration:** The system fetches Solo Queue rank and LP data for all tracked accounts at a configurable interval (default: 30 minutes).
+1. **Riot API Integration:** The system fetches Solo Queue rank and LP data for all tracked accounts at a dynamic interval derived from tracked-player count and the configured request budget. The scheduler checks whether a refresh is due every 30 seconds. See [Architecture](ARCHITECTURE.md#scheduler-pipeline).
 
 2. **Pricing Engine:** Share prices are computed from Absolute LP using a formula that incorporates base volatility, momentum streaks, per-player obfuscation, and random noise. See [Economy Mechanics](ECONOMY_MECHANICS.md) for details.
 
@@ -53,3 +53,11 @@ Local setup, invitation registration, password recovery, sessions, isolated demo
 5. **Bank Debt Ledger:** Borrowing, interest capitalization, and repayments are stored as immutable bank-ledger entries. Outstanding debt is account-level and is not represented as a trade order.
 
 Administrator and participant views are available through the account menu. Onboarded administrators use ordinary trading, portfolio, bank and profile actions under the same economy rules. Linking can be dismissed, preserving account administration when Riot is unavailable. The game activity list shows successful rescue-access restorations with actor, affected member, time and the change in remaining uses. Failed interventions and account access operations do not create activity entries.
+
+## Identity and demo behavior
+
+Normal views show the local username and linked RiotName. Streamer Mode uses each participant's permanent League alias across all views and reloads. It hides personal names, Riot tags and identifying links. Editing a Riot profile requires explicitly leaving Streamer Mode. The feature protects rendered presentation; it does not hide legitimate identity data from authenticated API consumers.
+
+Explicit demo mode automatically loads a shared simulated market and requires `demo/demo` login. Every browser session has separate temporary balance, holdings and orders without administrator permissions. Reload preserves a valid session. Logout immediately deletes personal state. Thirty minutes of inactivity ends access, and the minute-based cleanup removes abandoned state while preserving shared market data. Trusted user interaction renews activity; polling and streams do not. Browser closure is not an immediate deletion signal.
+
+Gamba is disabled by default. Operators can enable the existing mechanic explicitly for private use; this baseline adds no economy mechanics. [Economy mechanics](ECONOMY_MECHANICS.md) owns formulas and configurable defaults.

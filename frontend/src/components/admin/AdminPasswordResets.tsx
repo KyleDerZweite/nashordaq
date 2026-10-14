@@ -1,4 +1,5 @@
 import { useState } from "react";
+import SecretLinkDelivery from "./SecretLinkDelivery";
 import type { FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAdminUsers } from "../../api/hooks";
@@ -31,13 +32,11 @@ export default function AdminPasswordResets() {
   });
   const [selectedUser, setSelectedUser] = useState("");
   const [latest, setLatest] = useState<CreatedReset>();
-  const [copyMessage, setCopyMessage] = useState<string>();
   const create = useMutation({
     mutationFn: (userId: number) =>
       post<CreatedReset>("/auth/resets", { user_id: userId }),
     onSuccess: (reset) => {
       setLatest(reset);
-      setCopyMessage(undefined);
       void queryClient.invalidateQueries({ queryKey });
     },
   });
@@ -51,17 +50,6 @@ export default function AdminPasswordResets() {
       void queryClient.invalidateQueries({ queryKey });
     },
   });
-  async function copy() {
-    if (!latest) return;
-    try {
-      await navigator.clipboard.writeText(latest.url);
-      setCopyMessage("Reset link copied.");
-    } catch {
-      setCopyMessage(
-        "Select and copy the link above. Clipboard access is unavailable.",
-      );
-    }
-  }
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (selectedUser && !create.isPending) create.mutate(Number(selectedUser));
@@ -100,8 +88,11 @@ export default function AdminPasswordResets() {
           </button>
         </div>
       )}
-      <form onSubmit={submit} className="mt-4 flex flex-wrap items-end gap-3">
-        <div className="min-w-0 flex-1">
+      <form
+        onSubmit={submit}
+        className="mt-4 flex flex-col items-start gap-3 sm:flex-row sm:items-end"
+      >
+        <div className="w-full min-w-0 sm:flex-1">
           <label
             htmlFor="reset-account"
             className="block text-sm font-bold text-hex-white"
@@ -139,40 +130,18 @@ export default function AdminPasswordResets() {
         </p>
       )}
       {latest && (
-        <div className="mt-5 border border-hex-gold-dim bg-hex-bg p-4">
-          <p role="status" className="text-sm text-hex-white">
-            Reset link created for {userName(latest.user_id)}. Share it
-            privately with that account's owner.
-          </p>
-          <label
-            htmlFor="password-reset-link"
-            className="mt-3 block text-sm font-bold text-hex-white"
-          >
-            Password reset link
-          </label>
-          <input
-            id="password-reset-link"
-            readOnly
-            value={latest.url}
-            onFocus={(event) => event.target.select()}
-            className="mt-2 w-full min-w-0 border-2 border-hex-border bg-hex-bg-alt px-3 py-2 text-sm text-hex-white focus:border-hex-gold focus:outline-none"
-          />
-          <p className="mt-2 text-xs text-hex-bronze">
-            Save this link now. It cannot be retrieved after leaving this page.
-          </p>
-          <button
-            type="button"
-            onClick={() => void copy()}
-            className={`${buttonClass} mt-3`}
-          >
-            Copy reset link
-          </button>
-          {copyMessage && (
-            <p role="status" className="mt-3 text-sm text-hex-bronze">
-              {copyMessage}
-            </p>
-          )}
-        </div>
+        <SecretLinkDelivery
+          key={latest.id}
+          id="password-reset-link"
+          label="Password reset link"
+          url={latest.url}
+          copyLabel="Copy reset link"
+          copySuccess="Reset link copied."
+          buttonClass={buttonClass}
+        >
+          Reset link created for {userName(latest.user_id)}. Share it privately
+          with that account's owner.
+        </SecretLinkDelivery>
       )}
       {resets.isPending && (
         <p role="status" className="mt-5 text-sm text-hex-bronze">

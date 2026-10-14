@@ -11,13 +11,11 @@ Nashordaq is a personal project. Contributions are welcome, but there are no gua
 
 See the [README](README.md#development) for backend and frontend dev commands.
 
-You will need:
-- A [Riot Games API key](https://developer.riotgames.com/) (development keys rotate every 24 hours)
-- An Identity-Aware Proxy (e.g. [Pangolin](https://github.com/fosrl/pangolin)) or a way to inject `Remote-Email`, `Remote-Name`, and optional `Remote-User` fallback headers for local testing
+Use the local setup link and username/password sessions described in [Deployment](docs/DEPLOYMENT.md#local-development). No external identity provider or Riot key is needed for account access or demo development. Live Riot onboarding and updates require your own protected API key.
 
 ## Pull requests
 
-- Keep PRs focused -- one change per PR.
+- Keep PRs focused on one useful change.
 - Make sure linting and tests pass before submitting:
   ```bash
   # Backend

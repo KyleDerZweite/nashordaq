@@ -1,4 +1,5 @@
 from datetime import UTC, datetime, timedelta
+from math import ceil
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -530,7 +531,7 @@ async def get_admin_system_status(
         or 0
     )
     interval = get_required_market_update_interval(trackable_player_count)
-    expected_update_interval_minutes = int(interval.total_seconds() // 60)
+    expected_update_interval_minutes = ceil(interval.total_seconds() / 60)
     last_market_update_at = get_last_market_update_at()
     scheduler_running = is_scheduler_running()
 
