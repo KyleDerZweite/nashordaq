@@ -7,8 +7,7 @@ import time
 from contextlib import closing
 from pathlib import Path
 
-from app.database import validate_existing_database
-from app.models import Base
+from app.database import validate_existing_database, validate_standalone_schema
 
 SQLITE_SIDECARS = ("-wal", "-shm", "-journal")
 
@@ -64,29 +63,7 @@ def backup_database(source: Path, destination: Path) -> None:
             ).fetchone()
             live.backup(snapshot, pages=256, progress=progress, sleep=0.1)
             snapshot.execute("PRAGMA journal_mode=DELETE")
-            for table in Base.metadata.sorted_tables:
-                present_columns = {
-                    row[1]
-                    for row in snapshot.execute(f'PRAGMA table_info("{table.name}")')
-                }
-                if not {column.name for column in table.columns}.issubset(
-                    present_columns
-                ):
-                    raise RuntimeError(
-                        "Snapshot schema is incomplete for this release. "
-                        "Use the matching release and a complete supported backup."
-                    )
-            if snapshot.execute("PRAGMA integrity_check").fetchall() != [("ok",)]:
-                raise RuntimeError(
-                    "Database integrity check failed. "
-                    "Preserve the source and use a healthy backup."
-                )
-            if snapshot.execute("PRAGMA foreign_key_check").fetchone() is not None:
-                raise RuntimeError(
-                    "Database references are inconsistent. "
-                    "Preserve the source and use a healthy backup."
-                )
-        validate_existing_database(temporary)
+            validate_standalone_schema(snapshot.execute)
         with temporary.open("rb") as file:
             os.fsync(file.fileno())
         require_fresh_destination(destination)

@@ -1475,9 +1475,9 @@ async def test_existing_standalone_data_receives_aliases_without_account_changes
         )
         await session.commit()
     before = (await client.get("/api/user/me")).json()
-    # Prepare the earlier unreleased standalone shape before aliases existed.
+    # Empty alias assignments in the complete current schema exercise backfill.
     async with database.engine.begin() as connection:
-        await connection.execute(text("DROP TABLE identity_aliases"))
+        await connection.execute(text("DELETE FROM identity_aliases"))
     await database.engine.dispose()
     await main.initialize_instance()
     assert (await client.get("/api/user/me")).json() == before
