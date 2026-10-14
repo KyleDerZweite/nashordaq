@@ -43,7 +43,7 @@ Verify setup, reload, logout and login in the browser. Without a session, game q
 
 Local setup, login and administrator access work with an empty or rejected Riot key. The authenticated market and player-setup views show whether the key is missing, rejected, rate limited or affected by an upstream outage. Status never returns the key. A configured key starts as unverified until Riot accepts a request.
 
-New player links require a successful account and ranked Solo Queue lookup. A failed lookup leaves the local account usable and creates no linked tracked player. Retry the same player after recovery. Real refreshes roll back their entire transaction when Riot authentication, rate limits or network availability fail. Existing prices and history remain unchanged. Demo uses its own simulated market and requires no key.
+New player links require a successful account and ranked Solo Queue lookup. A failed lookup leaves the local account usable and creates no linked tracked player. Retry the same player after recovery. Real refreshes roll back their entire transaction when Riot authentication, rate limits, response validation or network availability fail. Existing prices and history remain unchanged. Demo uses its own simulated market and requires no key.
 
 For a missing or rejected key, replace `NASHORDAQ_RIOT_API_KEY` in the protected environment file. Recreate the full Compose stack to load the changed environment. A Compose `restart` retains its old environment. Use `podman-compose -f podman-compose.yaml up -d --force-recreate` or `docker compose -f podman-compose.yaml up -d --force-recreate`. Keep the existing data bind mount and database. Do not repeat setup or create another administrator.
 

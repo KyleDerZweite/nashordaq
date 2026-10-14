@@ -138,7 +138,7 @@ Persistence checks the database marker before schema creation, alteration or swi
 
 ## Riot availability boundary
 
-`app/riot.py` owns configuration checks and safe upstream failure reports. Authenticated system status exposes its availability and operator instructions without credentials. Authentication and administration never call Riot to establish access. New links require successful ranked data; failed onboarding rolls back the player and link together. A real scheduler refresh rolls back its complete transaction on authentication, rate-limit or upstream availability failures, preserving existing prices and history. The simulated demo market remains independent.
+`app/riot.py` owns configuration checks, response validation and safe upstream failure reports. Authenticated system status exposes its availability and operator instructions without credentials. Authentication and administration never call Riot to establish access. New links require successful ranked data; failed onboarding rolls back the player and link together. A real scheduler refresh rolls back its complete transaction on authentication, rate-limit, malformed-response or upstream availability failures, preserving existing prices and history. Valid empty match history retains the existing aggregate-pricing behavior. The simulated demo market remains independent. Its status uses the configured simulation cadence and records a successful refresh only after a simulation tick commits.
 
 ## Scheduler pipeline
 

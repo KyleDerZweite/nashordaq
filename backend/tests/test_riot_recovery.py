@@ -4,6 +4,7 @@ import httpx
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+import app.riot as riot_module
 import app.scheduler as scheduler_module
 from app.config import settings
 from app.main import app
@@ -16,13 +17,19 @@ def stub_initial_player_refresh():
     return None
 
 
+@pytest.fixture(autouse=True)
+def isolated_riot_status(monkeypatch):
+    monkeypatch.setattr(riot_module, "_last_failure", None)
+    monkeypatch.setattr(riot_module, "_verified", False)
+
+
 async def test_missing_riot_key_explained_without_affecting_local_access(
     admin_client, monkeypatch
 ):
     monkeypatch.setattr(settings, "riot_api_key", "")
     status = await admin_client.get("/api/system/status")
     assert status.json()["riot_status"] == "missing_key"
-    assert "restart" in status.json()["riot_status_detail"]
+    assert "recreate the full Compose stack" in status.json()["riot_status_detail"]
     lookup = await admin_client.get("/api/market/account?gameName=Player&tagLine=EUW")
     assert lookup.status_code == 503
     assert "NASHORDAQ_RIOT_API_KEY" in lookup.json()["detail"]
@@ -232,6 +239,218 @@ async def test_missing_key_preserves_existing_market(
         await auth_client.get(f"/api/market/players/{seeded_player.id}")
     ).json() == before
     assert (await auth_client.get("/api/auth/session")).status_code == 200
+
+
+@pytest.mark.parametrize(
+    "endpoint, response",
+    [
+        ("list", {"content": "upstream returned invalid JSON"}),
+        ("list", {"json": {"matches": []}}),
+        ("list", {"json": [42]}),
+        ("detail", {"content": "upstream returned invalid JSON"}),
+        ("detail", {"json": []}),
+        ("detail", {"json": {"info": {"participants": "invalid"}}}),
+        (
+            "detail",
+            {
+                "json": {
+                    "info": {
+                        "queueId": 420,
+                        "gameDuration": 1200,
+                        "gameEndTimestamp": 1710000000000,
+                        "participants": [{"puuid": "second", "win": "false"}],
+                    }
+                }
+            },
+        ),
+    ],
+    ids=[
+        "list-json",
+        "list-object",
+        "list-id",
+        "detail-json",
+        "detail-array",
+        "detail-participants",
+        "detail-outcome",
+    ],
+)
+async def test_malformed_matches_roll_back_entire_market_refresh(
+    auth_client, db_session, db_engine, monkeypatch, endpoint, response
+):
+    db_session.add_all(
+        [
+            TrackedPlayer(
+                game_name="First",
+                tag_line="EUW",
+                display_name="First",
+                puuid="first",
+                current_price=10,
+                lp_abs=0,
+            ),
+            TrackedPlayer(
+                game_name="Second",
+                tag_line="EUW",
+                display_name="Second",
+                puuid="second",
+                current_price=25,
+                lp_abs=1500,
+            ),
+        ]
+    )
+    await db_session.commit()
+    before = (await auth_client.get("/api/market/players")).json()
+    before_details = [
+        (await auth_client.get(f"/api/market/players/{player['id']}")).json()
+        for player in before
+    ]
+
+    def riot_response(request):
+        if "/lol/league/" in request.url.path:
+            return httpx.Response(
+                200,
+                json=[
+                    {
+                        "queueType": "RANKED_SOLO_5x5",
+                        "tier": "GOLD",
+                        "rank": "I",
+                        "leaguePoints": 75,
+                        "wins": 10,
+                        "losses": 10,
+                    }
+                ],
+            )
+        if request.url.path.endswith("/ids") and endpoint == "detail":
+            return httpx.Response(200, json=["EUW1_42"])
+        return httpx.Response(200, **response)
+
+    monkeypatch.setattr(
+        scheduler_module,
+        "SessionLocal",
+        async_sessionmaker(db_engine, class_=AsyncSession, expire_on_commit=False),
+    )
+    monkeypatch.setattr(scheduler_module, "_app", app)
+    monkeypatch.setattr(scheduler_module, "_last_market_update_at", None)
+    monkeypatch.setattr(settings, "riot_request_stagger_seconds", 0)
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(riot_response)
+    ) as riot_client:
+        monkeypatch.setattr(app.state, "http_client", riot_client)
+        await scheduler_module.market_update_job()
+
+    assert (await auth_client.get("/api/market/players")).json() == before
+    assert [
+        (await auth_client.get(f"/api/market/players/{player['id']}")).json()
+        for player in before
+    ] == before_details
+    status = (await auth_client.get("/api/system/status")).json()
+    assert status["last_market_update_at"] is None
+    assert status["riot_status"] == "unavailable"
+    assert "invalid response" in status["riot_status_detail"]
+
+
+async def test_valid_empty_match_history_keeps_aggregate_pricing(
+    auth_client, seeded_player, db_session, db_engine, monkeypatch
+):
+    seeded_player.puuid = "test-player"
+    await db_session.commit()
+    before = (await auth_client.get(f"/api/market/players/{seeded_player.id}")).json()
+
+    def riot_response(request):
+        if "/lol/league/" in request.url.path:
+            return httpx.Response(
+                200,
+                json=[
+                    {
+                        "queueType": "RANKED_SOLO_5x5",
+                        "tier": "GOLD",
+                        "rank": "I",
+                        "leaguePoints": 75,
+                        "wins": 10,
+                        "losses": 10,
+                    }
+                ],
+            )
+        return httpx.Response(200, json=[])
+
+    monkeypatch.setattr(
+        scheduler_module,
+        "SessionLocal",
+        async_sessionmaker(db_engine, class_=AsyncSession, expire_on_commit=False),
+    )
+    monkeypatch.setattr(scheduler_module, "_app", app)
+    monkeypatch.setattr(scheduler_module, "_last_market_update_at", None)
+    monkeypatch.setattr(settings, "riot_request_stagger_seconds", 0)
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(riot_response)
+    ) as riot_client:
+        monkeypatch.setattr(app.state, "http_client", riot_client)
+        await scheduler_module.market_update_job()
+
+    after = (await auth_client.get(f"/api/market/players/{seeded_player.id}")).json()
+    assert after["current_price"] == 28.78675
+    assert len(after["price_history"]) == len(before["price_history"]) + 1
+    status = (await auth_client.get("/api/system/status")).json()
+    assert status["last_market_update_at"] is not None
+    assert status["riot_status"] == "available"
+
+
+@pytest.mark.parametrize(
+    "endpoint, response",
+    [
+        ("account", {"content": "private provider diagnostic"}),
+        ("account", {"json": []}),
+        ("account", {"json": {"puuid": 42}}),
+        ("rank", {"content": "private provider diagnostic"}),
+        ("rank", {"json": {"entries": []}}),
+        ("rank", {"json": [{"queueType": "RANKED_SOLO_5x5"}]}),
+        (
+            "rank",
+            {
+                "json": [
+                    {
+                        "queueType": "RANKED_SOLO_5x5",
+                        "tier": "UNKNOWN",
+                        "rank": "I",
+                        "leaguePoints": 75,
+                    }
+                ]
+            },
+        ),
+    ],
+    ids=[
+        "account-json",
+        "account-array",
+        "account-puuid",
+        "rank-json",
+        "rank-object",
+        "rank-fields",
+        "rank-tier",
+    ],
+)
+async def test_malformed_riot_identity_response_keeps_onboarding_atomic(
+    auth_client, monkeypatch, endpoint, response
+):
+    def riot_response(request):
+        if "/riot/account/" in request.url.path and endpoint == "rank":
+            return httpx.Response(200, json={"puuid": "test-player"})
+        return httpx.Response(200, **response)
+
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(riot_response)
+    ) as riot_client:
+        monkeypatch.setattr(app.state, "http_client", riot_client)
+        result = await auth_client.post(
+            "/api/user/onboarding", json={"game_name": "Player", "tag_line": "EUW"}
+        )
+    assert result.status_code == 502
+    assert "invalid response" in result.json()["detail"]
+    assert "private provider diagnostic" not in result.text
+    assert (await auth_client.get("/api/user/me")).json()["linked_player_id"] is None
+    assert (await auth_client.get("/api/market/players")).json() == []
+    assert (await auth_client.get("/api/auth/session")).status_code == 200
+    assert (await auth_client.get("/api/system/status")).json()[
+        "riot_status"
+    ] == "unavailable"
 
 
 async def test_profile_failure_keeps_existing_link_and_identity(

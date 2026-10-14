@@ -181,6 +181,26 @@ async def test_browser_changes_reject_cross_origin_and_simple_requests(local_ins
     assert (await client.post("/api/auth/logout")).status_code == 200
 
 
+@pytest.mark.parametrize(
+    "headers",
+    [
+        {"Origin": "https://evil.example"},
+        {"Origin": "null"},
+        {"Sec-Fetch-Site": "cross-site"},
+        {"X-Nashordaq-CSRF": ""},
+    ],
+)
+async def test_csrf_rejections_prevent_caching_and_referrer_disclosure(client, headers):
+    response = await client.post(
+        "/api/auth/login",
+        json={"username": "member", "password": "a secure password"},
+        headers={"X-Nashordaq-CSRF": "1", **headers},
+    )
+    assert response.status_code == 403
+    assert response.headers.get("Cache-Control") == "no-store"
+    assert response.headers.get("Referrer-Policy") == "no-referrer"
+
+
 async def test_expiry_ends_access_after_seven_days(local_instance, monkeypatch):
     from datetime import UTC, datetime, timedelta
 
