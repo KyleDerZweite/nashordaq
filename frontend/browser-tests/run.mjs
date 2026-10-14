@@ -202,11 +202,18 @@ async function ready(origin) {
 let directory;
 let composeArgs;
 let results;
-let stage = "provider preflight";
+let stage = "source preflight";
 let success = false;
 let cleanup = "not needed";
 const project = `nashordaq-browser-${randomUUID().slice(0, 12)}`;
 try {
+  for (const name of ["backend", "frontend", "demo"]) {
+    const directory = await lstat(join(repository, name));
+    if (directory.isSymbolicLink() || !directory.isDirectory()) {
+      throw new Error(`Source directory must be a real directory: ${name}`);
+    }
+  }
+  stage = "provider preflight";
   const version = await run(runtime, ["--version"], { capture: true });
   if (runtime === "docker" && /podman/i.test(version)) {
     throw new Error(
