@@ -12,7 +12,7 @@ Explicit demo deployment requires `demo/demo` login and gives each browser sessi
 
 Docker Compose and Podman Compose build locally from pinned inputs and retain SQLite in a host bind directory. Gamba is disabled by default. Operator commands provide administrator recovery, consistent live backup, fresh restore and supported-schema preflight. The initial complete schema is version 1; partial development schemas and old proxy data are unsupported.
 
-The implementation is unreleased. Final acceptance must distinguish current-revision checks, live Riot, operator public HTTPS, release-tag installation and owner judgment. The first standalone release has no released predecessor. The following release must verify its advertised predecessor update and matching-backup recovery.
+The implementation is merged. Installation uses a git clone of `main`, the supplied environment example and Compose. Updates use compatible commits with schema preflight and matching-backup recovery. [Self-host acceptance](SELF_HOST_ACCEPTANCE.md) distinguishes recorded commit checks, live Riot evidence and owner judgment.
 
 ## Existing economy
 

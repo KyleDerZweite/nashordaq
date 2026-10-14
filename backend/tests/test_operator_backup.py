@@ -288,7 +288,7 @@ def test_restore_refuses_incomplete_schema_without_publishing_or_changing_backup
     before = source.read_bytes()
     result = run_operator("restore", "--backup", source, "--database", destination)
     assert result.returncode == 1
-    assert "matching release" in result.stderr
+    assert "matching code revision" in result.stderr
     assert source.read_bytes() == before
     assert set(tmp_path.iterdir()) == {source}
 
