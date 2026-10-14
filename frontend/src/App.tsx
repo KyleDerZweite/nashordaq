@@ -1,10 +1,12 @@
+import AccountPassword from "./components/AccountPassword";
 import { useEffect, useMemo, useState } from "react";
 import BalanceInsightsModal from "./components/BalanceInsightsModal";
 import AdminDashboard from "./components/admin/AdminDashboard";
+import AdminAccessManagement from "./components/admin/AdminAccessManagement";
 import Header from "./components/Header";
+import GameActivity from "./components/GameActivity";
 import BankModal from "./components/BankModal";
 import DemoBanner from "./components/DemoBanner";
-import DemoNicknameModal from "./components/DemoNicknameModal";
 import SimulationView from "./components/SimulationView";
 import FlyingPoro from "./components/FlyingPoro";
 import MarketGrid from "./components/MarketGrid";
@@ -17,16 +19,15 @@ import PlayerProfileModal from "./components/PlayerProfileModal";
 import PlayerDetailsModal from "./components/PlayerDetailsModal";
 import TradeTerminal from "./components/TradeTerminal";
 import OnboardingModal from "./components/OnboardingModal";
-import { useStreamerMode } from "./contexts/useStreamerMode";
+import { useIdentityPresentation } from "./contexts/useIdentityPresentation";
 import type { OrderSide } from "./types";
 import { formatAmount, formatLocalDateTime } from "./utils/format";
-import { getStreamerSafeName } from "./utils/streamerMode";
+import { isRiotUnavailable } from "./utils/riotStatus";
 
 import {
   useBankSummary,
   useAdminOverview,
   useAdminPlayerInsights,
-  useAdminSystemStatus,
   useAdminUsers,
   useUser,
   usePlayers,
@@ -44,25 +45,34 @@ interface TradeTarget {
 }
 
 type TickerSortMode = "value" | "name";
-type AdminViewMode = "spectator" | "admin";
+type AdminViewMode = "participant" | "admin";
 
 const ADMIN_VIEW_MODE_STORAGE_KEY = "nashordaq.adminViewMode";
 
 function getInitialAdminViewMode(): AdminViewMode {
   if (typeof window === "undefined") {
-    return "spectator";
+    return "participant";
   }
 
   const storedValue = window.localStorage.getItem(ADMIN_VIEW_MODE_STORAGE_KEY);
-  return storedValue === "admin" ? "admin" : "spectator";
+  return storedValue === "admin" ? "admin" : "participant";
 }
 
-export default function App() {
-  const { isStreamerMode } = useStreamerMode();
+export default function App({
+  onLogout,
+  isLoggingOut,
+  logoutError,
+}: {
+  onLogout: () => void;
+  isLoggingOut: boolean;
+  logoutError?: string;
+}) {
+  const { playerName } = useIdentityPresentation();
   const [trade, setTrade] = useState<TradeTarget | null>(null);
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
   const [tickerSortMode, setTickerSortMode] = useState<TickerSortMode>("value");
   const [isProfileEditorOpen, setIsProfileEditorOpen] = useState(false);
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [isBalanceInsightsOpen, setIsBalanceInsightsOpen] = useState(false);
   const [isBankModalOpen, setIsBankModalOpen] = useState(false);
   const [isPortfolioInsightsOpen, setIsPortfolioInsightsOpen] = useState(false);
@@ -76,16 +86,15 @@ export default function App() {
   const isDemo = user?.is_demo ?? false;
   const isAdmin = user?.role === "admin";
   const { data: players, isLoading: playersLoading } = usePlayers();
-  const { data: portfolio } = usePortfolio(onboardingComplete && !isAdmin);
-  const { data: orders } = useOrders(Boolean(user) && !isAdmin);
+  const { data: portfolio } = usePortfolio(onboardingComplete || isDemo);
+  const { data: orders } = useOrders(Boolean(user));
   const { data: recentOrders } = useRecentOrders(
-    Boolean(user) && (!isAdmin || adminViewMode === "spectator"),
+    Boolean(user) && (!isAdmin || adminViewMode === "participant"),
   );
   const { data: leaderboard } = useLeaderboard();
   const { data: systemStatus } = useSystemStatus();
   const { data: adminOverview } = useAdminOverview(isAdmin);
   const { data: adminUsers } = useAdminUsers(isAdmin);
-  const { data: adminSystemStatus } = useAdminSystemStatus(isAdmin);
   const { data: adminPlayerInsights } = useAdminPlayerInsights(
     isAdmin && adminViewMode === "admin",
   );
@@ -100,15 +109,14 @@ export default function App() {
   }, [adminViewMode]);
 
   const balance = user?.balance ?? 0;
-  const gambaEnabled = systemStatus?.gamba_enabled ?? true;
-  const canTrade =
-    Boolean(user) && user?.role === "player" && (onboardingComplete || isDemo);
+  const gambaEnabled = systemStatus?.gamba_enabled ?? false;
+  const canTrade = Boolean(user) && (onboardingComplete || isDemo);
   const canManageBank = canTrade && !isDemo;
   const showGamba = gambaEnabled && !isDemo;
   const effectiveAdminViewMode: AdminViewMode = isAdmin
     ? adminViewMode
-    : "spectator";
-  const isAdminSpectator = isAdmin && effectiveAdminViewMode === "spectator";
+    : "participant";
+  const isAdminView = isAdmin && effectiveAdminViewMode === "admin";
   const { data: bankSummary } = useBankSummary(canManageBank);
 
   const tradePlayer =
@@ -135,19 +143,26 @@ export default function App() {
           return right.current_price - left.current_price;
         }
 
-        return left.display_name.localeCompare(right.display_name, undefined, {
-          sensitivity: "base",
-        });
+        return playerName(left.id).localeCompare(
+          playerName(right.id),
+          undefined,
+          {
+            sensitivity: "base",
+          },
+        );
       }
 
-      return left.display_name.localeCompare(right.display_name, undefined, {
-        sensitivity: "base",
-      });
+      return playerName(left.id).localeCompare(
+        playerName(right.id),
+        undefined,
+        {
+          sensitivity: "base",
+        },
+      );
     });
-  }, [players, tickerSortMode]);
+  }, [players, tickerSortMode, playerName]);
 
-  const resolvedSystemStatus = isAdmin ? adminSystemStatus : systemStatus;
-  const marketStatusTone = resolvedSystemStatus?.market_status ?? "idle";
+  const marketStatusTone = systemStatus?.market_status ?? "idle";
   const marketStatusLabel =
     marketStatusTone === "healthy"
       ? "Healthy"
@@ -162,10 +177,15 @@ export default function App() {
         : "border-hex-border bg-hex-bronze shadow-none";
 
   let marketStatusDetail = "Checking market service...";
-  if (resolvedSystemStatus) {
-    if (resolvedSystemStatus.last_market_update_at) {
-      marketStatusDetail = `Last successful market refresh ${formatLocalDateTime(resolvedSystemStatus.last_market_update_at)}. Expected cadence about every ${resolvedSystemStatus.expected_update_interval_minutes} min.`;
-    } else if (resolvedSystemStatus.tracked_player_count === 0) {
+  if (systemStatus) {
+    if (isDemo) {
+      const cadence = systemStatus.expected_update_interval_minutes;
+      marketStatusDetail = systemStatus.last_market_update_at
+        ? `Last simulated market refresh ${formatLocalDateTime(systemStatus.last_market_update_at)}. Prices change about every ${cadence} min.`
+        : `Demo prices change automatically about every ${cadence} min. Awaiting the first simulated market refresh.`;
+    } else if (systemStatus.last_market_update_at) {
+      marketStatusDetail = `Last successful market refresh ${formatLocalDateTime(systemStatus.last_market_update_at)}. Expected cadence about every ${systemStatus.expected_update_interval_minutes} min.`;
+    } else if (systemStatus.tracked_player_count === 0) {
       marketStatusDetail =
         "No tracked players yet. Market polling will begin once the first player is onboarded.";
     } else {
@@ -183,10 +203,8 @@ export default function App() {
           bankSummary?.debt_adjusted_net_worth ??
           balance
         }
-        displayName={user?.display_name}
-        playerDisplayName={linkedPlayer?.display_name}
-        playerGameName={linkedPlayer?.game_name}
-        canEditProfile={Boolean(linkedPlayer) && !isAdmin}
+        userId={user?.id}
+        canEditProfile={Boolean(linkedPlayer)}
         canToggleAdminView={isAdmin}
         adminViewMode={effectiveAdminViewMode}
         isDemo={isDemo}
@@ -196,98 +214,131 @@ export default function App() {
         onOpenSimulation={() => setShowSimulation(true)}
         onToggleAdminView={() =>
           setAdminViewMode((current) =>
-            current === "admin" ? "spectator" : "admin",
+            current === "admin" ? "participant" : "admin",
           )
         }
+        onLogout={onLogout}
+        isLoggingOut={isLoggingOut}
       />
 
       <main className="mx-auto w-full max-w-[88rem] flex-1 px-6 py-8">
+        {logoutError && (
+          <p
+            role="alert"
+            className="mb-6 border border-red-700 bg-red-950/40 p-4 text-red-200"
+          >
+            {logoutError}
+          </p>
+        )}
+        {!isDemo && user && <AccountPassword />}
+        {systemStatus && isRiotUnavailable(systemStatus.riot_status) && (
+          <p
+            role="status"
+            className="mb-6 border border-hex-gold p-4 font-mono text-sm text-hex-gold"
+          >
+            {systemStatus.riot_status_detail}
+          </p>
+        )}
         {isDemo && <DemoBanner />}
+        {user && !onboardingComplete && !isDemo && (
+          <section className="mb-6 border-2 border-hex-gold-dim bg-hex-panel p-4">
+            <h2 className="font-serif text-xl text-hex-gold">
+              Join the market
+            </h2>
+            <p className="mt-2 font-mono text-sm text-hex-bronze">
+              Link your Riot account to trade and use your portfolio and bank.
+              You can use your account and read the market before linking.
+            </p>
+            <button
+              type="button"
+              onClick={() => setIsOnboardingOpen(true)}
+              className="mt-3 border border-hex-gold px-4 py-2 font-mono text-sm text-hex-gold hover:bg-hex-gold hover:text-hex-bg"
+            >
+              Link Riot account
+            </button>
+          </section>
+        )}
         {showSimulation ? (
           <SimulationView onClose={() => setShowSimulation(false)} />
         ) : (
           <>
             {/* Market ticker bar */}
-            {players &&
-              players.length > 0 &&
-              (!isAdmin || isAdminSpectator) && (
-                <div className="mb-8 overflow-hidden border-2 border-hex-border bg-hex-bg-alt">
-                  <div className="flex items-center justify-between border-b-2 border-hex-border px-4 py-2">
-                    <span className="font-mono text-xs font-bold uppercase tracking-wider text-hex-bronze">
-                      Market Snapshot
+            {players && players.length > 0 && !isAdminView && (
+              <div className="mb-8 overflow-hidden border-2 border-hex-border bg-hex-bg-alt">
+                <div className="flex items-center justify-between border-b-2 border-hex-border px-4 py-2">
+                  <span className="font-mono text-xs font-bold uppercase tracking-wider text-hex-bronze">
+                    Market Snapshot
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs uppercase tracking-wider text-hex-bronze">
+                      Sort
                     </span>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs uppercase tracking-wider text-hex-bronze">
-                        Sort
-                      </span>
-                      <div className="flex border border-hex-border">
-                        <button
-                          type="button"
-                          onClick={() => setTickerSortMode("value")}
-                          className={`px-3 py-1 font-mono text-xs font-bold uppercase tracking-wider transition-colors ${
-                            tickerSortMode === "value"
-                              ? "bg-hex-gold text-hex-bg"
-                              : "bg-transparent text-hex-bronze hover:bg-hex-panel hover:text-hex-white"
-                          }`}
-                        >
-                          Value
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setTickerSortMode("name")}
-                          className={`border-l border-hex-border px-3 py-1 font-mono text-xs font-bold uppercase tracking-wider transition-colors ${
-                            tickerSortMode === "name"
-                              ? "bg-hex-gold text-hex-bg"
-                              : "bg-transparent text-hex-bronze hover:bg-hex-panel hover:text-hex-white"
-                          }`}
-                        >
-                          Name
-                        </button>
-                      </div>
+                    <div className="flex border border-hex-border">
+                      <button
+                        type="button"
+                        onClick={() => setTickerSortMode("value")}
+                        className={`px-3 py-1 font-mono text-xs font-bold uppercase tracking-wider transition-colors ${
+                          tickerSortMode === "value"
+                            ? "bg-hex-gold text-hex-bg"
+                            : "bg-transparent text-hex-bronze hover:bg-hex-panel hover:text-hex-white"
+                        }`}
+                      >
+                        Value
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTickerSortMode("name")}
+                        className={`border-l border-hex-border px-3 py-1 font-mono text-xs font-bold uppercase tracking-wider transition-colors ${
+                          tickerSortMode === "name"
+                            ? "bg-hex-gold text-hex-bg"
+                            : "bg-transparent text-hex-bronze hover:bg-hex-panel hover:text-hex-white"
+                        }`}
+                      >
+                        Name
+                      </button>
                     </div>
                   </div>
-
-                  <div className="flex divide-x-2 divide-hex-border overflow-x-auto">
-                    {sortedTickerPlayers.map((p) => (
-                      <div
-                        key={p.id}
-                        className="flex items-center gap-3 px-5 py-2.5"
-                      >
-                        <span className="font-mono text-xs font-bold text-hex-white">
-                          {isStreamerMode
-                            ? getStreamerSafeName(p.game_name, p.display_name)
-                            : p.display_name}
-                        </span>
-                        <span
-                          className={`font-mono text-xs font-bold ${
-                            p.trend === "up"
-                              ? "text-emerald-400"
-                              : p.trend === "down"
-                                ? "text-red-400"
-                                : "text-hex-bronze"
-                          }`}
-                          title={
-                            p.trend === "up"
-                              ? "Rising"
-                              : p.trend === "down"
-                                ? "Falling"
-                                : "Flat"
-                          }
-                        >
-                          {p.trend === "up"
-                            ? "▲"
-                            : p.trend === "down"
-                              ? "▼"
-                              : "■"}
-                        </span>
-                        <span className="font-mono text-sm font-bold text-hex-gold">
-                          {formatAmount(p.current_price)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
                 </div>
-              )}
+
+                <div className="flex divide-x-2 divide-hex-border overflow-x-auto">
+                  {sortedTickerPlayers.map((p) => (
+                    <div
+                      key={p.id}
+                      className="flex items-center gap-3 px-5 py-2.5"
+                    >
+                      <span className="font-mono text-xs font-bold text-hex-white">
+                        {playerName(p.id)}
+                      </span>
+                      <span
+                        className={`font-mono text-xs font-bold ${
+                          p.trend === "up"
+                            ? "text-emerald-400"
+                            : p.trend === "down"
+                              ? "text-red-400"
+                              : "text-hex-bronze"
+                        }`}
+                        title={
+                          p.trend === "up"
+                            ? "Rising"
+                            : p.trend === "down"
+                              ? "Falling"
+                              : "Flat"
+                        }
+                      >
+                        {p.trend === "up"
+                          ? "▲"
+                          : p.trend === "down"
+                            ? "▼"
+                            : "■"}
+                      </span>
+                      <span className="font-mono text-sm font-bold text-hex-gold">
+                        {formatAmount(p.current_price)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Loading state */}
             {playersLoading && (
@@ -297,70 +348,16 @@ export default function App() {
             )}
 
             {/* Main grid: market + sidebar */}
-            {isAdmin ? (
-              isAdminSpectator ? (
-                <>
-                  <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-                    <div className="lg:col-span-2">
-                      <MarketGrid
-                        players={players ?? []}
-                        onTrade={() => undefined}
-                        onOpenDetails={(playerId) =>
-                          setSelectedPlayerId(playerId)
-                        }
-                        canTrade={false}
-                        ownPlayerId={null}
-                        showTradeActions={false}
-                      />
-                    </div>
-
-                    <div className="flex flex-col gap-6">
-                      <section className="border-2 border-hex-gold-dim bg-hex-panel px-5 py-4">
-                        <h2 className="font-serif text-xl font-bold text-hex-gold">
-                          Spectator Mode
-                        </h2>
-                        <p className="mt-2 font-mono text-sm leading-6 text-hex-bronze">
-                          Admin is viewing the player-facing market shell in
-                          read-only mode. Trading, selling, gamba, and other
-                          player actions stay disabled here.
-                        </p>
-                        <div className="mt-4 grid gap-3 font-mono text-xs text-hex-bronze">
-                          <div className="border border-hex-border bg-hex-bg-alt px-3 py-2">
-                            Market status:{" "}
-                            {adminSystemStatus?.market_status ?? "idle"}
-                          </div>
-                          <div className="border border-hex-border bg-hex-bg-alt px-3 py-2">
-                            Scheduler:{" "}
-                            {adminSystemStatus?.scheduler_running
-                              ? "Running"
-                              : "Stopped"}
-                          </div>
-                        </div>
-                      </section>
-
-                      <Leaderboard entries={leaderboard ?? []} />
-                    </div>
-                  </div>
-
-                  <div className="mt-6">
-                    <OrderHistory
-                      ownOrders={recentOrders ?? []}
-                      allOrders={recentOrders ?? []}
-                      defaultView="all"
-                      allowViewToggle={false}
-                    />
-                  </div>
-                </>
-              ) : (
-                <div className="space-y-8">
-                  <AdminDashboard
-                    overview={adminOverview}
-                    users={adminUsers ?? []}
-                    systemStatus={adminSystemStatus}
-                    playerInsights={adminPlayerInsights ?? []}
-                  />
-                </div>
-              )
+            {isAdminView ? (
+              <div className="space-y-8">
+                <AdminAccessManagement />
+                <AdminDashboard
+                  overview={adminOverview}
+                  users={adminUsers ?? []}
+                  systemStatus={systemStatus}
+                  playerInsights={adminPlayerInsights ?? []}
+                />
+              </div>
             ) : (
               <>
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -377,11 +374,13 @@ export default function App() {
                   </div>
 
                   <div className="flex flex-col gap-6">
-                    <Portfolio
-                      portfolio={portfolio}
-                      onOpenInsights={() => setIsPortfolioInsightsOpen(true)}
-                      gambaEnabled={showGamba}
-                    />
+                    {canTrade && (
+                      <Portfolio
+                        portfolio={portfolio}
+                        onOpenInsights={() => setIsPortfolioInsightsOpen(true)}
+                        gambaEnabled={showGamba}
+                      />
+                    )}
                     <Leaderboard entries={leaderboard ?? []} />
                     {showGamba && (
                       <GambaWidget balance={balance} canTrade={canTrade} />
@@ -400,6 +399,9 @@ export default function App() {
             )}
           </>
         )}
+        <div className="mt-8">
+          <GameActivity />
+        </div>
       </main>
 
       {/* Footer */}
@@ -507,21 +509,8 @@ export default function App() {
         />
       )}
 
-      {/* First-login onboarding modal */}
-      {isAdmin && (
-        <div className="pointer-events-none fixed bottom-4 right-4 border-2 border-hex-border bg-hex-panel px-3 py-2 font-mono text-xs uppercase tracking-wider text-hex-bronze">
-          {effectiveAdminViewMode === "admin"
-            ? "Admin View"
-            : "Admin Spectator"}
-        </div>
-      )}
-
-      {user && !user.onboarding_complete && !isAdmin && !isDemo && (
-        <OnboardingModal />
-      )}
-
-      {isDemo && (!user?.display_name || user.display_name === "") && (
-        <DemoNicknameModal />
+      {user && !onboardingComplete && !isDemo && isOnboardingOpen && (
+        <OnboardingModal onClose={() => setIsOnboardingOpen(false)} />
       )}
 
       {!isDemo && <FlyingPoro enabled={canTrade} />}

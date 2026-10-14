@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { get, post, put, del } from "./client";
 import type {
+  GameIntervention,
+  IdentityDirectory,
   AdminOverviewResponse,
   AdminPlayerInsightResponse,
   AdminUserPortfolioResponse,
@@ -35,6 +37,8 @@ import type {
 // ---- Keys ----
 
 export const queryKeys = {
+  identities: ["identities"] as const,
+  activity: ["activity"] as const,
   user: ["user"] as const,
   players: ["players"] as const,
   player: (id: number, limit?: number | null) =>
@@ -48,7 +52,6 @@ export const queryKeys = {
   systemStatus: ["systemStatus"] as const,
   adminOverview: ["adminOverview"] as const,
   adminUsers: ["adminUsers"] as const,
-  adminSystemStatus: ["adminSystemStatus"] as const,
   adminPlayerInsights: ["adminPlayerInsights"] as const,
   adminUserPortfolio: (userId: number) =>
     ["adminUserPortfolio", userId] as const,
@@ -253,15 +256,6 @@ export function useAdminUsers(enabled = true) {
   });
 }
 
-export function useAdminSystemStatus(enabled = true) {
-  return useQuery<SystemStatusResponse>({
-    queryKey: queryKeys.adminSystemStatus,
-    queryFn: () => get<SystemStatusResponse>("/admin/system/status"),
-    enabled,
-    refetchInterval: 30_000,
-  });
-}
-
 export function useAdminPlayerInsights(enabled = true) {
   return useQuery<AdminPlayerInsightResponse[]>({
     queryKey: queryKeys.adminPlayerInsights,
@@ -373,6 +367,7 @@ export function useCompleteOnboarding() {
   return useMutation<UserResponse, Error, UserOnboardingCreate>({
     mutationFn: (body) => post<UserResponse>("/user/onboarding", body),
     onSuccess: async (user) => {
+      void qc.invalidateQueries({ queryKey: queryKeys.identities });
       qc.setQueryData(queryKeys.user, user);
       await qc.refetchQueries({ queryKey: queryKeys.user });
       void qc.invalidateQueries({ queryKey: queryKeys.players });
@@ -390,6 +385,7 @@ export function useUpdateUserProfile() {
   return useMutation<UserResponse, Error, UserProfileUpdate>({
     mutationFn: (body) => put<UserResponse>("/user/profile", body),
     onSuccess: async (user) => {
+      void qc.invalidateQueries({ queryKey: queryKeys.identities });
       qc.setQueryData(queryKeys.user, user);
       await qc.refetchQueries({ queryKey: queryKeys.user });
       void qc.invalidateQueries({ queryKey: queryKeys.players });
@@ -453,6 +449,9 @@ export function useRestoreAdminRescue(userId: number | null) {
         {},
       ),
     onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.activity });
+      void qc.invalidateQueries({ queryKey: queryKeys.bank });
+      void qc.invalidateQueries({ queryKey: queryKeys.portfolio });
       void qc.invalidateQueries({ queryKey: queryKeys.adminUsers });
       void qc.invalidateQueries({ queryKey: queryKeys.adminOverview });
       if (userId !== null) {
@@ -475,16 +474,6 @@ export function useClaimPoro() {
       void qc.invalidateQueries({ queryKey: queryKeys.portfolio });
       void qc.invalidateQueries({ queryKey: queryKeys.bank });
       void qc.invalidateQueries({ queryKey: queryKeys.leaderboard });
-    },
-  });
-}
-
-export function useSetDemoNickname() {
-  const qc = useQueryClient();
-  return useMutation<UserResponse, Error, { display_name: string }>({
-    mutationFn: (body) => post<UserResponse>("/user/demo-nickname", body),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: queryKeys.user });
     },
   });
 }
@@ -516,5 +505,22 @@ export function useSimulationPlayerMatches(
 export function useRunSimulation() {
   return useMutation<SimulationResponse, Error, SimulationRequest>({
     mutationFn: (body) => post<SimulationResponse>("/simulate", body),
+  });
+}
+
+export function useGameActivity() {
+  return useQuery<GameIntervention[]>({
+    queryKey: queryKeys.activity,
+    queryFn: () => get<GameIntervention[]>("/activity"),
+    refetchInterval: 30_000,
+  });
+}
+
+export function useIdentities() {
+  return useQuery<IdentityDirectory>({
+    queryKey: queryKeys.identities,
+    queryFn: () => get<IdentityDirectory>("/identities"),
+    staleTime: 30_000,
+    refetchInterval: 30_000,
   });
 }

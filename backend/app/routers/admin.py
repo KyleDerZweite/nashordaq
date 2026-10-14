@@ -6,9 +6,10 @@ from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import CurrentAdminUser, get_user_role
-from app.banking import build_account_snapshot, restore_rescue_loan_use
+from app.banking import build_account_snapshot
 from app.config import settings
 from app.database import get_session
+from app.interventions import restore_rescue_access
 from app.models import (
     GambaPosition,
     GambaStatus,
@@ -24,12 +25,6 @@ from app.models import (
 )
 from app.pricing import BETA, calculate_win_rate
 from app.routers.portfolio import build_portfolio_response
-from app.scheduler import (
-    classify_market_status,
-    get_last_market_update_at,
-    get_required_market_update_interval,
-    is_scheduler_running,
-)
 from app.schemas import (
     AdminOverviewResponse,
     AdminPlayerInsightResponse,
@@ -40,6 +35,7 @@ from app.schemas import (
     AdminUserSummaryResponse,
     SystemStatusResponse,
 )
+from app.system_status import observe_system_status
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -76,7 +72,7 @@ async def _build_admin_user_portfolio_response(
         user_id=user.id,
         email=identity,
         display_name=user.display_name or identity,
-        role=get_user_role(identity),
+        role=get_user_role(user),
         linked_player_id=user.linked_player_id,
         linked_player_name=linked_player_name,
         linked_player_game_name=linked_player_game_name,
@@ -175,7 +171,7 @@ async def get_admin_overview(
         total_debt_outstanding += snapshot.debt_outstanding
         if user.linked_player_id is not None:
             onboarded_users += 1
-        if get_user_role(user.email or user.username) == "admin":
+        if get_user_role(user) == "admin":
             admin_users += 1
 
     tracked_players = await session.scalar(
@@ -221,7 +217,7 @@ async def list_admin_users(
                 id=user.id,
                 email=identity,
                 display_name=user.display_name or identity,
-                role=get_user_role(identity),
+                role=get_user_role(user),
                 linked_player_id=user.linked_player_id,
                 linked_player_name=(
                     linked_player_identities.get(user.linked_player_id, (None, None))[0]
@@ -499,16 +495,14 @@ async def restore_admin_user_rescue_unlock(
     admin_user: CurrentAdminUser,
     session: SessionDep,
 ) -> AdminUserPortfolioResponse:
-    del admin_user
-
     user = await session.get(User, user_id)
-    if user is None:
+    if user is None or user.is_demo:
         raise HTTPException(status_code=404, detail="User not found")
 
-    restore_rescue_loan_use(user)
+    await restore_rescue_access(session, admin_user, user)
+    response = await _build_admin_user_portfolio_response(session, user)
     await session.commit()
-    await session.refresh(user)
-    return await _build_admin_user_portfolio_response(session, user)
+    return response
 
 
 @router.get("/system/status", response_model=SystemStatusResponse)
@@ -517,36 +511,4 @@ async def get_admin_system_status(
     session: SessionDep,
 ) -> SystemStatusResponse:
     del admin_user
-
-    total_player_count = (
-        await session.scalar(select(func.count()).select_from(TrackedPlayer)) or 0
-    )
-    trackable_player_count = (
-        await session.scalar(
-            select(func.count())
-            .select_from(TrackedPlayer)
-            .where(TrackedPlayer.lp_abs > 0)
-        )
-        or 0
-    )
-    interval = get_required_market_update_interval(trackable_player_count)
-    expected_update_interval_minutes = int(interval.total_seconds() // 60)
-    last_market_update_at = get_last_market_update_at()
-    scheduler_running = is_scheduler_running()
-
-    return SystemStatusResponse(
-        service_status="ok",
-        scheduler_running=scheduler_running,
-        market_status=classify_market_status(
-            now=datetime.now(UTC),
-            last_market_update_at=last_market_update_at,
-            tracked_player_count=total_player_count,
-            scheduler_running=scheduler_running,
-            expected_interval=interval,
-        ),
-        tracked_player_count=total_player_count,
-        expected_update_interval_minutes=max(1, expected_update_interval_minutes),
-        last_market_update_at=last_market_update_at,
-        gamba_enabled=settings.gamba_enabled,
-        demo_mode_enabled=settings.demo_mode_enabled,
-    )
+    return await observe_system_status(session)

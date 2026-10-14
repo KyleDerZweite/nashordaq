@@ -1,9 +1,8 @@
 import { useMemo, useState } from "react";
-import { useStreamerMode } from "../contexts/useStreamerMode";
+import { useIdentityPresentation } from "../contexts/useIdentityPresentation";
 import type { OrderResponse } from "../types";
 import { useCancelOrder } from "../api";
 import OrderDetailsModal from "./OrderDetailsModal";
-import { getStreamerSafeName } from "../utils/streamerMode";
 import { formatAmount, formatQuantity } from "../utils/format";
 
 interface Props {
@@ -23,11 +22,15 @@ export default function OrderHistory({
   allowViewToggle = true,
   title = "Recent Orders",
 }: Props) {
-  const { isStreamerMode } = useStreamerMode();
+  const { isStreamerMode, playerName, userName } = useIdentityPresentation();
   const cancelOrder = useCancelOrder();
   const [view, setView] = useState<OrderHistoryView>(defaultView);
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
-  const [filterQuery, setFilterQuery] = useState("");
+  const [filters, setFilters] = useState({ normal: "", streamer: "" });
+  const filterMode = isStreamerMode ? "streamer" : "normal";
+  const filterQuery = filters[filterMode];
+  const setFilterQuery = (value: string) =>
+    setFilters((current) => ({ ...current, [filterMode]: value }));
 
   const orders = useMemo(
     () => (view === "own" ? ownOrders : allOrders),
@@ -41,24 +44,16 @@ export default function OrderHistory({
     }
 
     return orders.filter((order) => {
-      const stockMatch = (
-        isStreamerMode
-          ? getStreamerSafeName(order.player_game_name, order.player_name)
-          : order.player_name
-      )
+      const stockMatch = playerName(order.player_id)
         .toLocaleLowerCase()
         .includes(normalizedFilterQuery);
-      const playerMatch = (
-        isStreamerMode
-          ? (order.user_game_name ?? order.user_name ?? "")
-          : (order.user_name ?? "")
-      )
+      const playerMatch = userName(order.user_id)
         .toLocaleLowerCase()
         .includes(normalizedFilterQuery);
 
       return stockMatch || playerMatch;
     });
-  }, [isStreamerMode, normalizedFilterQuery, orders]);
+  }, [playerName, userName, normalizedFilterQuery, orders]);
 
   const showScrollbar = filteredOrders.length > 30;
 
@@ -141,9 +136,7 @@ export default function OrderHistory({
                   #{o.id}
                 </td>
                 <td className="px-4 py-2.5 font-mono text-sm text-hex-white">
-                  {isStreamerMode
-                    ? getStreamerSafeName(o.player_game_name, o.player_name)
-                    : o.player_name}
+                  {playerName(o.player_id)}
                   {o.source === "GAMBA" && (
                     <span className="ml-2 inline-block border border-hex-gold-dim px-1.5 py-0.5 align-middle font-mono text-[10px] font-bold uppercase tracking-wider text-hex-gold">
                       Gamba
@@ -152,9 +145,7 @@ export default function OrderHistory({
                 </td>
                 {view === "all" && (
                   <td className="px-4 py-2.5 font-mono text-sm text-hex-bronze">
-                    {isStreamerMode
-                      ? (o.user_game_name ?? o.user_name ?? "--")
-                      : (o.user_name ?? "--")}
+                    {userName(o.user_id)}
                   </td>
                 )}
                 <td className="px-4 py-2.5">

@@ -9,6 +9,7 @@ export {
 } from "./client";
 export {
   queryKeys,
+  useGameActivity,
   useUser,
   usePlayers,
   usePlayer,
@@ -21,7 +22,6 @@ export {
   useSystemStatus,
   useAdminOverview,
   useAdminUsers,
-  useAdminSystemStatus,
   useAdminPlayerInsights,
   useAdminUserPortfolio,
   useBankSummary,
@@ -37,7 +37,6 @@ export {
   useCancelOrder,
   useCompleteOnboarding,
   useUpdateUserProfile,
-  useSetDemoNickname,
   useSimulationDefaults,
   useSimulationPlayerMatches,
   useRunSimulation,

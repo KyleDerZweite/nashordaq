@@ -145,6 +145,7 @@ export interface OrderCreate {
 }
 
 export interface OrderResponse {
+  user_id: number | null;
   id: number;
   player_id: number;
   player_name: string;
@@ -349,6 +350,15 @@ export interface LeaderboardPlayerPortfolioResponse {
 }
 
 export interface SystemStatusResponse {
+  riot_status:
+    | "missing_key"
+    | "unchecked"
+    | "available"
+    | "invalid_key"
+    | "unavailable"
+    | "rate_limited"
+    | "demo";
+  riot_status_detail: string;
   service_status: "ok";
   scheduler_running: boolean;
   market_status: MarketStatus;
@@ -480,4 +490,33 @@ export interface SimulationPlayerMatchResponse {
   price_before: number;
   price_after: number;
   completed_at: string;
+}
+
+export interface ActivityIdentity {
+  user_id: number;
+  username: string;
+  linked_player_id: number | null;
+  game_name: string | null;
+  tag_line: string | null;
+}
+
+export interface GameIntervention {
+  id: number;
+  actor: ActivityIdentity;
+  affected: ActivityIdentity;
+  kind: "rescue_access_restored";
+  previous_uses: number;
+  new_uses: number;
+  created_at: string;
+}
+
+export interface IdentityDirectory {
+  users: (ActivityIdentity & { streamer_alias: string })[];
+  players: {
+    player_id: number;
+    username: string | null;
+    game_name: string;
+    tag_line: string;
+    streamer_alias: string;
+  }[];
 }

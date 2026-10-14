@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useStreamerMode } from "../contexts/useStreamerMode";
+import { useId, useState } from "react";
 
-import { ApiError, getMarketAccount } from "../api";
+import { ApiError, getMarketAccount, useSystemStatus } from "../api";
 import type { MarketAccountResponse, UserOnboardingCreate } from "../types";
+import { isRiotUnavailable } from "../utils/riotStatus";
 
 interface Props {
   title: string;
@@ -24,6 +26,9 @@ export default function PlayerProfileModal({
   onSubmit,
   onClose,
 }: Props) {
+  const { isStreamerMode, setStreamerMode } = useStreamerMode();
+  const fieldId = useId();
+  const { data: systemStatus } = useSystemStatus();
   const [gameName, setGameName] = useState(initialValues?.game_name ?? "");
   const [tagLine, setTagLine] = useState(initialValues?.tag_line ?? "");
   const [isCheckingProfile, setIsCheckingProfile] = useState(false);
@@ -54,10 +59,8 @@ export default function PlayerProfileModal({
         setLookupErrorMessage(
           "Riot lookup is temporarily rate limited. Please wait a moment and try again.",
         );
-      } else if (error instanceof Error) {
-        setLookupErrorMessage(
-          "We could not verify this Riot account right now. Please try again in a moment.",
-        );
+      } else if (error instanceof ApiError) {
+        setLookupErrorMessage(error.message);
       } else {
         setLookupErrorMessage(
           "We could not verify this Riot account right now. Please try again in a moment.",
@@ -100,67 +103,99 @@ export default function PlayerProfileModal({
           )}
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 px-5 py-4">
-          <div>
-            <label className="mb-1 block font-mono text-xs uppercase tracking-wider text-hex-bronze">
-              Game Name
-            </label>
-            <input
-              type="text"
-              value={gameName}
-              onChange={(e) => {
-                setGameName(e.target.value);
-                setLookupErrorMessage(undefined);
-              }}
-              autoFocus
-              className="w-full border-2 border-hex-border bg-hex-bg px-3 py-2 font-mono text-sm text-hex-white outline-none focus:border-hex-gold"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block font-mono text-xs uppercase tracking-wider text-hex-bronze">
-              Tag Line (without #)
-            </label>
-            <input
-              type="text"
-              value={tagLine}
-              onChange={(e) => {
-                setTagLine(e.target.value.replace(/^#/, ""));
-                setLookupErrorMessage(undefined);
-              }}
-              placeholder="EUW"
-              className="w-full border-2 border-hex-border bg-hex-bg px-3 py-2 font-mono text-sm text-hex-white outline-none focus:border-hex-gold"
-            />
-          </div>
-
-          {lookupErrorMessage && (
-            <p className="font-mono text-xs text-hex-zaun">
-              {lookupErrorMessage}
+        {isStreamerMode ? (
+          <div className="space-y-4 px-5 py-4 font-mono text-sm text-hex-bronze">
+            <p>
+              Streamer Mode hides your Riot account and any unsaved changes.
+              Turn it off to view or edit your profile. Your account details
+              will become visible.
             </p>
-          )}
+            <button
+              type="button"
+              onClick={() => setStreamerMode(false)}
+              className="w-full border-2 border-hex-gold px-3 py-2 text-hex-gold"
+            >
+              Turn off Streamer Mode to edit
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4 px-5 py-4">
+            {systemStatus && isRiotUnavailable(systemStatus.riot_status) && (
+              <p role="status" className="font-mono text-xs text-hex-gold">
+                {systemStatus.riot_status_detail}
+              </p>
+            )}
+            <div>
+              <label
+                htmlFor={`${fieldId}-game-name`}
+                className="mb-1 block font-mono text-xs uppercase tracking-wider text-hex-bronze"
+              >
+                Game Name
+              </label>
+              <input
+                id={`${fieldId}-game-name`}
+                type="text"
+                value={gameName}
+                onChange={(e) => {
+                  setGameName(e.target.value);
+                  setLookupErrorMessage(undefined);
+                }}
+                autoFocus
+                className="w-full border-2 border-hex-border bg-hex-bg px-3 py-2 font-mono text-sm text-hex-white outline-none focus:border-hex-gold"
+              />
+            </div>
 
-          {errorMessage && (
-            <p className="font-mono text-xs text-hex-zaun">{errorMessage}</p>
-          )}
+            <div>
+              <label
+                htmlFor={`${fieldId}-tag-line`}
+                className="mb-1 block font-mono text-xs uppercase tracking-wider text-hex-bronze"
+              >
+                Tag Line (without #)
+              </label>
+              <input
+                id={`${fieldId}-tag-line`}
+                type="text"
+                value={tagLine}
+                onChange={(e) => {
+                  setTagLine(e.target.value.replace(/^#/, ""));
+                  setLookupErrorMessage(undefined);
+                }}
+                placeholder="EUW"
+                className="w-full border-2 border-hex-border bg-hex-bg px-3 py-2 font-mono text-sm text-hex-white outline-none focus:border-hex-gold"
+              />
+            </div>
 
-          <button
-            type="submit"
-            disabled={!canSubmit || isBusy}
-            className={`w-full border-2 py-2.5 font-mono text-sm font-bold uppercase tracking-wider transition-colors ${
-              isBusy
-                ? "border-hex-magic bg-hex-magic/20 text-hex-magic"
-                : canSubmit
-                  ? "border-hex-gold bg-transparent text-hex-gold hover:bg-hex-gold hover:text-hex-bg"
-                  : "cursor-not-allowed border-hex-border text-hex-border"
-            }`}
-          >
-            {isCheckingProfile
-              ? "Checking Riot Account..."
-              : isPending
-                ? "Saving..."
-                : submitLabel}
-          </button>
-        </form>
+            {lookupErrorMessage && (
+              <p role="alert" className="font-mono text-xs text-hex-zaun">
+                {lookupErrorMessage}
+              </p>
+            )}
+
+            {errorMessage && (
+              <p role="alert" className="font-mono text-xs text-hex-zaun">
+                {errorMessage}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              disabled={!canSubmit || isBusy}
+              className={`w-full border-2 py-2.5 font-mono text-sm font-bold uppercase tracking-wider transition-colors ${
+                isBusy
+                  ? "border-hex-magic bg-hex-magic/20 text-hex-magic"
+                  : canSubmit
+                    ? "border-hex-gold bg-transparent text-hex-gold hover:bg-hex-gold hover:text-hex-bg"
+                    : "cursor-not-allowed border-hex-border text-hex-border"
+              }`}
+            >
+              {isCheckingProfile
+                ? "Checking Riot Account..."
+                : isPending
+                  ? "Saving..."
+                  : submitLabel}
+            </button>
+          </form>
+        )}
       </section>
     </div>
   );

@@ -1,6 +1,5 @@
-import { useStreamerMode } from "../../contexts/useStreamerMode";
+import { useIdentityPresentation } from "../../contexts/useIdentityPresentation";
 import { useAdminUserPortfolio, useRestoreAdminRescue } from "../../api";
-import { getStreamerSafeName } from "../../utils/streamerMode";
 import { formatAmount, formatLocalDateTime } from "../../utils/format";
 
 interface Props {
@@ -9,43 +8,34 @@ interface Props {
 }
 
 export default function AdminPortfolioModal({ userId, onClose }: Props) {
-  const { isStreamerMode } = useStreamerMode();
+  const { playerName, userName } = useIdentityPresentation();
   const { data, isLoading, isError, error } = useAdminUserPortfolio(userId);
   const restoreAdminRescue = useRestoreAdminRescue(userId);
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-hex-bg/80"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-hex-bg/80 px-3 py-4"
       onClick={onClose}
     >
       <section
-        className="w-full max-w-4xl border-4 border-hex-gold bg-hex-panel shadow-brutal-lg"
+        className="max-h-[92vh] w-full max-w-4xl overflow-y-auto border-4 border-hex-gold bg-hex-panel shadow-brutal-lg"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b-4 border-hex-gold px-5 py-3">
-          <div>
+        <div className="flex items-center justify-between gap-3 border-b-4 border-hex-gold px-5 py-3">
+          <div className="min-w-0">
             <h2 className="font-serif text-xl font-bold text-hex-gold">
               User Portfolio
             </h2>
             {data && (
-              <p className="mt-1 font-mono text-xs uppercase tracking-[0.18em] text-hex-bronze">
-                {data.linked_player_name
-                  ? isStreamerMode
-                    ? getStreamerSafeName(
-                        data.linked_player_game_name,
-                        data.linked_player_name,
-                      )
-                    : data.linked_player_name
-                  : isStreamerMode
-                    ? data.display_name
-                    : `${data.display_name} · No linked player`}
+              <p className="mt-1 break-all font-mono text-xs uppercase tracking-[0.18em] text-hex-bronze">
+                {userName(data.user_id)}
               </p>
             )}
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="border-2 border-hex-border px-4 py-3 font-mono text-xs font-bold uppercase tracking-[0.18em] text-hex-bronze transition-colors hover:border-hex-white hover:text-hex-white"
+            className="shrink-0 border-2 border-hex-border px-4 py-3 font-mono text-xs font-bold uppercase tracking-[0.18em] text-hex-bronze transition-colors hover:border-hex-white hover:text-hex-white"
           >
             Close
           </button>
@@ -77,14 +67,10 @@ export default function AdminPortfolioModal({ userId, onClose }: Props) {
                   },
                   {
                     label: "Linked Player",
-                    value: data.linked_player_name
-                      ? isStreamerMode
-                        ? getStreamerSafeName(
-                            data.linked_player_game_name,
-                            data.linked_player_name,
-                          )
-                        : data.linked_player_name
-                      : "None",
+                    value:
+                      data.linked_player_id === null
+                        ? "None"
+                        : playerName(data.linked_player_id),
                   },
                 ].map((item) => (
                   <div
@@ -197,12 +183,7 @@ export default function AdminPortfolioModal({ userId, onClose }: Props) {
                         className="border-b border-hex-border/50"
                       >
                         <td className="px-4 py-2.5 font-mono text-sm text-hex-white">
-                          {isStreamerMode
-                            ? getStreamerSafeName(
-                                holding.player_game_name,
-                                holding.player_name,
-                              )
-                            : holding.player_name}
+                          {playerName(holding.player_id)}
                         </td>
                         <td className="px-4 py-2.5 text-right font-mono text-sm text-hex-bronze">
                           {holding.quantity}

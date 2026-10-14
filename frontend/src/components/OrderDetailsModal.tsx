@@ -1,6 +1,5 @@
-import { useStreamerMode } from "../contexts/useStreamerMode";
+import { useIdentityPresentation } from "../contexts/useIdentityPresentation";
 import { useOrderDetail } from "../api";
-import { getStreamerSafeName } from "../utils/streamerMode";
 import {
   formatAmount,
   formatLocalDateTime,
@@ -20,7 +19,7 @@ function adjustmentLabel(reason: string | null): string {
 }
 
 export default function OrderDetailsModal({ orderId, onClose }: Props) {
-  const { isStreamerMode } = useStreamerMode();
+  const { playerName } = useIdentityPresentation();
   const { data: order, isLoading, isError, error } = useOrderDetail(orderId);
 
   return (
@@ -66,12 +65,7 @@ export default function OrderDetailsModal({ orderId, onClose }: Props) {
                 {[
                   {
                     label: "Stock",
-                    value: isStreamerMode
-                      ? getStreamerSafeName(
-                          order.player_game_name,
-                          order.player_name,
-                        )
-                      : order.player_name,
+                    value: playerName(order.player_id),
                   },
                   { label: "Side", value: order.side },
                   { label: "Qty", value: formatQuantity(order.quantity) },

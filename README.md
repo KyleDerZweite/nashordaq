@@ -1,174 +1,50 @@
 # Nashordaq
 
-> **Early Development Notice**
-> This project is in early development and subject to breaking changes. It is intended for personal use only and is **not compliant with Riot Games Production API key requirements**. Self-hosting requires technical knowledge (Identity-Aware Proxy setup, environment configuration, containerized deployment). The future production-facing path documented in this repo excludes the private-only `gamba` mechanic entirely.
+Nashordaq is a self-hosted virtual share market for a private League of Legends friend group. Users trade whole shares in tracked players with virtual currency. Ranked Solo Queue performance drives prices through the Riot API and the existing [economy rules](docs/ECONOMY_MECHANICS.md).
 
-A self-hosted virtual share market for a private League of Legends friend group.
+One installation runs one private market with one administrator. Local username/password accounts, invitation access, revocable sessions and password recovery require no external identity provider. The administrator can participate after ordinary Riot onboarding. Members can inspect game interventions, and Streamer Mode uses permanent League aliases across views.
 
-Users trade shares in League of Legends players using virtual currency. Share prices fluctuate automatically based on real-time Ranked LP changes fetched from the Riot Games API.
+The standalone baseline is implemented but unreleased. [Self-host acceptance](docs/SELF_HOST_ACCEPTANCE.md) records development verification and the remaining release, live Riot, public HTTPS and owner checks. This implementation does not claim Riot production-key approval. Future hosted service and OAuth/OIDC ideas are outside the accepted baseline.
 
-## Try It
+## Try the demo
 
-A live demo is available at **[demo-nashordaq.kylehub.dev](https://demo-nashordaq.kylehub.dev/)**. No account or API key needed -- just open the link and start trading with simulated data.
+The [public demo](https://demo-nashordaq.kylehub.dev/) may run older code. This revision uses explicit demo deployment and `demo/demo` login. Each visitor receives separate temporary balance, holdings and orders in a shared simulated market, without administrator permissions or a Riot key.
 
-## What's Next
+Reload preserves a valid demo session. Sign out to delete personal state immediately. Thirty minutes of inactivity ends access; automatic cleanup runs every minute. Closing a browser does not guarantee immediate deletion.
 
-Nashordaq started as a personal project for my friend group, and it does what I set out to build. The direction now is Nashordaq as a **self-hosted private-league product for friend groups**. There is no hosted version planned.
+## Self-hosting
 
-The next areas of interest are more trackable queues as selectable shares, such as Ranked Flex, TFT Ranked, and TFT Double Up alongside Ranked Solo. See the [Roadmap](docs/ROADMAP.md#future-v2) and open GitHub issues for the current plan.
+Follow the [deployment guide](docs/DEPLOYMENT.md) to install, create the administrator, invite members, recover passwords, back up, restore and update. Docker Compose and Podman Compose use the same manifest and build locally from pinned inputs. Only the frontend HTTP entry point is published. SQLite persists in the host directory `./data`.
 
-**If that sounds interesting to you:**
-- Drop your thoughts in the [Discussions](https://github.com/KyleDerZweite/nashordaq/discussions) tab
-- Leave a star if you self-host it with your group
-- Open an [Idea](https://github.com/KyleDerZweite/nashordaq/discussions/categories/ideas) for features you'd like to see
+Set `NASHORDAQ_PUBLIC_URL` to the exact LAN HTTP or operator-provided HTTPS origin before setup. No domain or tunnel is required for LAN access. Login and administration work without a Riot key; live onboarding and updates require one. Gamba is disabled by default and requires an explicit private-use choice.
 
-## Features
-
-- **Live Market** -- share prices update automatically from real Riot API data.
-- **Portfolio Management** -- buy and sell orders based on player performance.
-- **Leaderboards** -- global ranking of users by total portfolio net worth.
-- **Self-Hosted** -- single-process deployment, no external database or message broker required.
-- **Proxy-Ready Auth** -- designed to sit behind an Identity-Aware Proxy for zero-friction user management.
-
-## Self-Hosting Guide
-
-### Prerequisites
-
-- A Linux server (or any host that runs containers)
-- A domain name pointed at your server
-- [Pangolin](https://github.com/fosrl/pangolin) (or another Identity-Aware Proxy) for authentication
-- A Riot Games API key
-
-### 1. Clone the repository
-
-```bash
-git clone https://github.com/KyleDerZweite/nashordaq.git
-cd nashordaq
-```
-
-### 2. Create your environment file
-
-```bash
-cp .env.example .env
-```
-
-Open `.env` in your editor and fill in every value. The sections below explain each one.
-
-### 3. Get a Riot Games API key
-
-1. Go to the [Riot Developer Portal](https://developer.riotgames.com/).
-2. Sign in with your Riot account.
-3. Generate a **Development API Key** (regenerates every 24 hours) or apply for a **Personal/Production API Key** for persistent access.
-4. Paste the key into `.env`:
-   ```
-   NASHORDAQ_RIOT_API_KEY=RGAPI-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-   ```
-
-### 4. Set your Riot API region
-
-Nashordaq needs two API base URLs. Set them in `.env` based on the server your players play on.
-
-| Player Server | `RIOT_API_BASE_URL` (continent) | `RIOT_API_REGION_URL` (platform) |
-|---|---|---|
-| EU West | `https://europe.api.riotgames.com` | `https://euw1.api.riotgames.com` |
-| EU Nordic & East | `https://europe.api.riotgames.com` | `https://eun1.api.riotgames.com` |
-| North America | `https://americas.api.riotgames.com` | `https://na1.api.riotgames.com` |
-| Korea | `https://asia.api.riotgames.com` | `https://kr.api.riotgames.com` |
-
-Full list: [Riot routing values](https://developer.riotgames.com/docs/lol#routing-values)
-
-### 5. Configure your domain
-
-Set `NASHORDAQ_DOMAIN` to the public domain you will serve the app on, and `NASHORDAQ_CORS_ORIGINS` to the full origin URL of your frontend:
-
-```
-NASHORDAQ_DOMAIN=nashordaq.yourdomain.com
-NASHORDAQ_CORS_ORIGINS=https://nashordaq.yourdomain.com
-```
-
-### 6. Set up authentication with Pangolin
-
-Nashordaq does not handle login or passwords. It expects an Identity-Aware Proxy to authenticate users and forward their identity via an HTTP header.
-
-**Using [Pangolin](https://github.com/fosrl/pangolin):**
-
-1. Install and configure Pangolin on your server following the [Pangolin documentation](https://docs.fossorial.io/).
-2. Create a new site/resource in Pangolin pointing to your Nashordaq instance.
-3. Enable authentication on the resource. Pangolin will handle login (SSO, OIDC, etc.) and inject headers into proxied requests.
-4. Ensure SSO authentication is enabled on the resource. Pangolin will automatically forward `Remote-User`, `Remote-Email`, and `Remote-Name` headers. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for a step-by-step Pangolin setup guide.
-
-For defense-in-depth, enable trusted-proxy enforcement so direct backend requests are rejected unless they originate from your reverse proxy network:
-
-```env
-# Primary identity header (recommended: Remote-Email)
-NASHORDAQ_REMOTE_EMAIL_HEADER=Remote-Email
-NASHORDAQ_REMOTE_NAME_HEADER=Remote-Name
-
-# Legacy fallback identity header (default: Remote-User)
-NASHORDAQ_AUTH_HEADER=Remote-User
-
-# Optional admin account list for the operator dashboard. Comma-separate
-# multiple email addresses if you want more than one admin.
-NASHORDAQ_ADMIN_REMOTE_USERS=admin@yourdomain.com
-
-# Optional hardening (recommended in production)
-NASHORDAQ_ENFORCE_TRUSTED_PROXY=true
-NASHORDAQ_TRUSTED_PROXY_CIDRS=10.89.0.0/16,127.0.0.1/32,::1/128
-```
-
-Set `NASHORDAQ_TRUSTED_PROXY_CIDRS` to the CIDR(s) used by your proxy/tunnel containers on the Podman network.
-
-For any public-facing, compliance-oriented, or future production-style deployment, also set:
-
-```env
-NASHORDAQ_GAMBA_ENABLED=false
-```
-
-Newly tracked players cannot be bought until they receive their first successful market update, so users do not trade against the placeholder startup price.
-
-Riot API timeout behavior is also configurable:
-
-```env
-NASHORDAQ_HTTP_TIMEOUT_SECONDS=10
-NASHORDAQ_HTTP_CONNECT_TIMEOUT_SECONDS=5
-```
-
-When a user visits Nashordaq, Pangolin authenticates them first. The backend identifies users primarily from `Remote-Email`, with `Remote-User` retained as a legacy fallback. New users are automatically provisioned with the configured starting balance and then complete a one-time in-app self-onboarding step to link their Riot `game_name` and `tag_line`.
-
-### 7. Start the application
-
-No external database or message broker to set up -- Nashordaq uses SQLite (created automatically on first run) and an in-process scheduler.
-
-```bash
-podman-compose up -d
-```
-
-The SQLite database file is stored at the path configured by `NASHORDAQ_DATABASE_URL` (default: `data/nashordaq.db`). Back up this file to preserve all data.
+Start with a separate empty data directory when leaving the previous proxy installation. Startup rejects its database without migrating or deleting it. Preserve the old installation and data. No standalone release tag has been published from this implementation; an implementation-branch checkout establishes development verification only.
 
 ## Development
 
-### Backend (Python/FastAPI)
+Use the [local development procedure](docs/DEPLOYMENT.md#local-development) to configure the browser origin and create an account. Backend commands run from `backend/`:
 
 ```bash
-cd backend
-uv sync                            # Install dependencies
-uv run uvicorn app.main:app --reload  # Start dev server
-uv run pytest -v                   # Run tests
-uv run ruff check .                # Lint
-uv run ruff format .               # Format
+mkdir -p data
+uv sync --locked --dev
+NASHORDAQ_PUBLIC_URL=http://localhost:5173 uv run uvicorn app.main:app --reload
+uv run pytest -v
+uv run ruff check .
+uv run ruff format .
 ```
 
-### Frontend (React/TypeScript)
+Frontend commands run from `frontend/` with the version declared in `packageManager`:
 
 ```bash
-cd frontend
-pnpm install                       # Install dependencies
-pnpm run dev                       # Start dev server
-pnpm run build                     # Production build
-pnpm run lint                      # Lint (ESLint)
-pnpm run format                    # Format (Prettier)
+corepack pnpm@10.34.7 install --frozen-lockfile
+corepack pnpm@10.34.7 run dev
+corepack pnpm@10.34.7 run lint
+corepack pnpm@10.34.7 run format
+corepack pnpm@10.34.7 run build
 ```
+
+Use [GitHub issues](https://github.com/KyleDerZweite/nashordaq/issues) for work and [Discussions](https://github.com/KyleDerZweite/nashordaq/discussions) for ideas. The [roadmap](docs/ROADMAP.md) separates the implemented baseline from possible later work.
 
 ## License
 
-This project is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0). See [LICENSE](LICENSE).
+Nashordaq uses the GNU Affero General Public License v3.0. See [LICENSE](LICENSE).

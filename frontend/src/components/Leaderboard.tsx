@@ -1,7 +1,6 @@
 import { useState } from "react";
-import { useStreamerMode } from "../contexts/useStreamerMode";
+import { useIdentityPresentation } from "../contexts/useIdentityPresentation";
 import type { LeaderboardEntry } from "../types";
-import { getStreamerSafeName } from "../utils/streamerMode";
 import { formatAmount } from "../utils/format";
 import LeaderboardPlayerInsight from "./LeaderboardPlayerInsight";
 
@@ -10,7 +9,7 @@ interface Props {
 }
 
 export default function Leaderboard({ entries }: Props) {
-  const { isStreamerMode } = useStreamerMode();
+  const { userName } = useIdentityPresentation();
   const [selectedEntry, setSelectedEntry] = useState<LeaderboardEntry | null>(
     null,
   );
@@ -63,9 +62,7 @@ export default function Leaderboard({ entries }: Props) {
                   </span>
                 </td>
                 <td className="px-4 py-2.5 font-mono text-sm font-medium text-hex-white">
-                  {isStreamerMode
-                    ? getStreamerSafeName(e.game_name, e.display_name)
-                    : e.display_name}
+                  {userName(e.user_id)}
                 </td>
                 <td className="px-4 py-2.5 text-right font-mono text-sm font-bold text-hex-gold">
                   {formatAmount(e.total_value)}
@@ -79,8 +76,6 @@ export default function Leaderboard({ entries }: Props) {
       {selectedEntry && (
         <LeaderboardPlayerInsight
           userId={selectedEntry.user_id}
-          displayName={selectedEntry.display_name}
-          gameName={selectedEntry.game_name}
           totalValue={selectedEntry.total_value}
           rank={selectedEntry.rank}
           onClose={() => setSelectedEntry(null)}

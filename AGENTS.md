@@ -16,16 +16,18 @@ This is the primary instruction file for contributors and coding agents. Follow 
 - Never use `npm` or `yarn`.
 
 ### Authentication / Security Model
-- Authentication is external (IAP + reverse proxy).
-- Never implement JWT issuance, password hashing, sessions, or login forms.
-- Backend identity source is `Remote-Email` (stable key), with `Remote-Name` for display name and `Remote-User` as fallback (matching Pangolin's forwarded headers).
-- Keep security assumptions aligned with `docs/ARCHITECTURE.md` (trust boundary and hardening settings).
+- Preserve standalone local authentication with username, password and revocable sessions.
+- Identity headers grant no authentication or administrator permissions. OAuth/OIDC is outside the accepted baseline.
+- Follow the accepted decision in `docs/adr/0001-self-host-baseline.md` and the security boundary in `docs/ARCHITECTURE.md`.
+- Local authentication, explicit isolated demo sessions and operator recovery are implemented. Keep code and tests aligned with the accepted contract.
 
 ## 2) Canonical References
 
 - Architecture and security boundary: `docs/ARCHITECTURE.md`
 - Pricing model and formulas: `docs/ECONOMY_MECHANICS.md`
 - Product scope and behavior: `docs/PRD.md`
+- Operator procedures: `docs/DEPLOYMENT.md`
+- Self-host acceptance evidence and remaining checks: `docs/SELF_HOST_ACCEPTANCE.md`
 
 Do not duplicate complex formula or architecture details in multiple places; reference canonical docs instead.
 
@@ -54,3 +56,20 @@ If checks fail, fix issues autonomously before concluding.
 - Follow: KISS, YAGNI, DRY, SOLID.
 - Keep comments and docs concise. No emojis.
 - Do not add features beyond the requested scope.
+
+## Agent skills
+
+### Issue tracker
+
+Track issues and specs in GitHub Issues for `KyleDerZweite/nashordaq`.
+Before reading or publishing tickets, read `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Use the five default triage labels.
+Before triaging issues, read `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Use a single-context layout with root `GLOSSARY.md` and `docs/adr/`.
+Before exploring domain terms or decisions, read `docs/agents/domain.md`.

@@ -1,9 +1,5 @@
 from datetime import UTC, datetime
 
-from httpx import ASGITransport, AsyncClient
-
-from app.config import settings
-from app.main import app
 from app.models import (
     PlayingIncomeEntry,
     PlayingIncomeMatchResult,
@@ -23,23 +19,15 @@ async def test_admin_overview_requires_admin(auth_client):
 
 
 async def test_admin_can_view_overview_users_and_orders(
-    auth_client, tradable_player, monkeypatch
+    auth_client, tradable_player, admin_client, account_client
 ):
     await auth_client.post(
         "/api/orders",
         json={"player_id": tradable_player.id, "side": "BUY", "quantity": 1},
     )
-    monkeypatch.setattr(settings, "admin_remote_users", "testuser@test.dev")
 
-    transport = ASGITransport(app=app)
-    async with AsyncClient(
-        transport=transport,
-        base_url="http://test",
-        headers={
-            "Remote-User": "seconduser",
-            "Remote-Email": "seconduser@test.dev",
-            "Remote-Name": "Second User",
-        },
+    async with account_client(
+        "seconduser", display_name="Second User"
     ) as second_user_client:
         onboarding_resp = await second_user_client.post(
             "/api/user/onboarding",
@@ -50,9 +38,9 @@ async def test_admin_can_view_overview_users_and_orders(
         )
         assert onboarding_resp.status_code == 200
 
-    overview_resp = await auth_client.get("/api/admin/overview")
-    users_resp = await auth_client.get("/api/admin/users")
-    status_resp = await auth_client.get("/api/admin/system/status")
+    overview_resp = await admin_client.get("/api/admin/overview")
+    users_resp = await admin_client.get("/api/admin/users")
+    status_resp = await admin_client.get("/api/admin/system/status")
 
     assert overview_resp.status_code == 200
     assert overview_resp.json()["admin_users"] == 1
@@ -61,7 +49,7 @@ async def test_admin_can_view_overview_users_and_orders(
 
     assert users_resp.status_code == 200
     users = users_resp.json()
-    assert users[0]["role"] == "admin"
+    assert any(user["role"] == "admin" for user in users)
     assert {user["email"] for user in users} >= {
         "testuser@test.dev",
         "seconduser@test.dev",
@@ -71,7 +59,9 @@ async def test_admin_can_view_overview_users_and_orders(
     assert status_resp.json()["service_status"] == "ok"
 
 
-async def test_admin_can_view_user_portfolio(auth_client, tradable_player, monkeypatch):
+async def test_admin_can_view_user_portfolio(
+    auth_client, tradable_player, admin_client
+):
     buy_resp = await auth_client.post(
         "/api/orders",
         json={"player_id": tradable_player.id, "side": "BUY", "quantity": 2},
@@ -82,13 +72,11 @@ async def test_admin_can_view_user_portfolio(auth_client, tradable_player, monke
     assert me_resp.status_code == 200
     user_id = me_resp.json()["id"]
 
-    monkeypatch.setattr(settings, "admin_remote_users", "testuser@test.dev")
-
-    resp = await auth_client.get(f"/api/admin/users/{user_id}/portfolio")
+    resp = await admin_client.get(f"/api/admin/users/{user_id}/portfolio")
 
     assert resp.status_code == 200
     data = resp.json()
-    assert data["role"] == "admin"
+    assert data["role"] == "player"
     assert data["linked_player_game_name"] == "TestPlayer"
     assert data["portfolio"]["holdings"][0]["player_name"] == "Tradable Player"
     assert data["portfolio"]["holdings"][0]["player_game_name"] == "TradablePlayer"
@@ -98,7 +86,7 @@ async def test_admin_can_view_user_portfolio(auth_client, tradable_player, monke
 async def test_admin_can_restore_a_spent_rescue_use(
     auth_client,
     db_session,
-    monkeypatch,
+    admin_client,
 ):
     await auth_client.post(
         "/api/user/onboarding",
@@ -129,9 +117,7 @@ async def test_admin_can_restore_a_spent_rescue_use(
     assert repay_resp.status_code == 200
     assert repay_resp.json()["rescue_loan_uses_remaining"] == 0
 
-    monkeypatch.setattr(settings, "admin_remote_users", "testuser@test.dev")
-
-    unlock_resp = await auth_client.post(f"/api/admin/users/{user_id}/rescue-unlock")
+    unlock_resp = await admin_client.post(f"/api/admin/users/{user_id}/rescue-unlock")
 
     assert unlock_resp.status_code == 200
     data = unlock_resp.json()
@@ -140,8 +126,7 @@ async def test_admin_can_restore_a_spent_rescue_use(
     assert data["rescue_loan_block_reason"] is None
 
 
-async def test_admin_can_view_player_insights(auth_client, db_session, monkeypatch):
-    monkeypatch.setattr(settings, "admin_remote_users", "testuser@test.dev")
+async def test_admin_can_view_player_insights(auth_client, db_session, admin_client):
 
     me_resp = await auth_client.get("/api/user/me")
     assert me_resp.status_code == 200
@@ -201,7 +186,7 @@ async def test_admin_can_view_player_insights(auth_client, db_session, monkeypat
     )
     await db_session.commit()
 
-    resp = await auth_client.get("/api/admin/players/insights")
+    resp = await admin_client.get("/api/admin/players/insights")
 
     assert resp.status_code == 200
     data = resp.json()

@@ -52,7 +52,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 10
+          package_json_file: frontend/package.json
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -69,6 +69,9 @@ jobs:
 
       - name: Prettier check
         run: pnpm exec prettier --check "src/**/*.{ts,tsx,css}"
+
+      - name: Identity presentation tests
+        run: pnpm run test
 
       - name: Build
         run: pnpm run build

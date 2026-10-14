@@ -1,8 +1,7 @@
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 
-import { useStreamerMode } from "../contexts/useStreamerMode";
+import { useIdentityPresentation } from "../contexts/useIdentityPresentation";
 import type { PortfolioResponse } from "../types";
-import { getStreamerSafeName } from "../utils/streamerMode";
 import { formatAmount } from "../utils/format";
 
 const SUMMARY_GRID_INTERNAL_BORDERS = 6;
@@ -35,7 +34,7 @@ export default function Portfolio({
   onOpenInsights,
   gambaEnabled = true,
 }: Props) {
-  const { isStreamerMode } = useStreamerMode();
+  const { playerName } = useIdentityPresentation();
   const holdings = portfolio?.holdings ?? [];
   const balance = portfolio?.balance ?? 0;
   const holdingsValue = portfolio?.holdings_value ?? 0;
@@ -207,9 +206,7 @@ export default function Portfolio({
                 className="border-b border-hex-border/50 transition-colors hover:bg-hex-bg-alt"
               >
                 <td className="px-4 py-2.5 font-mono text-sm font-medium text-hex-white">
-                  {isStreamerMode
-                    ? getStreamerSafeName(h.player_game_name, h.player_name)
-                    : h.player_name}
+                  {playerName(h.player_id)}
                 </td>
                 <td className="px-4 py-2.5 text-right font-mono text-sm text-hex-bronze">
                   {h.quantity}

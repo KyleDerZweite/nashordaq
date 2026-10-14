@@ -1,7 +1,8 @@
 from datetime import UTC, datetime
 from pathlib import Path
+from urllib.parse import urlsplit
 
-from pydantic import model_validator
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
@@ -18,19 +19,10 @@ class Settings(BaseSettings):
 
     # Demo mode
     demo_mode_enabled: bool = False
-    demo_session_ttl_hours: float = 24.0
     demo_sim_interval_seconds: int = 180
 
     # Riot API
     riot_api_key: str = ""
-
-    @model_validator(mode="after")
-    def _require_riot_key_in_production(self) -> "Settings":
-        if not self.demo_mode_enabled and not self.riot_api_key:
-            raise ValueError(
-                "NASHORDAQ_RIOT_API_KEY is required when demo mode is disabled"
-            )
-        return self
 
     riot_api_base_url: str = "https://europe.api.riotgames.com"
     riot_api_region_url: str = "https://euw1.api.riotgames.com"
@@ -50,19 +42,32 @@ class Settings(BaseSettings):
     http_timeout_seconds: float = 10.0
     http_connect_timeout_seconds: float = 5.0
 
-    # Auth (headers injected by reverse proxy / Pangolin)
-    auth_header: str = "Remote-User"
-    remote_email_header: str = "Remote-Email"
-    remote_name_header: str = "Remote-Name"
-    admin_remote_users: str = ""
-    enforce_trusted_proxy: bool = False
-    trusted_proxy_cidrs: str = "127.0.0.1/32,::1/128"
+    # The externally visible origin controls setup links and HTTPS cookie policy.
+    public_url: str = "http://localhost:8080"
+
+    @field_validator("public_url")
+    @classmethod
+    def _public_origin(cls, value: str) -> str:
+        parsed = urlsplit(value)
+        if (
+            parsed.scheme not in {"http", "https"}
+            or not parsed.hostname
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.path not in {"", "/"}
+            or parsed.query
+            or parsed.fragment
+        ):
+            raise ValueError("NASHORDAQ_PUBLIC_URL must be an HTTP or HTTPS origin")
+        # Accessing port validates its range and format.
+        _ = parsed.port
+        return f"{parsed.scheme}://{parsed.netloc}"
 
     # Economy
     starting_balance: float = 1000.0
     min_hold_period_hours: float = 4.0
     buy_revert_grace_seconds: int = 120
-    gamba_enabled: bool = True
+    gamba_enabled: bool = False
     gamba_min_hold_hours: float = 24.0
     gamba_max_hold_hours: float = 168.0
     gamba_settlement_multiplier_min: float = 2.0

@@ -1,9 +1,8 @@
 import { useMemo, useState } from "react";
 import TimeSeriesChart, { type TimeSeriesChartDatum } from "./TimeSeriesChart";
-import { useStreamerMode } from "../contexts/useStreamerMode";
+import { useIdentityPresentation } from "../contexts/useIdentityPresentation";
 import { usePlayer } from "../api";
 import type { OrderSide, PriceHistoryEntry } from "../types";
-import { getStreamerSafeName } from "../utils/streamerMode";
 import {
   formatAmount,
   formatLocalDate,
@@ -141,7 +140,7 @@ export default function PlayerDetailsModal({
   onTrade,
   onClose,
 }: Props) {
-  const { isStreamerMode } = useStreamerMode();
+  const { isStreamerMode, playerName } = useIdentityPresentation();
   const [range, setRange] = useState<ChartRange>(30);
   const [resolution, setResolution] = useState<ChartResolution>("daily");
   const { data: player, isLoading, isError, error } = usePlayer(playerId);
@@ -304,7 +303,7 @@ export default function PlayerDetailsModal({
       >
         <div className="border-b-4 border-hex-gold bg-hex-bg-alt px-6 py-5">
           <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
+            <div className="min-w-0 w-full lg:w-auto lg:flex-1">
               <div className="mb-2 flex flex-wrap items-center gap-3">
                 <span className="border border-hex-border px-2 py-1 font-mono text-[11px] font-bold uppercase tracking-[0.24em] text-hex-bronze">
                   Player Details
@@ -317,12 +316,8 @@ export default function PlayerDetailsModal({
                   </span>
                 )}
               </div>
-              <h2 className="font-serif text-3xl font-bold text-hex-gold">
-                {player
-                  ? isStreamerMode
-                    ? getStreamerSafeName(player.game_name, player.display_name)
-                    : player.display_name
-                  : "Loading player..."}
+              <h2 className="break-all font-serif text-3xl font-bold text-hex-gold">
+                {player ? playerName(player.id) : "Loading player..."}
               </h2>
               {player && opGgUrl && !isStreamerMode ? (
                 <a
@@ -337,11 +332,11 @@ export default function PlayerDetailsModal({
                   </span>
                   <span>{`${player.game_name}#${player.tag_line}`}</span>
                 </a>
-              ) : (
+              ) : !player ? (
                 <p className="mt-1 font-mono text-sm text-hex-bronze">
                   Fetching complete market history
                 </p>
-              )}
+              ) : null}
             </div>
 
             <div className="flex flex-wrap items-center justify-end gap-3">

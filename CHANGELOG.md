@@ -7,18 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Locally built Docker Compose and Podman Compose packaging, WAL-aware live backup, fresh restore and supported-schema update preflight.
+- Isolated temporary demo sessions, permanent streamer aliases and member-visible administrator game interventions.
+
 ### Security
 
 - `/api/market/quote` and `/api/market/account` now require authentication; previously they were an unauthenticated proxy to the Riot API using the server's API key.
 - Enforced `NASHORDAQ_GAMBA_MAX_ACTIVE_POSITIONS_PER_USER` (default 1); the setting existed but was never checked, allowing unlimited concurrent leveraged positions.
-- Documented `NASHORDAQ_ENFORCE_TRUSTED_PROXY` and `NASHORDAQ_TRUSTED_PROXY_CIDRS` in `.env.example` and `docs/DEPLOYMENT.md`; enabling enforcement is strongly recommended since identity is derived from proxy-injected `Remote-*` headers.
+- Replaced proxy-header identity with local username/password accounts, one-time setup, invitations and revocable sessions. Added password changes, reset links and server-side administrator recovery.
 - nginx now sends `X-Frame-Options`, `X-Content-Type-Options`, and `Referrer-Policy` headers.
 - Dependabot auto-merge now only merges patch/minor updates; major bumps (or PRs whose version change cannot be determined) are left for manual review.
-- Capped unauthenticated simulation requests at 20 parameter sets.
+- Capped simulation requests at 20 parameter sets; all simulation endpoints now require a local session.
 
 ### Fixed
 
-- Email backfill for pre-migration users (matched via the legacy `Remote-User` header) is now committed reliably; previously it was silently discarded unless the display name changed in the same request.
 - All balance mutations in order execution, buy reverts, gamba, playing income, and settlement now round to cents, preventing float drift in stored balances.
 - SQLite now enables foreign-key enforcement and a 15s busy timeout (previously FK constraints were silently unenforced).
 - `/api/market/quote` and `/api/market/account` return 502 with a clear message when the Riot API fails unexpectedly, instead of an unhandled 500.
@@ -27,10 +31,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Docs
 
-- Corrected `docs/DEPLOYMENT.md` health-check URL (`/health`, not `/api/health`), documented the trusted-proxy variables, and fixed the demo `.env.example` compose instructions.
+- Reconciled English operator, architecture and product documentation with the standalone baseline and recorded acceptance evidence with remaining integration checks.
 - Corrected `docs/ARCHITECTURE.md` scheduler cadence (dynamic interval, not a fixed 30 minutes) and `docs/ECONOMY_MECHANICS.md` gamba mark value (mark-to-market, not locked cash).
 
-- Refreshed architecture, deployment, and product-strategy docs to reflect `Remote-Email` as the primary identity key, current onboarding behavior, and the single-tenant/private deployment model.
 - Clarified that the future production-facing Nashordaq product path excludes the private-only `gamba` mechanic entirely and is framed as a virtual investing and social market product.
 
 ## [0.2.0] - 2026-03-20

@@ -1,7 +1,18 @@
 import enum
 from datetime import datetime
 
-from sqlalchemy import Enum, Float, ForeignKey, Integer, String, UniqueConstraint, func
+from sqlalchemy import (
+    CheckConstraint,
+    Enum,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    UniqueConstraint,
+    func,
+    text,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -68,6 +79,16 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     username: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    password_hash: Mapped[str] = mapped_column(String(255), default="")
+    is_admin: Mapped[bool] = mapped_column(default=False)
+    __table_args__ = (
+        Index(
+            "sole_administrator",
+            "is_admin",
+            unique=True,
+            sqlite_where=text("is_admin = 1"),
+        ),
+    )
     email: Mapped[str | None] = mapped_column(
         String(255), unique=True, index=True, default=None
     )
@@ -425,3 +446,69 @@ class PriceHistory(Base):
     recorded_at: Mapped[datetime] = mapped_column(insert_default=func.now())
 
     player: Mapped["TrackedPlayer"] = relationship(back_populates="price_history")
+
+
+class InstanceMetadata(Base):
+    __tablename__ = "instance_metadata"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    schema_version: Mapped[int] = mapped_column(default=1)
+
+
+class AuthSession(Base):
+    __tablename__ = "auth_sessions"
+
+    token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    expires_at: Mapped[datetime] = mapped_column(index=True)
+    created_at: Mapped[datetime] = mapped_column(insert_default=func.now())
+
+
+class AccessToken(Base):
+    __tablename__ = "access_tokens"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    kind: Mapped[str] = mapped_column(String(16), index=True)
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), default=None
+    )
+    expires_at: Mapped[datetime | None] = mapped_column(default=None)
+    consumed_at: Mapped[datetime | None] = mapped_column(default=None)
+    revoked_at: Mapped[datetime | None] = mapped_column(default=None)
+
+
+class GameIntervention(Base):
+    __tablename__ = "game_interventions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    actor_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    affected_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    kind: Mapped[str] = mapped_column(String(64))
+    previous_uses: Mapped[int] = mapped_column(Integer)
+    new_uses: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(index=True)
+
+
+class IdentityAlias(Base):
+    __tablename__ = "identity_aliases"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), unique=True, default=None
+    )
+    player_id: Mapped[int | None] = mapped_column(
+        ForeignKey("tracked_players.id", ondelete="CASCADE"), unique=True, default=None
+    )
+    alias: Mapped[str] = mapped_column(String(255), unique=True)
+    user: Mapped["User | None"] = relationship()
+    player: Mapped["TrackedPlayer | None"] = relationship()
+    __table_args__ = (
+        CheckConstraint(
+            "(user_id IS NOT NULL AND player_id IS NULL) OR "
+            "(user_id IS NULL AND player_id IS NOT NULL)",
+            name="one_identity_alias_target",
+        ),
+    )

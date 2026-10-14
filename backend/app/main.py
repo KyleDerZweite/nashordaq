@@ -1,28 +1,32 @@
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime
 from typing import Annotated, Any
 
 import httpx
-from fastapi import Depends, FastAPI, Query
+from fastapi import Depends, FastAPI, Query, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import CurrentUser
+from app.auth import CurrentUser, get_current_user, initialize_setup
+from app.auth import router as auth_router
 from app.config import settings
-from app.database import engine, get_session, init_db
-from app.models import TrackedPlayer
+from app.database import SessionLocal, engine, get_session, init_db
+from app.identities import AliasPoolExhausted
+from app.middleware import SessionRequestProtection
 from app.riot import (
     PlayerNotFoundError,
     RateLimitedError,
+    RiotIntegrationError,
     get_account_by_riot_id,
     get_rank,
 )
 from app.routers import (
+    activity,
     admin,
     bank,
     gamba,
+    identities,
     leaderboard,
     market,
     orders,
@@ -31,17 +35,17 @@ from app.routers import (
     simulation,
     user,
 )
-from app.scheduler import (
-    classify_market_status,
-    get_last_market_update_at,
-    get_required_market_update_interval,
-    is_scheduler_running,
-    start_scheduler,
-    stop_scheduler,
-)
+from app.scheduler import start_scheduler, stop_scheduler
 from app.schemas import MarketAccountResponse, SystemStatusResponse
+from app.system_status import observe_system_status
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
+
+
+async def initialize_instance() -> None:
+    await init_db()
+    async with SessionLocal() as session:
+        await initialize_setup(session)
 
 
 @asynccontextmanager
@@ -52,7 +56,7 @@ async def lifespan(app: FastAPI):
             connect=settings.http_connect_timeout_seconds,
         )
     )
-    await init_db()
+    await initialize_instance()
     start_scheduler(app)
     yield
     stop_scheduler()
@@ -62,81 +66,93 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Nashordaq", lifespan=lifespan)
 
+
+@app.exception_handler(AliasPoolExhausted)
+async def alias_pool_exhausted(
+    request: Request, error: AliasPoolExhausted
+) -> JSONResponse:
+    return JSONResponse(status_code=503, content={"detail": str(error)})
+
+
+@app.exception_handler(RiotIntegrationError)
+async def riot_integration_error(
+    request: Request, error: RiotIntegrationError
+) -> JSONResponse:
+    return JSONResponse(status_code=error.http_status, content={"detail": str(error)})
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error_without_secrets(
+    request: Request, error: RequestValidationError
+) -> JSONResponse:
+    return JSONResponse(
+        status_code=422,
+        content={
+            "detail": [
+                {key: entry[key] for key in ("type", "loc", "msg") if key in entry}
+                for entry in error.errors()
+            ]
+        },
+    )
+
+
 allowed_origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "DELETE"],
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=[
         "Content-Type",
-        settings.auth_header,
-        "Remote-Email",
-        "Remote-Name",
+        "X-Nashordaq-CSRF",
     ],
 )
 
-if settings.demo_mode_enabled:
-    from app.middleware import DemoCookieMiddleware
+app.add_middleware(SessionRequestProtection)
 
-    app.add_middleware(DemoCookieMiddleware)
+app.include_router(auth_router, prefix="/api")
+app.include_router(activity.router, prefix="/api")
+app.include_router(identities.router, prefix="/api")
 
-app.include_router(user.router, prefix="/api")
-app.include_router(admin.router, prefix="/api")
-app.include_router(market.router, prefix="/api")
-app.include_router(orders.router, prefix="/api")
-app.include_router(gamba.router, prefix="/api")
-app.include_router(bank.router, prefix="/api")
-app.include_router(poro.router, prefix="/api")
-app.include_router(portfolio.router, prefix="/api")
-app.include_router(leaderboard.router, prefix="/api")
-app.include_router(simulation.router, prefix="/api")
+app.include_router(user.router, prefix="/api", dependencies=[Depends(get_current_user)])
+app.include_router(
+    admin.router, prefix="/api", dependencies=[Depends(get_current_user)]
+)
+app.include_router(
+    market.router, prefix="/api", dependencies=[Depends(get_current_user)]
+)
+app.include_router(
+    orders.router, prefix="/api", dependencies=[Depends(get_current_user)]
+)
+app.include_router(
+    gamba.router, prefix="/api", dependencies=[Depends(get_current_user)]
+)
+app.include_router(bank.router, prefix="/api", dependencies=[Depends(get_current_user)])
+app.include_router(poro.router, prefix="/api", dependencies=[Depends(get_current_user)])
+app.include_router(
+    portfolio.router, prefix="/api", dependencies=[Depends(get_current_user)]
+)
+app.include_router(
+    leaderboard.router, prefix="/api", dependencies=[Depends(get_current_user)]
+)
+app.include_router(
+    simulation.router, prefix="/api", dependencies=[Depends(get_current_user)]
+)
 
 
 @app.get("/health")
 async def health() -> dict[str, str]:
-    last_update = get_last_market_update_at() or datetime.now(UTC)
-    return {
-        "status": "ok",
-        "update": last_update.strftime("%Y-%m-%d %H:%M"),
-    }
+    return {"status": "ok"}
 
 
-@app.get("/api/system/status", response_model=SystemStatusResponse)
+@app.get(
+    "/api/system/status",
+    response_model=SystemStatusResponse,
+    dependencies=[Depends(get_current_user)],
+)
 async def system_status(session: SessionDep) -> SystemStatusResponse:
-    total_player_count = (
-        await session.scalar(select(func.count()).select_from(TrackedPlayer)) or 0
-    )
-    trackable_player_count = (
-        await session.scalar(
-            select(func.count())
-            .select_from(TrackedPlayer)
-            .where(TrackedPlayer.lp_abs > 0)
-        )
-        or 0
-    )
-    interval = get_required_market_update_interval(trackable_player_count)
-    expected_update_interval_minutes = int(interval.total_seconds() // 60)
-    last_market_update_at = get_last_market_update_at()
-    scheduler_running = is_scheduler_running()
-
-    return SystemStatusResponse(
-        service_status="ok",
-        scheduler_running=scheduler_running,
-        market_status=classify_market_status(
-            now=datetime.now(UTC),
-            last_market_update_at=last_market_update_at,
-            tracked_player_count=total_player_count,
-            scheduler_running=scheduler_running,
-            expected_interval=interval,
-        ),
-        tracked_player_count=total_player_count,
-        expected_update_interval_minutes=max(1, expected_update_interval_minutes),
-        last_market_update_at=last_market_update_at,
-        gamba_enabled=settings.gamba_enabled,
-        demo_mode_enabled=settings.demo_mode_enabled,
-    )
+    return await observe_system_status(session)
 
 
 @app.get("/api/market/quote")

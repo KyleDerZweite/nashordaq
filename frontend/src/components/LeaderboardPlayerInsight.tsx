@@ -1,12 +1,9 @@
 import { useLeaderboardPlayerPortfolio } from "../api";
-import { useStreamerMode } from "../contexts/useStreamerMode";
-import { getStreamerSafeName } from "../utils/streamerMode";
+import { useIdentityPresentation } from "../contexts/useIdentityPresentation";
 import { formatAmount } from "../utils/format";
 
 interface Props {
   userId: number;
-  displayName: string;
-  gameName: string;
   totalValue: number;
   rank: number;
   onClose: () => void;
@@ -14,18 +11,14 @@ interface Props {
 
 export default function LeaderboardPlayerInsight({
   userId,
-  displayName,
-  gameName,
   totalValue,
   rank,
   onClose,
 }: Props) {
-  const { isStreamerMode } = useStreamerMode();
+  const { playerName, userName } = useIdentityPresentation();
   const { data: portfolio, isLoading } = useLeaderboardPlayerPortfolio(userId);
 
-  const name = isStreamerMode
-    ? getStreamerSafeName(gameName, displayName)
-    : displayName;
+  const name = userName(userId);
 
   return (
     <div
@@ -38,7 +31,7 @@ export default function LeaderboardPlayerInsight({
       >
         <div className="border-b-4 border-hex-gold bg-hex-bg-alt px-4 py-4 sm:px-6 sm:py-5">
           <div className="flex items-start justify-between gap-4">
-            <div>
+            <div className="min-w-0">
               <div className="mb-2 flex items-center gap-3">
                 <span
                   className={`inline-block h-7 w-7 border-2 text-center text-xs leading-6 font-bold ${
@@ -57,7 +50,7 @@ export default function LeaderboardPlayerInsight({
                   Portfolio
                 </span>
               </div>
-              <h2 className="font-serif text-2xl font-bold text-hex-gold">
+              <h2 className="break-all font-serif text-2xl font-bold text-hex-gold">
                 {name}
               </h2>
               <p className="mt-1 font-mono text-sm text-hex-bronze">
@@ -68,7 +61,7 @@ export default function LeaderboardPlayerInsight({
             <button
               type="button"
               onClick={onClose}
-              className="border-2 border-hex-border px-4 py-3 font-mono text-xs font-bold uppercase tracking-[0.18em] text-hex-bronze transition-colors hover:border-hex-white hover:text-hex-white"
+              className="shrink-0 border-2 border-hex-border px-4 py-3 font-mono text-xs font-bold uppercase tracking-[0.18em] text-hex-bronze transition-colors hover:border-hex-white hover:text-hex-white"
             >
               Close
             </button>
@@ -120,12 +113,7 @@ export default function LeaderboardPlayerInsight({
                       >
                         <td className="px-4 py-3 font-mono text-sm font-medium text-hex-white">
                           <span className="block truncate">
-                            {isStreamerMode
-                              ? getStreamerSafeName(
-                                  h.player_game_name,
-                                  h.player_name,
-                                )
-                              : h.player_name}
+                            {playerName(h.player_id)}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-right font-mono text-sm text-hex-white">

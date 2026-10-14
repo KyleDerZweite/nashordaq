@@ -108,10 +108,6 @@ class BalanceInsightsResponse(BaseModel):
     history: list[UserWealthSnapshotResponse]
 
 
-class DemoNicknameRequest(BaseModel):
-    display_name: str = Field(min_length=1, max_length=32)
-
-
 class UserOnboardingCreate(BaseModel):
     game_name: str = Field(min_length=1, max_length=255)
     tag_line: str = Field(min_length=1, max_length=10)
@@ -152,6 +148,7 @@ class OrderCreate(BaseModel):
 
 
 class OrderResponse(BaseModel):
+    user_id: int
     id: int
     player_id: int
     player_name: str
@@ -354,6 +351,8 @@ class LeaderboardPlayerPortfolioResponse(BaseModel):
 
 
 class SystemStatusResponse(BaseModel):
+    riot_status: str
+    riot_status_detail: str
     service_status: Literal["ok"]
     scheduler_running: bool
     market_status: MarketStatus
@@ -480,3 +479,21 @@ class SimulationPlayerMatchResponse(BaseModel):
     price_before: float
     price_after: float
     completed_at: datetime
+
+
+class ActivityIdentityResponse(BaseModel):
+    user_id: int
+    username: str
+    linked_player_id: int | None
+    game_name: str | None
+    tag_line: str | None
+
+
+class GameInterventionResponse(BaseModel):
+    id: int
+    actor: ActivityIdentityResponse
+    affected: ActivityIdentityResponse
+    kind: Literal["rescue_access_restored"]
+    previous_uses: int
+    new_uses: int
+    created_at: datetime

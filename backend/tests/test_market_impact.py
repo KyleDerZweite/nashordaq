@@ -188,6 +188,7 @@ async def test_gamba_does_not_move_price(
 
     monkeypatch.setattr(random, "choice", lambda _: tradable_player)
     monkeypatch.setattr(random, "uniform", lambda a, b: a)
+    monkeypatch.setattr(settings, "gamba_enabled", True)
     monkeypatch.setattr(settings, "gamba_max_active_positions_per_user", 5)
 
     original_price = tradable_player.current_price

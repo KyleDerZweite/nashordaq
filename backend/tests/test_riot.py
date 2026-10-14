@@ -106,6 +106,15 @@ async def test_get_rank_by_puuid_success(httpx_mock):
     assert result.summoner_id == SUMMONER_ID
 
 
+async def test_get_rank_preserves_signed_league_points(httpx_mock):
+    httpx_mock.add_response(json=[{**SOLO_QUEUE_ENTRY, "leaguePoints": -5}])
+    async with httpx.AsyncClient() as client:
+        result = await get_rank_by_puuid(
+            client=client, region_url=REGION_URL, api_key=API_KEY, puuid=PUUID
+        )
+    assert result.league_points == -5
+
+
 async def test_get_rank_by_puuid_no_solo_queue(httpx_mock):
     httpx_mock.add_response(
         url=f"{REGION_URL}/lol/league/v4/entries/by-puuid/{PUUID}",

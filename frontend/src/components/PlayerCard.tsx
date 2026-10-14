@@ -1,6 +1,5 @@
-import { useStreamerMode } from "../contexts/useStreamerMode";
+import { useIdentityPresentation } from "../contexts/useIdentityPresentation";
 import type { PlayerSummary, OrderSide } from "../types";
-import { getStreamerSafeName } from "../utils/streamerMode";
 import { formatAmount, formatLocalTime } from "../utils/format";
 
 interface Props {
@@ -20,7 +19,7 @@ export default function PlayerCard({
   isOwnStock = false,
   showTradeActions = true,
 }: Props) {
-  const { isStreamerMode } = useStreamerMode();
+  const { playerName } = useIdentityPresentation();
   const canBuy = canTrade && player.last_updated !== null && !isOwnStock;
   const trendIndicator =
     player.trend === "up"
@@ -38,16 +37,9 @@ export default function PlayerCard({
       >
         {/* Top row: name + tag */}
         <div className="mb-3 flex items-baseline justify-between">
-          <h3 className="font-serif text-xl font-bold text-hex-white transition-colors group-hover:text-hex-gold">
-            {isStreamerMode
-              ? getStreamerSafeName(player.game_name, player.display_name)
-              : player.display_name}
+          <h3 className="min-w-0 break-all font-serif text-xl font-bold text-hex-white transition-colors group-hover:text-hex-gold">
+            {playerName(player.id)}
           </h3>
-          {!isStreamerMode && (
-            <span className="font-mono text-xs text-hex-bronze">
-              {`${player.game_name}#${player.tag_line}`}
-            </span>
-          )}
         </div>
 
         {/* Divider */}
@@ -105,7 +97,7 @@ export default function PlayerCard({
             }`}
           >
             {!canTrade
-              ? "Admin"
+              ? "Link Riot account"
               : isOwnStock
                 ? "Own Stock"
                 : canBuy

@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import CurrentOnboardedUser, CurrentUser, is_admin_user
+from app.auth import CurrentOnboardedUser, CurrentUser
 from app.banking import round_currency
 from app.config import settings
 from app.database import get_session
@@ -87,6 +87,7 @@ def _order_response(
 
     return OrderResponse(
         id=order.id,
+        user_id=order.user_id,
         player_id=order.player_id,
         player_name=player_name,
         player_game_name=player_game_name,
@@ -126,6 +127,7 @@ def _order_detail_response(
 
     return OrderDetailResponse(
         id=order.id,
+        user_id=order.user_id,
         player_id=order.player_id,
         player_name=player_name,
         player_game_name=player_game_name,
@@ -448,9 +450,6 @@ async def list_orders(
     session: SessionDep,
     status: OrderStatus | None = Query(default=None),  # noqa: B008
 ) -> list[OrderResponse]:
-    if is_admin_user(user):
-        return []
-
     if user.linked_player_id is None and not user.is_demo:
         return []
 
@@ -471,13 +470,11 @@ async def list_recent_orders(
     session: SessionDep,
     limit: int = Query(default=100, ge=1, le=500),  # noqa: B008
 ) -> list[OrderResponse]:
-    del user
-
     stmt = select(Order)
-    if settings.demo_mode_enabled:
-        stmt = stmt.join(User, User.id == Order.user_id).where(
-            User.is_demo == False  # noqa: E712
-        )
+    if user.is_demo:
+        stmt = stmt.where(Order.user_id == user.id)
+    else:
+        stmt = stmt.join(User, User.id == Order.user_id).where(User.is_demo.is_(False))
     result = await session.execute(stmt.order_by(Order.created_at.desc()).limit(limit))
     orders = result.scalars().all()
     return await build_order_responses(session, orders)
@@ -489,9 +486,12 @@ async def get_order_detail(
     user: CurrentUser,
     session: SessionDep,
 ) -> OrderDetailResponse:
-    del user
-
-    result = await session.execute(select(Order).where(Order.id == order_id))
+    stmt = select(Order).where(Order.id == order_id)
+    if user.is_demo:
+        stmt = stmt.where(Order.user_id == user.id)
+    else:
+        stmt = stmt.join(User, User.id == Order.user_id).where(User.is_demo.is_(False))
+    result = await session.execute(stmt)
     order = result.scalar_one_or_none()
     if order is None:
         raise HTTPException(status_code=404, detail="Order not found")

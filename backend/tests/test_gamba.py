@@ -19,6 +19,11 @@ from app.models import (
 from app.riot import RankData
 
 
+@pytest.fixture(autouse=True)
+def enable_private_gamba(monkeypatch):
+    monkeypatch.setattr(settings, "gamba_enabled", True)
+
+
 async def test_create_gamba_returns_404_when_disabled(
     auth_client,
     tradable_player,
@@ -128,7 +133,9 @@ async def test_create_gamba_position_enforces_active_position_limit(
 
 
 @pytest.mark.asyncio
-async def test_market_update_job_settles_due_gamba_position(db_engine, monkeypatch):
+async def test_market_update_job_settles_due_gamba_position(
+    db_engine, monkeypatch, httpx_mock
+):
     session_factory = async_sessionmaker(
         db_engine, class_=AsyncSession, expire_on_commit=False
     )
@@ -194,6 +201,7 @@ async def test_market_update_job_settles_due_gamba_position(db_engine, monkeypat
             inactive=True,
         )
 
+    httpx_mock.add_response(json=[])
     http_client = httpx.AsyncClient()
     monkeypatch.setattr(scheduler_module, "SessionLocal", session_factory)
     monkeypatch.setattr(scheduler_module, "get_rank_by_puuid", fake_get_rank)

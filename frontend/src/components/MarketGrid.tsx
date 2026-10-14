@@ -1,3 +1,4 @@
+import { useIdentityPresentation } from "../contexts/useIdentityPresentation";
 import { useMemo, useState } from "react";
 import type { PlayerSummary, OrderSide } from "../types";
 import PlayerCard from "./PlayerCard";
@@ -22,6 +23,7 @@ export default function MarketGrid({
   ownPlayerId = null,
   showTradeActions = true,
 }: Props) {
+  const { playerName } = useIdentityPresentation();
   const [sortField, setSortField] = useState<MarketSortField>("value");
   const [sortDirection, setSortDirection] =
     useState<MarketSortDirection>("desc");
@@ -39,12 +41,12 @@ export default function MarketGrid({
       }
 
       return (
-        left.display_name.localeCompare(right.display_name, undefined, {
+        playerName(left.id).localeCompare(playerName(right.id), undefined, {
           sensitivity: "base",
         }) * directionMultiplier
       );
     });
-  }, [players, sortDirection, sortField]);
+  }, [players, sortDirection, sortField, playerName]);
 
   return (
     <section>

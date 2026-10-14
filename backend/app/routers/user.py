@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import CurrentUser, get_user_role, is_admin_user
+from app.auth import CurrentUser, get_user_role
 from app.banking import build_balance_insights_summary, record_user_wealth_snapshot
 from app.config import settings
 from app.database import get_session
@@ -16,10 +16,9 @@ from app.pricing import (
     calculate_lp_abs,
     calculate_win_rate,
 )
-from app.riot import PlayerNotFoundError, RateLimitedError, get_rank
+from app.riot import PlayerNotFoundError, get_rank
 from app.schemas import (
     BalanceInsightsResponse,
-    DemoNicknameRequest,
     UserOnboardingCreate,
     UserProfileUpdate,
     UserResponse,
@@ -60,28 +59,10 @@ async def _initialize_player_market_state(
             tag_line=player.tag_line,
         )
     except PlayerNotFoundError:
-        logger.warning(
-            "Onboarding completed without initial price refresh for %s#%s: "
-            "no ranked Riot data",
-            player.game_name,
-            player.tag_line,
-        )
-        return
-    except RateLimitedError:
-        logger.warning(
-            "Onboarding completed without initial price refresh for %s#%s: "
-            "Riot API rate limited",
-            player.game_name,
-            player.tag_line,
-        )
-        return
-    except Exception:
-        logger.exception(
-            "Onboarding completed without initial price refresh for %s#%s",
-            player.game_name,
-            player.tag_line,
-        )
-        return
+        raise HTTPException(
+            status_code=404,
+            detail="No ranked Solo Queue data found for this Riot account",
+        ) from None
 
     player.puuid = rank_data.puuid
     player.summoner_id = rank_data.summoner_id
@@ -118,18 +99,13 @@ async def _initialize_player_market_state(
 
 def _to_user_response(user: User) -> UserResponse:
     identity = user.email or user.username
-    if user.is_demo:
-        demo_fallback = "Demo Trader"
-        display = user.display_name or demo_fallback
-        shown_email = demo_fallback
-    else:
-        display = user.display_name or identity
-        shown_email = identity
+    display = user.username if user.is_demo else user.display_name or identity
+    shown_email = identity
     return UserResponse(
         id=user.id,
         email=shown_email,
         display_name=display,
-        role=get_user_role(identity),
+        role=get_user_role(user),
         balance=user.balance,
         linked_player_id=user.linked_player_id,
         onboarding_complete=user.is_demo or user.linked_player_id is not None,
@@ -176,21 +152,6 @@ async def get_balance_insights(
     )
 
 
-@router.post("/user/demo-nickname", response_model=UserResponse)
-async def set_demo_nickname(
-    body: DemoNicknameRequest,
-    user: CurrentUser,
-    session: SessionDep,
-) -> UserResponse:
-    if not user.is_demo:
-        raise HTTPException(status_code=403, detail="Only available for demo users")
-
-    user.display_name = body.display_name
-    await session.commit()
-    await session.refresh(user)
-    return _to_user_response(user)
-
-
 @router.post("/user/onboarding", response_model=UserResponse)
 async def complete_onboarding(
     body: UserOnboardingCreate,
@@ -200,8 +161,6 @@ async def complete_onboarding(
 ) -> UserResponse:
     if user.is_demo:
         raise HTTPException(status_code=403, detail="Not available in demo mode")
-    if is_admin_user(user):
-        raise HTTPException(status_code=403, detail="Admin users cannot onboard")
 
     if user.linked_player_id is not None:
         raise HTTPException(status_code=409, detail="Onboarding already completed")
@@ -258,11 +217,6 @@ async def update_profile(
 ) -> UserResponse:
     if user.is_demo:
         raise HTTPException(status_code=403, detail="Not available in demo mode")
-    if is_admin_user(user):
-        raise HTTPException(
-            status_code=403,
-            detail="Admin users cannot edit their profile",
-        )
 
     if user.linked_player_id is None:
         raise HTTPException(status_code=403, detail="Complete onboarding first")

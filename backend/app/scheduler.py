@@ -52,7 +52,7 @@ from app.pricing import (
 from app.riot import (
     MatchSummary,
     PlayerNotFoundError,
-    RateLimitedError,
+    RiotIntegrationError,
     get_match_summary,
     get_rank,
     get_rank_by_puuid,
@@ -85,7 +85,10 @@ def get_required_market_update_interval(trackable_player_count: int) -> timedelt
     Uses the Riot API rate-limit budget (default 100 req / 2 min) and estimated
     per-player API cost to compute the fastest safe polling interval.  Only
     players with actual LP data (lp_abs > 0) should be counted.
+    Demo status uses the configured simulation interval instead.
     """
+    if settings.demo_mode_enabled:
+        return timedelta(seconds=settings.demo_sim_interval_seconds)
     if trackable_player_count <= 0:
         return timedelta(seconds=MIN_UPDATE_INTERVAL_SECONDS)
 
@@ -677,17 +680,18 @@ async def market_update_job() -> None:
                 logger.warning(
                     "Player not found: %s#%s", player.game_name, player.tag_line
                 )
-                continue
-            except RateLimitedError:
-                logger.warning("Rate limited, skipping remaining players")
-                break
+                await session.rollback()
+                return
+            except (RiotIntegrationError, httpx.HTTPError):
+                logger.warning("Riot refresh failed; rolling back the market update")
+                await session.rollback()
+                return
             except Exception:
-                logger.exception(
-                    "Error fetching data for %s#%s",
-                    player.game_name,
-                    player.tag_line,
+                logger.warning(
+                    "Unexpected rank response; rolling back the market update"
                 )
-                continue
+                await session.rollback()
+                return
 
             if player.puuid != rank_data.puuid:
                 player.puuid = rank_data.puuid
@@ -758,20 +762,21 @@ async def market_update_job() -> None:
                         player.tag_line,
                     )
                     all_summaries = []
-                except RateLimitedError:
+                except (RiotIntegrationError, httpx.HTTPError):
                     logger.warning(
-                        "Rate limited while fetching matches for %s#%s",
-                        player.game_name,
-                        player.tag_line,
+                        "Riot match refresh failed; rolling back the market update"
                     )
-                    all_summaries = []
+                    await session.rollback()
+                    return
                 except Exception:
                     logger.exception(
-                        "Error fetching matches for %s#%s",
+                        "Unexpected match response for %s#%s; "
+                        "rolling back the market update",
                         player.game_name,
                         player.tag_line,
                     )
-                    all_summaries = []
+                    await session.rollback()
+                    return
 
                 _learn_player_lp_averages(
                     player,
@@ -894,18 +899,21 @@ async def market_update_job() -> None:
                         player.game_name,
                         player.tag_line,
                     )
-                except RateLimitedError:
+                except (RiotIntegrationError, httpx.HTTPError):
                     logger.warning(
-                        "Rate limited while fetching matches for %s#%s",
-                        player.game_name,
-                        player.tag_line,
+                        "Riot match refresh failed; rolling back the market update"
                     )
+                    await session.rollback()
+                    return
                 except Exception:
                     logger.exception(
-                        "Error applying playing income for %s#%s",
+                        "Error applying playing income for %s#%s; "
+                        "rolling back the market update",
                         player.game_name,
                         player.tag_line,
                     )
+                    await session.rollback()
+                    return
 
             if should_record_market_update:
                 player.last_updated = datetime.now(UTC)
@@ -1075,6 +1083,8 @@ async def demo_market_tick_job() -> None:
     """Simulate market movements for demo mode using random LP deltas."""
     import random
 
+    global _last_market_update_at
+
     async with SessionLocal() as session:
         result = await session.execute(select(TrackedPlayer))
         players = result.scalars().all()
@@ -1114,58 +1124,20 @@ async def demo_market_tick_job() -> None:
             )
 
         await session.commit()
+        if players:
+            _last_market_update_at = datetime.now(UTC)
         logger.info("Demo market tick: updated %d players", len(players))
 
 
 async def demo_cleanup_job() -> None:
-    """Remove expired demo users and all their related rows."""
-    cutoff = datetime.now(UTC) - timedelta(hours=settings.demo_session_ttl_hours)
+    """Remove only temporary users without a live demo session."""
+    from app.auth import cleanup_expired_demo_users
 
     async with SessionLocal() as session:
-        expired_result = await session.execute(
-            select(User).where(
-                User.is_demo == True,  # noqa: E712
-                User.created_at < cutoff,
-            )
-        )
-        expired_users = expired_result.scalars().all()
-
-        if not expired_users:
-            return
-
-        expired_ids = [u.id for u in expired_users]
-
-        # Delete in dependency order
-        from sqlalchemy import delete as sa_delete
-
-        from app.models import (
-            BankLedgerEntry,
-            HoldingLot,
-            PoroSpawn,
-            UserPoroState,
-            UserWealthSnapshot,
-        )
-
-        for model in [
-            UserPoroState,
-            PoroSpawn,
-            UserWealthSnapshot,
-            PlayingIncomeEntry,
-            BankLedgerEntry,
-            GambaPosition,
-            Transaction,
-            HoldingLot,
-            Holding,
-            Order,
-        ]:
-            await session.execute(
-                sa_delete(model).where(model.user_id.in_(expired_ids))
-            )
-
-        await session.execute(sa_delete(User).where(User.id.in_(expired_ids)))
-
+        removed = await cleanup_expired_demo_users(session)
         await session.commit()
-        logger.info("Demo cleanup: removed %d expired demo users", len(expired_ids))
+        if removed:
+            logger.info("Demo cleanup: removed %d expired demo users", removed)
 
 
 def start_scheduler(app: FastAPI) -> None:
@@ -1186,7 +1158,7 @@ def start_scheduler(app: FastAPI) -> None:
         )
         scheduler.add_job(
             demo_cleanup_job,
-            IntervalTrigger(seconds=600),
+            IntervalTrigger(seconds=60),
             id="demo_cleanup",
             replace_existing=True,
             max_instances=1,
@@ -1194,7 +1166,7 @@ def start_scheduler(app: FastAPI) -> None:
         )
         scheduler.start()
         logger.info(
-            "Scheduler started in demo mode (sim interval=%ds, cleanup interval=600s)",
+            "Scheduler started in demo mode (sim interval=%ds, cleanup interval=60s)",
             settings.demo_sim_interval_seconds,
         )
         return
