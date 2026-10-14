@@ -20,6 +20,8 @@ from app.models import AccessToken, AuthSession, User
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 SESSION_COOKIE = "nashordaq_session"
 SESSION_LIFETIME = timedelta(days=7)
+DEMO_INACTIVITY_LIMIT = timedelta(minutes=30)
+
 INVITE_LIFETIME = timedelta(days=7)
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -108,8 +110,6 @@ def is_demo_user(user: User) -> bool:
 
 
 async def lookup_session_user(session: AsyncSession, token: str | None) -> User | None:
-    if settings.demo_mode_enabled:
-        return None
     if not token:
         return None
     return await session.scalar(
@@ -118,6 +118,7 @@ async def lookup_session_user(session: AsyncSession, token: str | None) -> User 
         .where(
             AuthSession.token_hash == hash_token(token),
             AuthSession.expires_at > utc_now(),
+            User.is_demo == settings.demo_mode_enabled,
         )
     )
 
@@ -188,7 +189,8 @@ async def create_session(session: AsyncSession, user: User, response: Response) 
         AuthSession(
             token_hash=hash_token(token),
             user_id=user.id,
-            expires_at=utc_now() + SESSION_LIFETIME,
+            expires_at=utc_now()
+            + (DEMO_INACTIVITY_LIMIT if user.is_demo else SESSION_LIFETIME),
         )
     )
     await session.commit()
@@ -246,10 +248,27 @@ async def setup(
 
 @router.post("/login")
 async def login(
-    body: Credentials, session: SessionDep, response: Response
+    body: Credentials, session: SessionDep, response: Response, request: Request
 ) -> dict[str, str]:
     if settings.demo_mode_enabled:
-        raise HTTPException(status_code=403, detail="Demo login is not available yet")
+        if body.username != "demo" or body.password != "demo":
+            raise HTTPException(status_code=401, detail="Invalid username or password")
+        previous = await lookup_session_user(
+            session, request.cookies.get(SESSION_COOKIE)
+        )
+        if previous is not None:
+            await delete_demo_users(session, [previous.id])
+        username = f"demo_{secrets.token_hex(16)}"
+        user = User(
+            username=username,
+            display_name=username,
+            is_demo=True,
+            balance=settings.starting_balance,
+        )
+        session.add(user)
+        await session.flush()
+        await create_session(session, user, response)
+        return {"status": "ok"}
     user = await session.scalar(
         select(User).where(User.username == body.username, User.is_demo.is_(False))
     )
@@ -271,12 +290,15 @@ async def current_session(user: CurrentUser) -> dict[str, bool]:
 async def logout(
     request: Request, response: Response, user: CurrentUser, session: SessionDep
 ) -> dict[str, str]:
-    await session.execute(
-        delete(AuthSession).where(
-            AuthSession.token_hash == hash_token(request.cookies[SESSION_COOKIE]),
-            AuthSession.user_id == user.id,
+    if user.is_demo:
+        await delete_demo_users(session, [user.id])
+    else:
+        await session.execute(
+            delete(AuthSession).where(
+                AuthSession.token_hash == hash_token(request.cookies[SESSION_COOKIE]),
+                AuthSession.user_id == user.id,
+            )
         )
-    )
     await session.commit()
     response.delete_cookie(
         SESSION_COOKIE,
@@ -286,6 +308,87 @@ async def logout(
         samesite="strict",
     )
     return {"status": "ok"}
+
+
+@router.post("/activity")
+async def record_activity(
+    request: Request, user: CurrentUser, session: SessionDep
+) -> dict[str, str]:
+    """Explicit human activity signal. Ordinary requests never extend demo access."""
+    if user.is_demo:
+        now = utc_now()
+        renewed = await session.execute(
+            update(AuthSession)
+            .where(
+                AuthSession.token_hash == hash_token(request.cookies[SESSION_COOKIE]),
+                AuthSession.user_id == user.id,
+                AuthSession.expires_at > now,
+            )
+            .values(expires_at=now + DEMO_INACTIVITY_LIMIT)
+        )
+        if not renewed.rowcount:
+            raise HTTPException(status_code=401, detail="Login required")
+        await session.commit()
+    return {"status": "ok"}
+
+
+async def delete_demo_users(session: AsyncSession, user_ids: list[int]) -> None:
+    """Delete temporary personal state, preserving shared tracked players/history."""
+    from app.models import (
+        BankLedgerEntry,
+        GambaPosition,
+        Holding,
+        HoldingLot,
+        Order,
+        PlayingIncomeEntry,
+        PoroSpawn,
+        Transaction,
+        UserPoroState,
+        UserWealthSnapshot,
+    )
+
+    demo_ids = select(User.id).where(User.id.in_(user_ids), User.is_demo.is_(True))
+    for model in [
+        AuthSession,
+        AccessToken,
+        UserPoroState,
+        PoroSpawn,
+        UserWealthSnapshot,
+        PlayingIncomeEntry,
+        BankLedgerEntry,
+        GambaPosition,
+        Transaction,
+        HoldingLot,
+        Holding,
+        Order,
+    ]:
+        await session.execute(delete(model).where(model.user_id.in_(demo_ids)))
+    await session.execute(delete(User).where(User.id.in_(demo_ids)))
+
+
+async def cleanup_expired_demo_users(session: AsyncSession) -> int:
+    now = utc_now()
+    # Acquire SQLite's writer lock before identifying users, so activity cannot
+    # renew a session between selection and personal-state deletion.
+    await session.execute(
+        delete(AuthSession).where(
+            AuthSession.expires_at <= now,
+            AuthSession.user_id.in_(select(User.id).where(User.is_demo.is_(True))),
+        )
+    )
+    expired_ids = list(
+        await session.scalars(
+            select(User.id).where(
+                User.is_demo.is_(True),
+                ~User.id.in_(
+                    select(AuthSession.user_id).where(AuthSession.expires_at > now)
+                ),
+            )
+        )
+    )
+    if expired_ids:
+        await delete_demo_users(session, expired_ids)
+    return len(expired_ids)
 
 
 class InvitationResponse(BaseModel):

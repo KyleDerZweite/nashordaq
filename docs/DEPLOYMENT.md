@@ -10,7 +10,7 @@ Start with a separate empty SQLite directory. Startup rejects the previous proxy
 
 Open the setup link printed in the backend log. Choose a username and a password with at least 12 characters. Only that link creates the sole administrator. Successful setup signs you in and closes setup permanently. An unused link rotates on restart. Normal login sessions last seven days, reload preserves a valid session, and logout revokes the current session immediately.
 
-Setup, login and administrator access do not require a Riot key. Live Riot onboarding and updates still require one. Recovery flows, administrator participation and explicit isolated demo sessions are separate implementation slices. Demo access currently fails closed.
+Setup, login and administrator access do not require a Riot key. Live Riot onboarding and updates still require one. Recovery flows and administrator participation are separate implementation slices. Explicit demo mode loads its seeds without Riot and requires demo/demo login. Visitors have separate temporary personal state, deleted immediately on logout or automatically after 30 minutes of inactivity. Background polling does not extend sessions.
 
 The [Architecture](ARCHITECTURE.md#authentication-and-session-trust-boundary) owns the security contract. Every state-changing API request requires `X-Nashordaq-CSRF: 1`. Browser origins are checked; native API clients may omit Origin when sending this header. All game-data endpoints require the local session cookie.
 

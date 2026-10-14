@@ -19,7 +19,6 @@ class Settings(BaseSettings):
 
     # Demo mode
     demo_mode_enabled: bool = False
-    demo_session_ttl_hours: float = 24.0
     demo_sim_interval_seconds: int = 180
 
     # Riot API

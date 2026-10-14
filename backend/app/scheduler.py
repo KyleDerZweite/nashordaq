@@ -1118,54 +1118,14 @@ async def demo_market_tick_job() -> None:
 
 
 async def demo_cleanup_job() -> None:
-    """Remove expired demo users and all their related rows."""
-    cutoff = datetime.now(UTC) - timedelta(hours=settings.demo_session_ttl_hours)
+    """Remove only temporary users without a live demo session."""
+    from app.auth import cleanup_expired_demo_users
 
     async with SessionLocal() as session:
-        expired_result = await session.execute(
-            select(User).where(
-                User.is_demo == True,  # noqa: E712
-                User.created_at < cutoff,
-            )
-        )
-        expired_users = expired_result.scalars().all()
-
-        if not expired_users:
-            return
-
-        expired_ids = [u.id for u in expired_users]
-
-        # Delete in dependency order
-        from sqlalchemy import delete as sa_delete
-
-        from app.models import (
-            BankLedgerEntry,
-            HoldingLot,
-            PoroSpawn,
-            UserPoroState,
-            UserWealthSnapshot,
-        )
-
-        for model in [
-            UserPoroState,
-            PoroSpawn,
-            UserWealthSnapshot,
-            PlayingIncomeEntry,
-            BankLedgerEntry,
-            GambaPosition,
-            Transaction,
-            HoldingLot,
-            Holding,
-            Order,
-        ]:
-            await session.execute(
-                sa_delete(model).where(model.user_id.in_(expired_ids))
-            )
-
-        await session.execute(sa_delete(User).where(User.id.in_(expired_ids)))
-
+        removed = await cleanup_expired_demo_users(session)
         await session.commit()
-        logger.info("Demo cleanup: removed %d expired demo users", len(expired_ids))
+        if removed:
+            logger.info("Demo cleanup: removed %d expired demo users", removed)
 
 
 def start_scheduler(app: FastAPI) -> None:
@@ -1186,7 +1146,7 @@ def start_scheduler(app: FastAPI) -> None:
         )
         scheduler.add_job(
             demo_cleanup_job,
-            IntervalTrigger(seconds=600),
+            IntervalTrigger(seconds=60),
             id="demo_cleanup",
             replace_existing=True,
             max_instances=1,
@@ -1194,7 +1154,7 @@ def start_scheduler(app: FastAPI) -> None:
         )
         scheduler.start()
         logger.info(
-            "Scheduler started in demo mode (sim interval=%ds, cleanup interval=600s)",
+            "Scheduler started in demo mode (sim interval=%ds, cleanup interval=60s)",
             settings.demo_sim_interval_seconds,
         )
         return

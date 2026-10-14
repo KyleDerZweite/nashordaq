@@ -85,15 +85,19 @@ function SignInForm({
     }
   }
 
-  if (status.demo_mode_enabled) {
+  if (status.demo_mode_enabled && isRegistration) {
     return (
       <AuthPage>
         <h2 className="font-serif text-2xl font-bold text-hex-white">
-          Demo unavailable
+          Registration unavailable
         </h2>
-        <p className="mt-4 text-sm text-hex-bronze">
-          Demo sign-in is not available on this installation yet.
+        <p role="alert" className="mt-4 text-sm text-hex-bronze">
+          Demo visitors sign in with demo/demo. Administrator setup and
+          invitations are unavailable in demo mode.
         </p>
+        <a href="/" className="mt-6 inline-block text-hex-gold underline">
+          Go to sign in
+        </a>
       </AuthPage>
     );
   }
@@ -146,6 +150,11 @@ function SignInForm({
         <p className="mt-3 text-sm text-hex-bronze">
           Create the sole administrator for this private market. You can link
           your Riot account separately.
+        </p>
+      ) : status.demo_mode_enabled ? (
+        <p className="mt-3 text-sm text-hex-bronze">
+          Sign in with username demo and password demo. You receive a separate
+          temporary portfolio in the shared simulated market.
         </p>
       ) : isInvitation ? (
         <p className="mt-3 text-sm text-hex-bronze">
@@ -288,6 +297,42 @@ export default function AuthGate() {
     return () =>
       window.removeEventListener("nashordaq:session-lost", onSessionLost);
   }, [queryClient]);
+
+  useEffect(() => {
+    if (state.kind !== "signedIn") return;
+    let lastSignal = 0;
+    let trailingSignal: ReturnType<typeof setTimeout> | undefined;
+    function sendActivity() {
+      if (trailingSignal !== undefined) clearTimeout(trailingSignal);
+      trailingSignal = undefined;
+      lastSignal = Date.now();
+      void post<{ status: "ok" }>("/auth/activity", {}).catch(
+        (cause: unknown) => {
+          if (cause instanceof ApiError && cause.status === 401) {
+            window.dispatchEvent(new Event("nashordaq:session-lost"));
+          }
+        },
+      );
+    }
+    function onActivity(event: Event) {
+      if (!event.isTrusted || document.visibilityState !== "visible") return;
+      const remaining = 1_000 - (Date.now() - lastSignal);
+      if (remaining <= 0) {
+        sendActivity();
+      } else if (trailingSignal === undefined) {
+        // This one-shot timer exists only because trusted human input is pending.
+        trailingSignal = setTimeout(sendActivity, remaining);
+      }
+    }
+    const events = ["pointerdown", "keydown", "wheel", "touchstart"];
+    events.forEach((name) =>
+      window.addEventListener(name, onActivity, { passive: true }),
+    );
+    return () => {
+      if (trailingSignal !== undefined) clearTimeout(trailingSignal);
+      events.forEach((name) => window.removeEventListener(name, onActivity));
+    };
+  }, [state.kind]);
 
   async function logout() {
     if (isLoggingOut) return;
