@@ -469,8 +469,8 @@ export default function AdminPlayerInsightsPanel({ insights }: Props) {
               </div>
             </section>
 
-            <section className="grid gap-6 xl:grid-cols-2">
-              <article className="border border-hex-border px-4 py-4">
+            <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+              <article className="min-w-0 border border-hex-border px-4 py-4">
                 <h3 className="font-serif text-lg font-bold text-hex-gold">
                   Recent Poro Rewards
                 </h3>
