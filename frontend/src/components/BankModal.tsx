@@ -66,7 +66,7 @@ export default function BankModal({
       onClick={onClose}
     >
       <section
-        className="w-full max-w-3xl border-4 border-hex-gold bg-hex-panel shadow-brutal-lg"
+        className="max-h-[calc(100dvh-2rem)] w-full max-w-3xl overflow-y-auto border-4 border-hex-gold bg-hex-panel shadow-brutal-lg"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b-4 border-hex-gold px-5 py-3">

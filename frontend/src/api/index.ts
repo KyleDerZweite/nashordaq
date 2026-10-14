@@ -9,6 +9,7 @@ export {
 } from "./client";
 export {
   queryKeys,
+  useGameActivity,
   useUser,
   usePlayers,
   usePlayer,

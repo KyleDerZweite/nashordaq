@@ -68,7 +68,7 @@ export default function AdminPlayerInsightsPanel({ insights }: Props) {
           No tracked players available yet.
         </div>
       ) : (
-        <div className="grid gap-0 xl:grid-cols-[22rem_minmax(0,1fr)]">
+        <div className="grid grid-cols-1 gap-0 xl:grid-cols-[22rem_minmax(0,1fr)]">
           <aside className="border-b-2 border-hex-border xl:border-r-2 xl:border-b-0">
             <div className="max-h-[70rem] overflow-y-auto">
               {insights.map((entry) => {

@@ -478,3 +478,21 @@ class SimulationPlayerMatchResponse(BaseModel):
     price_before: float
     price_after: float
     completed_at: datetime
+
+
+class ActivityIdentityResponse(BaseModel):
+    user_id: int
+    username: str
+    linked_player_id: int | None
+    game_name: str | None
+    tag_line: str | None
+
+
+class GameInterventionResponse(BaseModel):
+    id: int
+    actor: ActivityIdentityResponse
+    affected: ActivityIdentityResponse
+    kind: Literal["rescue_access_restored"]
+    previous_uses: int
+    new_uses: int
+    created_at: datetime

@@ -134,8 +134,6 @@ CurrentUser = Annotated[User, Depends(get_current_user)]
 
 
 def _require_onboarded_user(user: CurrentUser) -> User:
-    if is_admin_user(user):
-        raise HTTPException(status_code=403, detail="Admin users cannot trade")
     if not user.is_demo and user.linked_player_id is None:
         raise HTTPException(status_code=403, detail="Complete onboarding first")
     return user

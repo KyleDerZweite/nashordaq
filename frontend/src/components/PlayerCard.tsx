@@ -105,7 +105,7 @@ export default function PlayerCard({
             }`}
           >
             {!canTrade
-              ? "Admin"
+              ? "Link Riot account"
               : isOwnStock
                 ? "Own Stock"
                 : canBuy

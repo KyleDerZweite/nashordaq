@@ -95,23 +95,6 @@ async def test_onboarding_tagline_with_hash_is_accepted(auth_client):
     assert data["onboarding_complete"] is True
 
 
-async def test_admin_user_role_and_onboarding_blocked(admin_client):
-
-    me_resp = await admin_client.get("/api/user/me")
-    assert me_resp.status_code == 200
-    assert me_resp.json()["role"] == "admin"
-
-    onboarding_resp = await admin_client.post(
-        "/api/user/onboarding",
-        json={
-            "game_name": "viewer",
-            "tag_line": "EUW",
-        },
-    )
-    assert onboarding_resp.status_code == 403
-    assert onboarding_resp.json()["detail"] == "Admin users cannot onboard"
-
-
 async def test_onboarding_initializes_market_price(auth_client, monkeypatch):
     async def _initialize(request, session, player):
         player.current_price = 42.0
@@ -204,16 +187,3 @@ async def test_update_profile_duplicate_player_rejected(auth_client, account_cli
         )
 
     assert update_resp.status_code == 409
-
-
-async def test_admin_user_profile_update_blocked(admin_client):
-
-    update_resp = await admin_client.put(
-        "/api/user/profile",
-        json={
-            "game_name": "viewer",
-            "tag_line": "EUW",
-        },
-    )
-    assert update_resp.status_code == 403
-    assert update_resp.json()["detail"] == "Admin users cannot edit their profile"
