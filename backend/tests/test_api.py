@@ -30,7 +30,9 @@ async def test_system_status_is_idle_without_tracked_players(auth_client, monkey
 
     assert resp.status_code == 200
     data = resp.json()
-    assert data == {
+    assert data["riot_status"] in {"unchecked", "available"}
+    assert data["riot_status_detail"]
+    assert {k: v for k, v in data.items() if not k.startswith("riot_")} == {
         "service_status": "ok",
         "scheduler_running": False,
         "market_status": "idle",

@@ -349,6 +349,15 @@ export interface LeaderboardPlayerPortfolioResponse {
 }
 
 export interface SystemStatusResponse {
+  riot_status:
+    | "missing_key"
+    | "unchecked"
+    | "available"
+    | "invalid_key"
+    | "unavailable"
+    | "rate_limited"
+    | "demo";
+  riot_status_detail: string;
   service_status: "ok";
   scheduler_running: boolean;
   market_status: MarketStatus;

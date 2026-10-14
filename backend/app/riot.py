@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from typing import Literal
 
 import httpx
 from pydantic import BaseModel
@@ -34,8 +35,79 @@ class PlayerNotFoundError(Exception):
     pass
 
 
-class RateLimitedError(Exception):
-    pass
+RiotStatus = Literal[
+    "missing_key",
+    "unchecked",
+    "available",
+    "invalid_key",
+    "unavailable",
+    "rate_limited",
+    "demo",
+]
+
+
+class RiotIntegrationError(Exception):
+    def __init__(self, status: RiotStatus, detail: str, http_status: int = 503):
+        super().__init__(detail)
+        self.status = status
+        self.http_status = http_status
+
+
+class RateLimitedError(RiotIntegrationError):
+    def __init__(self, detail: str = "Riot is rate limited. Wait a moment and retry."):
+        super().__init__("rate_limited", detail, 429)
+
+
+_last_failure: RiotIntegrationError | None = None
+_verified = False
+
+
+def integration_status(api_key: str, demo: bool = False) -> tuple[RiotStatus, str]:
+    if demo:
+        return "demo", "Demo uses a simulated market and does not require Riot."
+    if not api_key.strip():
+        return (
+            "missing_key",
+            "Riot is not configured. Ask the operator to set "
+            "NASHORDAQ_RIOT_API_KEY and restart the backend. "
+            "Local account access remains available.",
+        )
+    if _last_failure is not None:
+        return _last_failure.status, str(_last_failure)
+    if _verified:
+        return "available", "The last Riot request succeeded."
+    return "unchecked", "Riot is configured but has not been verified yet."
+
+
+async def _request(
+    client: httpx.AsyncClient,
+    url: str,
+    api_key: str,
+    *,
+    params: dict[str, int | str] | None = None,
+) -> httpx.Response:
+    global _last_failure, _verified
+    try:
+        if not api_key.strip():
+            raise RiotIntegrationError("missing_key", integration_status(api_key)[1])
+        response = await client.get(
+            url, headers={"X-Riot-Token": api_key}, params=params
+        )
+        _check_response(response)
+    except RiotIntegrationError as error:
+        _last_failure = error
+        raise
+    except httpx.RequestError:
+        error = RiotIntegrationError(
+            "unavailable",
+            "Riot is unavailable. Retry later. Local account access remains available.",
+            502,
+        )
+        _last_failure = error
+        raise error from None
+    _last_failure = None
+    _verified = True
+    return response
 
 
 def _timestamp_seconds(value: datetime) -> int:
@@ -47,7 +119,20 @@ def _check_response(response: httpx.Response) -> None:
     if response.status_code == 404:
         raise PlayerNotFoundError("Player not found")
     if response.status_code == 429:
-        raise RateLimitedError("Riot API rate limit exceeded")
+        raise RateLimitedError()
+    if response.status_code in {401, 403}:
+        raise RiotIntegrationError(
+            "invalid_key",
+            "Riot rejected the API key. Ask the operator to replace "
+            "NASHORDAQ_RIOT_API_KEY and restart the backend. "
+            "Local account access remains available.",
+        )
+    if response.status_code >= 500:
+        raise RiotIntegrationError(
+            "unavailable",
+            "Riot is unavailable. Retry later. Local account access remains available.",
+            502,
+        )
     response.raise_for_status()
 
 
@@ -58,13 +143,11 @@ async def get_account_by_riot_id(
     game_name: str,
     tag_line: str,
 ) -> AccountData:
-    headers = {"X-Riot-Token": api_key}
-
-    account_resp = await client.get(
+    account_resp = await _request(
+        client,
         f"{base_url}/riot/account/v1/accounts/by-riot-id/{game_name}/{tag_line}",
-        headers=headers,
+        api_key=api_key,
     )
-    _check_response(account_resp)
     account_payload = account_resp.json()
     puuid = account_payload.get("puuid")
     if not puuid:
@@ -109,12 +192,11 @@ async def _fetch_league_entries(
     api_key: str,
     puuid: str,
 ) -> list[dict]:
-    headers = {"X-Riot-Token": api_key}
-    resp = await client.get(
+    resp = await _request(
+        client,
         f"{region_url}/lol/league/v4/entries/by-puuid/{puuid}",
-        headers=headers,
+        api_key=api_key,
     )
-    _check_response(resp)
     return resp.json()
 
 
@@ -161,7 +243,6 @@ async def get_recent_match_ids(
     queue: int | None = None,
     type: str | None = None,
 ) -> list[str]:
-    headers = {"X-Riot-Token": api_key}
     params: dict[str, int | str] = {"start": start, "count": count}
     if start_time is not None:
         params["startTime"] = _timestamp_seconds(start_time)
@@ -170,12 +251,12 @@ async def get_recent_match_ids(
     if type is not None:
         params["type"] = type
 
-    response = await client.get(
+    response = await _request(
+        client,
         f"{base_url}/lol/match/v5/matches/by-puuid/{puuid}/ids",
-        headers=headers,
+        api_key=api_key,
         params=params,
     )
-    _check_response(response)
     payload = response.json()
     return [str(match_id) for match_id in payload]
 
@@ -187,12 +268,11 @@ async def get_match_summary(
     puuid: str,
     match_id: str,
 ) -> MatchSummary:
-    headers = {"X-Riot-Token": api_key}
-    response = await client.get(
+    response = await _request(
+        client,
         f"{base_url}/lol/match/v5/matches/{match_id}",
-        headers=headers,
+        api_key=api_key,
     )
-    _check_response(response)
     payload = response.json()
     metadata = payload.get("metadata") or {}
     info = payload.get("info") or {}

@@ -14,6 +14,16 @@ Setup, login and administrator access do not require a Riot key. Live Riot onboa
 
 The [Architecture](ARCHITECTURE.md#authentication-and-session-trust-boundary) owns the security contract. Every state-changing API request requires `X-Nashordaq-CSRF: 1`. Browser origins are checked; native API clients may omit Origin when sending this header. All game-data endpoints require the local session cookie.
 
+## Riot configuration and recovery
+
+Local setup, login and administrator access work with an empty or rejected Riot key. The authenticated market and player-setup views show whether the key is missing, rejected, rate limited or affected by an upstream outage. Status never returns the key. A configured key starts as unverified until Riot accepts a request.
+
+New player links require a successful account and ranked Solo Queue lookup. A failed lookup leaves the local account usable and creates no linked tracked player. Retry the same player after recovery. Real refreshes roll back their entire transaction when Riot authentication, rate limits or network availability fail. Existing prices and history remain unchanged. Demo uses its own simulated market and requires no key.
+
+For a missing or rejected key, replace `NASHORDAQ_RIOT_API_KEY` in the protected environment file and restart the backend process with that environment. Container environments are fixed at creation: recreate the stack after editing the file, rather than using a Compose `restart` that retains its old environment. Use `podman-compose up -d --force-recreate` or the corresponding `docker compose` command. Keep the existing data bind mount and database. Do not repeat setup or create another administrator.
+
+Sign in again if needed, retry player setup, and check authenticated system status and the next due market refresh. A rate limit needs a later retry; a Riot outage needs upstream recovery. No reinstall is required. Controlled-response tests verify failure handling and retry behavior. Live linking and refresh recovery require an operator-owned valid Riot key and a separately recorded check; they have not been verified for the no-key local installation.
+
 ## Invite members
 
 Sign in as the administrator and select Admin View. In Member invitations, select Create invitation. Copy the generated link and share it privately with the intended member. The link is shown only after creation; later visits show lifecycle metadata without the secret. Create another invitation if you lose an unused link, and revoke the lost invitation. The frontend omits query strings and referrers from access logs. Configure any external reverse proxy to do the same for access-link routes.

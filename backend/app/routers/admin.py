@@ -23,6 +23,7 @@ from app.models import (
     User,
 )
 from app.pricing import BETA, calculate_win_rate
+from app.riot import integration_status
 from app.routers.portfolio import build_portfolio_response
 from app.scheduler import (
     classify_market_status,
@@ -535,6 +536,12 @@ async def get_admin_system_status(
     scheduler_running = is_scheduler_running()
 
     return SystemStatusResponse(
+        riot_status=integration_status(
+            settings.riot_api_key, settings.demo_mode_enabled
+        )[0],
+        riot_status_detail=integration_status(
+            settings.riot_api_key, settings.demo_mode_enabled
+        )[1],
         service_status="ok",
         scheduler_running=scheduler_running,
         market_status=classify_market_status(
