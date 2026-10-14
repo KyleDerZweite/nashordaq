@@ -39,7 +39,7 @@ Current SQLAlchemy tables:
 |---|---|
 | `users` | Local usernames, password verifiers, sole administrator flag and personal game state. |
 | `auth_sessions` | Hashed revocable session tokens and seven-day expiry. |
-| `access_tokens` | Hashed one-time setup and invitation tokens with lifecycle state. |
+| `access_tokens` | Hashed one-time setup, invitation and password-reset tokens with lifecycle state. |
 | `game_interventions` | Atomic administrator game changes with actor, affected member and concrete values. |
 | `instance_metadata` | Supported standalone database schema version. |
 | `tracked_players` | Riot accounts whose prices are tracked in the market. |
@@ -72,6 +72,11 @@ Core endpoints:
 | POST | `/api/auth/invites` | Admin | Create and deliver a seven-day invitation link |
 | GET | `/api/auth/invites` | Admin | Inspect invitation lifecycle metadata |
 | DELETE | `/api/auth/invites/{id}` | Admin | Revoke an unused active invitation |
+| POST | `/api/auth/password` | Yes | Verify current password, change own password and revoke all own sessions |
+| POST | `/api/auth/resets` | Admin | Create and deliver a one-hour password-reset link |
+| GET | `/api/auth/resets` | Admin | Inspect reset lifecycle and target account metadata |
+| DELETE | `/api/auth/resets/{id}` | Admin | Revoke an unused active reset link |
+| POST | `/api/auth/reset` | Reset token | Set the target password and revoke all target sessions atomically |
 | GET | `/api/auth/session` | Yes | Verify the current session |
 | POST | `/api/auth/logout` | Yes | Revoke the current session |
 | GET | `/api/system/status` | Yes | Scheduler, market, demo, and feature-flag status |
@@ -99,7 +104,7 @@ The accepted direction is recorded in [ADR-0001](adr/0001-self-host-baseline.md)
 
 The application owns identity, authentication, invite access and administrator permissions. A deployment's reverse proxy owns public TLS termination and does not establish application identity. Game data requires an authenticated session. Demo operation is explicit and isolates each visitor's temporary game state.
 
-Setup, invitations, local login, logout, isolated demo sessions and the private game-data gate are implemented. Password recovery is a later slice of [spec #19](https://github.com/KyleDerZweite/nashordaq/issues/19). Standalone packaging uses the shared Docker Compose and Podman Compose manifest described in [Deployment](DEPLOYMENT.md). The administrator can participate after the same Riot onboarding as members.
+Setup, invitations, password recovery, local login, logout, isolated demo sessions, standalone Compose packaging, administrator participation, member-visible game interventions and the private game-data gate are implemented. These follow [spec #19](https://github.com/KyleDerZweite/nashordaq/issues/19).
 
 ## Authentication and session trust boundary
 
@@ -108,6 +113,10 @@ Setup, invitations, local login, logout, isolated demo sessions and the private 
 Fresh startup logs a setup link using `NASHORDAQ_PUBLIC_URL`. Only its 256-bit random token permits administrator creation. SQLite conditionally consumes the token and creates the administrator and initial session in one transaction. A unique partial index permits only one administrator. Restart rotates an unused setup link; completed setup stays closed.
 
 Only the administrator creates, lists and revokes invitations. Creation delivers the usable link once; later listing contains only its ID, expiry, consumption, revocation and lifecycle status. Invitation tokens use 256 bits of randomness and only SHA-256 hashes enter SQLite. Registration conditionally consumes an unexpired, unused, unrevoked invitation and creates the member and session in one transaction. Invalid credentials and duplicate usernames preserve the invitation. Members have no administrator permissions and can register without Riot or email.
+
+Password changes require the authenticated user's current credential. Reset creation, listing and revocation require the sole administrator. Reset links use hashed 256-bit tokens, expire after one hour and work once. Consumption, credential replacement, deletion of every target session and revocation of other unused target reset links share one SQLite transaction. Invalid, expired, revoked or replayed tokens change neither credentials nor sessions. Password changes and operator recovery use the same auth-owned replacement operation. Session issuance conditionally rechecks the verified credential under the SQLite write lock, so a concurrent password replacement cannot leave a new session based on the old password. Unrelated accounts retain access. These operations create no game-intervention entry and are unavailable in demo mode.
+
+`app/operator.py` owns the server-side command boundary. It requires an explicit existing SQLite file, checks the supported schema through persistence before mutation and recovers the existing sole non-demo administrator. It accepts hidden terminal input or explicit protected stdin, with no password argument, public recovery endpoint, new administrator or startup/setup call. See [Deployment](DEPLOYMENT.md#change-and-recover-passwords) for the command procedure.
 
 Passwords use salted scrypt verifiers with N=131072, r=8 and p=1. Two simultaneous derivations bound memory use. Normal session tokens have 256 bits of randomness and only their SHA-256 hashes enter SQLite. Sessions expire seven days after creation. Logout deletes the current session; each request validates its persisted session. The poro stream also validates its session before each protected event. Validation responses omit submitted values so they cannot echo credentials or access tokens.
 

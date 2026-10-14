@@ -14,11 +14,11 @@ A closed, trusted friend group. Public registration and email verification are o
 
 Public registration, a mail-server requirement, OAuth/OIDC, additional administrators and hosted multi-room operation are outside this baseline. The first standalone release starts with fresh data; subsequent standalone releases establish the supported update path.
 
-Local setup, invitation registration, sessions, isolated demo sessions, administrator participation and member-visible game interventions are implemented. Recovery remains a later slice of the accepted baseline.
+Local setup, invitation registration, password recovery, sessions, isolated demo sessions, administrator participation and member-visible game interventions are implemented.
 
 ## Current core user flows
 
-1. **Authentication:** The operator creates the sole administrator through the one-time setup link in the application log. The administrator issues single-use invitation links valid for seven days and can revoke unused links. Invited members choose their own username and password without email or Riot details. Users sign in with local username/password credentials. Sessions last seven days and logout immediately revokes the current session. Setup and login work without a Riot key. All game information requires login. See [Architecture](ARCHITECTURE.md#authentication-and-session-trust-boundary) for the security boundary.
+1. **Authentication:** The operator creates the sole administrator through the one-time setup link in the application log. The administrator issues single-use invitation links valid for seven days and can revoke unused links. Invited members choose their own username and password without email or Riot details. Users sign in with local username/password credentials. Sessions last seven days and logout immediately revokes the current session. Users change their password after verifying their current credential. The administrator issues revocable one-hour reset links, and the operator can recover the existing sole administrator on the server. Successful password replacement ends every affected session. Setup and login work without a Riot key. All game information requires login. See [Architecture](ARCHITECTURE.md#authentication-and-session-trust-boundary) for the security boundary.
 
 2. **Market Overview:** Users can view a dashboard listing all tracked LoL accounts with their current share price and last update time.
 

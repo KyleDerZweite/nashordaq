@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import App from "../App";
+import ResetPasswordForm from "./ResetPasswordForm";
 import { ApiError, get, post } from "../api/client";
 
 interface AuthStatus {
@@ -11,7 +12,7 @@ interface AuthStatus {
 
 type AuthState =
   | { kind: "checking" }
-  | { kind: "signedIn" }
+  | { kind: "signedIn"; status?: AuthStatus }
   | { kind: "signedOut"; status: AuthStatus }
   | { kind: "unavailable" };
 
@@ -268,7 +269,10 @@ export default function AuthGate() {
       ]);
       if (!active) return;
       if (session.status === "fulfilled") {
-        setState({ kind: "signedIn" });
+        setState({
+          kind: "signedIn",
+          status: status.status === "fulfilled" ? status.value : undefined,
+        });
       } else if (
         status.status === "fulfilled" &&
         session.reason instanceof ApiError &&
@@ -286,10 +290,14 @@ export default function AuthGate() {
   }, [attempt]);
 
   useEffect(() => {
-    function onSessionLost() {
+    function onSessionLost(event: Event) {
       queryClient.clear();
       setLogoutError(undefined);
-      setSessionMessage("Your session has ended. Sign in again.");
+      setSessionMessage(
+        event instanceof CustomEvent && typeof event.detail === "string"
+          ? event.detail
+          : "Your session has ended. Sign in again.",
+      );
       setState({ kind: "checking" });
       setAttempt((current) => current + 1);
     }
@@ -299,7 +307,9 @@ export default function AuthGate() {
   }, [queryClient]);
 
   useEffect(() => {
-    if (state.kind !== "signedIn") return;
+    // Reset ends the target session. Keep its success page outside activity signals.
+    if (state.kind !== "signedIn" || window.location.pathname === "/reset")
+      return;
     let lastSignal = 0;
     let trailingSignal: ReturnType<typeof setTimeout> | undefined;
     function sendActivity() {
@@ -362,6 +372,19 @@ export default function AuthGate() {
     }
   }
 
+  if (
+    window.location.pathname === "/reset" &&
+    (state.kind === "signedIn" || state.kind === "signedOut")
+  ) {
+    return (
+      <AuthPage>
+        <ResetPasswordForm
+          demoMode={state.status?.demo_mode_enabled ?? false}
+          onReset={() => queryClient.clear()}
+        />
+      </AuthPage>
+    );
+  }
   if (state.kind === "signedIn" && window.location.pathname === "/invite") {
     return (
       <AuthPage>

@@ -301,6 +301,30 @@ async def test_demo_permissions_features_and_obsolete_nickname(
         ).status_code == 401
 
 
+async def test_demo_cannot_change_password_or_use_account_recovery(demo_instance):
+    async with demo_instance() as client:
+        await demo_login(client)
+        user_id = (await client.get("/api/user/me")).json()["id"]
+        for method, path, body in [
+            (
+                "POST",
+                "/api/auth/password",
+                {"current_password": "demo", "new_password": "a private new password"},
+            ),
+            (
+                "POST",
+                "/api/auth/reset",
+                {"token": "unavailable", "new_password": "a private new password"},
+            ),
+            ("GET", "/api/auth/resets", None),
+            ("POST", "/api/auth/resets", {"user_id": user_id}),
+            ("DELETE", "/api/auth/resets/1", None),
+        ]:
+            assert (await client.request(method, path, json=body)).status_code == 403
+            assert (await client.get("/api/auth/session")).status_code == 200
+        assert (await client.get("/api/user/me")).json()["id"] == user_id
+
+
 async def test_portfolio_and_recent_orders_enforce_mode_and_demo_owner_boundaries(
     demo_instance, monkeypatch
 ):

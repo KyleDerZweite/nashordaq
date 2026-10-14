@@ -1,5 +1,6 @@
 import json
 import logging
+import sqlite3
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
 from pathlib import Path
@@ -33,6 +34,47 @@ def _set_sqlite_pragmas(dbapi_conn: Any, _connection_record: Any) -> None:
 SessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
+def validate_schema_version(tables: set[str], version: int | None) -> None:
+    if tables and "instance_metadata" not in tables:
+        raise RuntimeError(
+            "Legacy proxy database detected. Stop Nashordaq, preserve the old database "
+            "and its WAL/SHM files as a backup, then configure a separate empty "
+            "data directory for standalone setup. Existing data is "
+            "not migrated or deleted."
+        )
+    if "instance_metadata" in tables and version != 1:
+        raise RuntimeError(
+            "Unsupported standalone database version; "
+            "use the matching release and backup."
+        )
+
+
+def validate_existing_database(path: Path) -> None:
+    """Check an operator-selected SQLite file before opening it for mutation."""
+    if not path.is_file():
+        raise RuntimeError("Select an existing standalone SQLite database file.")
+    with sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True) as connection:
+        tables = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' "
+                "AND name NOT LIKE 'sqlite_%'"
+            )
+        }
+        if not tables:
+            raise RuntimeError(
+                "The database has no standalone installation to recover."
+            )
+        version = (
+            connection.execute(
+                "SELECT schema_version FROM instance_metadata WHERE id=1"
+            ).fetchone()
+            if "instance_metadata" in tables
+            else None
+        )
+        validate_schema_version(tables, version[0] if version else None)
+
+
 async def init_db() -> None:
     from app.models import Base
 
@@ -47,23 +89,14 @@ async def init_db() -> None:
                 )
             ).scalars()
         )
-        if tables and "instance_metadata" not in tables:
-            raise RuntimeError(
-                "Legacy proxy database detected. Stop Nashordaq, preserve "
-                "the old database "
-                "and its WAL/SHM files as a backup, then configure a separate empty "
-                "data directory for standalone setup. Existing data is "
-                "not migrated or deleted."
-            )
-        if "instance_metadata" in tables:
-            version = await conn.scalar(
+        version = (
+            await conn.scalar(
                 text("SELECT schema_version FROM instance_metadata WHERE id=1")
             )
-            if version != 1:
-                raise RuntimeError(
-                    "Unsupported standalone database version; "
-                    "use the matching release and backup."
-                )
+            if "instance_metadata" in tables
+            else None
+        )
+        validate_schema_version(tables, version)
         await conn.execute(text("PRAGMA journal_mode=WAL"))
         await conn.run_sync(Base.metadata.create_all)
         if not tables:
