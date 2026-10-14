@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAdminUsers } from "../../api/hooks";
+import { useIdentityPresentation } from "../../contexts/useIdentityPresentation";
 import { del, get, post } from "../../api/client";
 import { formatLocalDateTime } from "../../utils/format";
 
@@ -22,6 +23,7 @@ const buttonClass =
 
 export default function AdminPasswordResets() {
   const queryClient = useQueryClient();
+  const { userName } = useIdentityPresentation();
   const users = useAdminUsers();
   const resets = useQuery({
     queryKey,
@@ -49,9 +51,6 @@ export default function AdminPasswordResets() {
       void queryClient.invalidateQueries({ queryKey });
     },
   });
-  const userName = (id: number) =>
-    users.data?.find((user) => user.id === id)?.display_name ??
-    `Account #${id}`;
   async function copy() {
     if (!latest) return;
     try {
@@ -120,7 +119,7 @@ export default function AdminPasswordResets() {
             <option value="">Choose an account</option>
             {users.data?.map((user) => (
               <option key={user.id} value={user.id}>
-                {user.display_name}
+                {userName(user.id)}
                 {user.role === "admin" ? " (administrator)" : ""}
               </option>
             ))}

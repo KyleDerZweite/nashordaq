@@ -1323,3 +1323,167 @@ async def test_invitation_and_password_recovery_do_not_create_game_interventions
             )
         ).status_code == 200
         assert (await client.get("/api/activity")).json() == []
+
+
+async def test_registered_alias_survives_restart_and_riot_name_changes(local_instance):
+    from sqlalchemy import select
+
+    from app.models import TrackedPlayer, User
+
+    client, logs, factory = local_instance
+    assert (await client.get("/api/identities")).status_code == 401
+    await register_operator(client, logs)
+    first = (await client.get("/api/identities")).json()
+    assert first["users"][0]["username"] == "operator"
+    assert first["users"][0]["streamer_alias"] == "Aatrox"
+    async with factory() as session:
+        operator = await session.scalar(select(User).where(User.username == "operator"))
+        player = TrackedPlayer(
+            game_name="Recognizable Name",
+            tag_line="SECRET",
+            display_name="Private Name",
+        )
+        session.add(player)
+        await session.flush()
+        operator.linked_player_id = player.id
+        await session.commit()
+    linked = (await client.get("/api/identities")).json()
+    assert linked["players"][0]["streamer_alias"] == "Aatrox"
+    async with factory() as session:
+        player = await session.scalar(select(TrackedPlayer))
+        player.game_name = "Changed Name"
+        await session.commit()
+    await database.engine.dispose()
+    await main.initialize_instance()
+    restarted = (await client.get("/api/identities")).json()
+    assert restarted["users"][0]["streamer_alias"] == "Aatrox"
+    assert restarted["players"][0]["streamer_alias"] == "Aatrox"
+    assert restarted["users"][0]["game_name"] == "Changed Name"
+
+
+async def test_registration_extends_champions_with_league_items(local_instance):
+    from app.models import User
+
+    client, logs, factory = local_instance
+    await register_operator(client, logs)
+    async with factory() as session:
+        # Occupy the remaining 172 champion identities through normal persistence
+        # creation. No cryptographic login is required for fixture population.
+        session.add_all([User(username=f"existing-{i}") for i in range(172)])
+        await session.commit()
+    invitation = (await client.post("/api/auth/invites")).json()
+    token = re.search(r"/invite\?token=([A-Za-z0-9_-]+)", invitation["url"])[1]
+    response = await client.post(
+        "/api/auth/register",
+        json={
+            "token": token,
+            "username": "beyond-champions",
+            "password": "my secure password",
+        },
+    )
+    assert response.status_code == 201
+    directory = (await client.get("/api/identities")).json()
+    aliases = {
+        member["username"]: member["streamer_alias"] for member in directory["users"]
+    }
+    assert aliases["operator"] == "Aatrox"
+    assert aliases["beyond-champions"] == "Infinity Edge"
+    assert len(set(aliases.values())) == 174
+
+
+async def test_full_alias_exhaustion_preserves_invitation_and_accounts(local_instance):
+    from app.models import User
+
+    client, logs, factory = local_instance
+    await register_operator(client, logs)
+    async with factory() as session:
+        # The pinned pool contains 173 champions and 20 item/ability names.
+        session.add_all([User(username=f"occupied-{i}") for i in range(192)])
+        await session.commit()
+    invitation = (await client.post("/api/auth/invites")).json()
+    token = re.search(r"/invite\?token=([A-Za-z0-9_-]+)", invitation["url"])[1]
+    response = await client.post(
+        "/api/auth/register",
+        json={"token": token, "username": "no-alias", "password": "my secure password"},
+    )
+    assert response.status_code == 503
+    assert "All League streamer aliases are in use" in response.json()["detail"]
+    assert (await client.get("/api/auth/invites")).json()[0]["status"] == "active"
+    directory = (await client.get("/api/identities")).json()
+    assert len(directory["users"]) == 193
+    assert "no-alias" not in [member["username"] for member in directory["users"]]
+
+
+async def test_concurrent_registration_assigns_distinct_permanent_aliases(
+    local_instance,
+):
+    import asyncio
+
+    client, logs, _ = local_instance
+    await register_operator(client, logs)
+    invitations = [(await client.post("/api/auth/invites")).json() for _ in range(2)]
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app),
+        base_url="http://test",
+        headers={"X-Nashordaq-CSRF": "1"},
+    ) as other:
+        responses = await asyncio.gather(
+            *[
+                browser.post(
+                    "/api/auth/register",
+                    json={
+                        "token": re.search(
+                            r"/invite\?token=([A-Za-z0-9_-]+)", invitation["url"]
+                        )[1],
+                        "username": username,
+                        "password": "my secure password",
+                    },
+                )
+                for browser, invitation, username in [
+                    (client, invitations[0], "member-one"),
+                    (other, invitations[1], "member-two"),
+                ]
+            ]
+        )
+        assert [response.status_code for response in responses] == [201, 201]
+        directory = (await client.get("/api/identities")).json()
+        members = {
+            member["username"]: member["streamer_alias"]
+            for member in directory["users"]
+        }
+        assert members["operator"] == "Aatrox"
+        assert {members["member-one"], members["member-two"]} == {"Ahri", "Akali"}
+        assert (await other.get("/api/identities")).json() == directory
+
+
+async def test_existing_standalone_data_receives_aliases_without_account_changes(
+    local_instance,
+):
+    from sqlalchemy import text
+
+    from app.models import TrackedPlayer
+
+    client, logs, factory = local_instance
+    await register_operator(client, logs)
+    async with factory() as session:
+        session.add(
+            TrackedPlayer(
+                game_name="Unlinked Private",
+                tag_line="TOPSECRET",
+                display_name="Private",
+            )
+        )
+        await session.commit()
+    before = (await client.get("/api/user/me")).json()
+    # Prepare the earlier unreleased standalone shape before aliases existed.
+    async with database.engine.begin() as connection:
+        await connection.execute(text("DROP TABLE identity_aliases"))
+    await database.engine.dispose()
+    await main.initialize_instance()
+    assert (await client.get("/api/user/me")).json() == before
+    directory = (await client.get("/api/identities")).json()
+    assert directory["users"][0]["streamer_alias"] == "Aatrox"
+    assert directory["players"][0]["streamer_alias"] == "Ahri"
+    assert directory["players"][0]["username"] is None
+    await main.initialize_instance()
+    assert (await client.get("/api/identities")).json() == directory

@@ -19,10 +19,9 @@ import PlayerProfileModal from "./components/PlayerProfileModal";
 import PlayerDetailsModal from "./components/PlayerDetailsModal";
 import TradeTerminal from "./components/TradeTerminal";
 import OnboardingModal from "./components/OnboardingModal";
-import { useStreamerMode } from "./contexts/useStreamerMode";
+import { useIdentityPresentation } from "./contexts/useIdentityPresentation";
 import type { OrderSide } from "./types";
 import { formatAmount, formatLocalDateTime } from "./utils/format";
-import { getStreamerSafeName } from "./utils/streamerMode";
 
 import {
   useBankSummary,
@@ -68,7 +67,7 @@ export default function App({
   isLoggingOut: boolean;
   logoutError?: string;
 }) {
-  const { isStreamerMode } = useStreamerMode();
+  const { playerName } = useIdentityPresentation();
   const [trade, setTrade] = useState<TradeTarget | null>(null);
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
   const [tickerSortMode, setTickerSortMode] = useState<TickerSortMode>("value");
@@ -145,16 +144,24 @@ export default function App({
           return right.current_price - left.current_price;
         }
 
-        return left.display_name.localeCompare(right.display_name, undefined, {
-          sensitivity: "base",
-        });
+        return playerName(left.id).localeCompare(
+          playerName(right.id),
+          undefined,
+          {
+            sensitivity: "base",
+          },
+        );
       }
 
-      return left.display_name.localeCompare(right.display_name, undefined, {
-        sensitivity: "base",
-      });
+      return playerName(left.id).localeCompare(
+        playerName(right.id),
+        undefined,
+        {
+          sensitivity: "base",
+        },
+      );
     });
-  }, [players, tickerSortMode]);
+  }, [players, tickerSortMode, playerName]);
 
   const resolvedSystemStatus = isAdmin ? adminSystemStatus : systemStatus;
   const marketStatusTone = resolvedSystemStatus?.market_status ?? "idle";
@@ -193,9 +200,7 @@ export default function App({
           bankSummary?.debt_adjusted_net_worth ??
           balance
         }
-        displayName={user?.display_name}
-        playerDisplayName={linkedPlayer?.display_name}
-        playerGameName={linkedPlayer?.game_name}
+        userId={user?.id}
         canEditProfile={Boolean(linkedPlayer)}
         canToggleAdminView={isAdmin}
         adminViewMode={effectiveAdminViewMode}
@@ -305,9 +310,7 @@ export default function App({
                       className="flex items-center gap-3 px-5 py-2.5"
                     >
                       <span className="font-mono text-xs font-bold text-hex-white">
-                        {isStreamerMode
-                          ? getStreamerSafeName(p.game_name, p.display_name)
-                          : p.display_name}
+                        {playerName(p.id)}
                       </span>
                       <span
                         className={`font-mono text-xs font-bold ${

@@ -42,6 +42,7 @@ Current SQLAlchemy tables:
 | `access_tokens` | Hashed one-time setup, invitation and password-reset tokens with lifecycle state. |
 | `game_interventions` | Atomic administrator game changes with actor, affected member and concrete values. |
 | `instance_metadata` | Supported standalone database schema version. |
+| `identity_aliases` | Unique permanent League aliases for users and unlinked tracked-player presentation. |
 | `tracked_players` | Riot accounts whose prices are tracked in the market. |
 | `holdings` | Aggregate user-player share positions. |
 | `holding_lots` | FIFO lots used for hold-period enforcement and buy reverts. |
@@ -198,4 +199,13 @@ Administrator permissions add access to account management and game administrati
 
 `app/interventions.py` owns rescue-access restoration. A conditional SQLite update changes the affected account's remaining uses from zero to one and inserts a typed `game_interventions` record in the same transaction. The administrator router builds its response before committing; failure rolls back both writes. Already available access returns 409 without an event. The economy and loan eligibility checks remain in the bank module.
 
-`GET /api/activity` requires a session and exposes the actor and affected member through stable user IDs, usernames and optional linked Riot identity, UTC timestamp, intervention kind and previous/new values. It does not expose credentials, access tokens or email. The frontend renders this list for every member. Read-only administration and access management produce no intervention records. Demo visitors receive an empty activity list, preserving normal-market privacy if the operator changes deployment mode. Permanent alias rendering belongs to the identity presentation slice.
+`GET /api/activity` requires a session and exposes the actor and affected member through stable user IDs, usernames and optional linked Riot identity, UTC timestamp, intervention kind and previous/new values. It does not expose credentials, access tokens or email. The frontend renders this list for every member. Read-only administration and access management produce no intervention records. Demo visitors receive an empty activity list, preserving normal-market privacy if the operator changes deployment mode. The shared identity presentation interface renders its actor and affected member consistently with the other participant views.
+
+
+## Identity presentation and alias persistence
+
+`app/identities.py` owns permanent League alias allocation through a shared SQLAlchemy creation invariant. New administrator, member, demo-user and tracked-player records receive unique aliases in the same transaction as their creation. Allocation takes SQLite's writer lock before selecting an unused name. A pinned champion pool is followed by item and ability names; exhausting the complete pool rejects creation without consuming an invitation or saving a partial account. Existing aliases remain unchanged after Riot linking, renaming and restart. Startup adds the alias table and backfills existing unreleased standalone data without deleting accounts, game state or sessions. This is not a released-version migration contract.
+
+Authenticated `GET /api/identities` provides the presentation directory. Linked tracked players resolve to their user's alias; unlinked tracked players retain their own alias. Normal requests exclude demo users. Demo requests expose only the requesting temporary user and mask linked identities belonging to excluded users. Shared market aliases remain available.
+
+`useIdentityPresentation` is the shared frontend interface for participant and tracked-player names across market, portfolio, orders, leaderboard, administrator controls, activity, simulation and Gamba. Normal labels show username plus linked RiotName, with username-only fallback. Streamer Mode uses persisted aliases and suppresses Riot tags, identifying links and profile-editor values. A missing directory never falls back to a real name. The account editor offers an explicit action to leave Streamer Mode before editing. Streamer Mode is presentation privacy, not an additional API authorization rule.

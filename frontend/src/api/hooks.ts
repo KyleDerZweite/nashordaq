@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { get, post, put, del } from "./client";
 import type {
   GameIntervention,
+  IdentityDirectory,
   AdminOverviewResponse,
   AdminPlayerInsightResponse,
   AdminUserPortfolioResponse,
@@ -36,6 +37,7 @@ import type {
 // ---- Keys ----
 
 export const queryKeys = {
+  identities: ["identities"] as const,
   activity: ["activity"] as const,
   user: ["user"] as const,
   players: ["players"] as const,
@@ -375,6 +377,7 @@ export function useCompleteOnboarding() {
   return useMutation<UserResponse, Error, UserOnboardingCreate>({
     mutationFn: (body) => post<UserResponse>("/user/onboarding", body),
     onSuccess: async (user) => {
+      void qc.invalidateQueries({ queryKey: queryKeys.identities });
       qc.setQueryData(queryKeys.user, user);
       await qc.refetchQueries({ queryKey: queryKeys.user });
       void qc.invalidateQueries({ queryKey: queryKeys.players });
@@ -392,6 +395,7 @@ export function useUpdateUserProfile() {
   return useMutation<UserResponse, Error, UserProfileUpdate>({
     mutationFn: (body) => put<UserResponse>("/user/profile", body),
     onSuccess: async (user) => {
+      void qc.invalidateQueries({ queryKey: queryKeys.identities });
       qc.setQueryData(queryKeys.user, user);
       await qc.refetchQueries({ queryKey: queryKeys.user });
       void qc.invalidateQueries({ queryKey: queryKeys.players });
@@ -518,6 +522,15 @@ export function useGameActivity() {
   return useQuery<GameIntervention[]>({
     queryKey: queryKeys.activity,
     queryFn: () => get<GameIntervention[]>("/activity"),
+    refetchInterval: 30_000,
+  });
+}
+
+export function useIdentities() {
+  return useQuery<IdentityDirectory>({
+    queryKey: queryKeys.identities,
+    queryFn: () => get<IdentityDirectory>("/identities"),
+    staleTime: 30_000,
     refetchInterval: 30_000,
   });
 }

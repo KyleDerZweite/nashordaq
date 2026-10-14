@@ -1,8 +1,7 @@
 import { useMemo } from "react";
 
-import { useStreamerMode } from "../contexts/useStreamerMode";
+import { useIdentityPresentation } from "../contexts/useIdentityPresentation";
 import type { GambaPositionResponse } from "../types";
-import { getStreamerSafeName } from "../utils/streamerMode";
 import {
   formatAmount,
   formatLocalDateTime,
@@ -32,7 +31,7 @@ function formatCompactDateTime(value: string): string {
 }
 
 export default function GambaModal({ positions, onClose }: Props) {
-  const { isStreamerMode } = useStreamerMode();
+  const { playerName } = useIdentityPresentation();
   const activePositions = useMemo(
     () => positions.filter((position) => position.status === "ACTIVE"),
     [positions],
@@ -165,12 +164,7 @@ export default function GambaModal({ positions, onClose }: Props) {
                     </td>
                     <td className="px-4 py-3 font-mono text-sm font-medium text-hex-white">
                       <span className="block truncate">
-                        {isStreamerMode
-                          ? getStreamerSafeName(
-                              position.player_game_name,
-                              position.player_name,
-                            )
-                          : position.player_name}
+                        {playerName(position.player_id)}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right font-mono text-sm text-hex-gold">
@@ -229,12 +223,7 @@ export default function GambaModal({ positions, onClose }: Props) {
                       {position.status}
                     </div>
                     <h3 className="mt-1 font-serif text-lg font-bold text-hex-white">
-                      {isStreamerMode
-                        ? getStreamerSafeName(
-                            position.player_game_name,
-                            position.player_name,
-                          )
-                        : position.player_name}
+                      {playerName(position.player_id)}
                     </h3>
                   </div>
                   <div className="text-right font-mono text-sm font-bold text-hex-gold">

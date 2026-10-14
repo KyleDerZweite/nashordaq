@@ -1,13 +1,12 @@
 import { useState } from "react";
 
-import { useStreamerMode } from "../../contexts/useStreamerMode";
+import { useIdentityPresentation } from "../../contexts/useIdentityPresentation";
 import type {
   AdminPlayerInsightResponse,
   AdminOverviewResponse,
   AdminUserSummaryResponse,
   SystemStatusResponse,
 } from "../../types";
-import { getStreamerSafeName } from "../../utils/streamerMode";
 import { formatAmount, formatLocalDateTime } from "../../utils/format";
 import AdminPlayerInsightsPanel from "./AdminPlayerInsightsPanel";
 import AdminPortfolioModal from "./AdminPortfolioModal";
@@ -25,7 +24,7 @@ export default function AdminDashboard({
   systemStatus,
   playerInsights,
 }: Props) {
-  const { isStreamerMode } = useStreamerMode();
+  const { playerName, userName } = useIdentityPresentation();
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
 
   const statCards = [
@@ -179,21 +178,7 @@ export default function AdminDashboard({
                     className="border-b border-hex-border/50 transition-colors hover:bg-hex-bg-alt"
                   >
                     <td className="px-4 py-2.5 font-mono text-sm text-hex-white">
-                      <div>
-                        {user.linked_player_name
-                          ? isStreamerMode
-                            ? getStreamerSafeName(
-                                user.linked_player_game_name,
-                                user.linked_player_name,
-                              )
-                            : user.linked_player_name
-                          : user.display_name}
-                      </div>
-                      {!isStreamerMode && (
-                        <div className="text-[11px] text-hex-bronze">
-                          {user.display_name}
-                        </div>
-                      )}
+                      <div>{userName(user.id)}</div>
                     </td>
                     <td className="px-4 py-2.5">
                       <span
@@ -207,14 +192,9 @@ export default function AdminDashboard({
                       </span>
                     </td>
                     <td className="px-4 py-2.5 font-mono text-sm text-hex-bronze">
-                      {user.linked_player_name
-                        ? isStreamerMode
-                          ? getStreamerSafeName(
-                              user.linked_player_game_name,
-                              user.linked_player_name,
-                            )
-                          : user.linked_player_name
-                        : "Not onboarded"}
+                      {user.linked_player_id === null
+                        ? "Not onboarded"
+                        : playerName(user.linked_player_id)}
                     </td>
                     <td className="px-4 py-2.5 text-right font-mono text-sm font-bold text-hex-gold">
                       {formatAmount(user.total_value)}

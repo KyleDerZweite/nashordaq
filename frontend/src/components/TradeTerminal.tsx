@@ -1,8 +1,7 @@
 import { useState } from "react";
-import { useStreamerMode } from "../contexts/useStreamerMode";
+import { useIdentityPresentation } from "../contexts/useIdentityPresentation";
 import type { PlayerSummary, OrderSide } from "../types";
 import { usePlaceOrder } from "../api";
-import { getStreamerSafeName } from "../utils/streamerMode";
 import { formatAmount } from "../utils/format";
 
 interface Props {
@@ -24,7 +23,7 @@ export default function TradeTerminal({
   isDemo = false,
   onClose,
 }: Props) {
-  const { isStreamerMode } = useStreamerMode();
+  const { playerName } = useIdentityPresentation();
   const [quantity, setQuantity] = useState(1);
   const placeOrder = usePlaceOrder();
 
@@ -99,25 +98,22 @@ export default function TradeTerminal({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-hex-bg/80"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-hex-bg/80 px-3 py-4"
       onClick={onClose}
     >
       <section
-        className="w-full max-w-md border-4 border-hex-gold bg-hex-panel shadow-brutal-lg"
+        className="max-h-[92vh] w-full max-w-md overflow-y-auto border-4 border-hex-gold bg-hex-panel shadow-brutal-lg"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b-4 border-hex-gold px-5 py-3">
-          <h2 className="font-serif text-xl font-bold text-hex-gold">
-            {side} &mdash;{" "}
-            {isStreamerMode
-              ? getStreamerSafeName(player.game_name, player.display_name)
-              : player.display_name}
+          <h2 className="min-w-0 break-all font-serif text-xl font-bold text-hex-gold">
+            {side}: {playerName(player.id)}
           </h2>
           <button
             type="button"
             onClick={onClose}
-            className="border-2 border-hex-border px-3 py-2 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-hex-bronze transition-colors hover:border-hex-white hover:text-hex-white"
+            className="shrink-0 border-2 border-hex-border px-3 py-2 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-hex-bronze transition-colors hover:border-hex-white hover:text-hex-white"
           >
             Close
           </button>
@@ -125,12 +121,10 @@ export default function TradeTerminal({
 
         {/* Player info */}
         <div className="flex items-baseline justify-between border-b-2 border-hex-border px-5 py-3">
-          <span className="font-mono text-xs text-hex-bronze">
-            {isStreamerMode
-              ? player.game_name
-              : `${player.game_name}#${player.tag_line}`}
+          <span className="min-w-0 break-all font-mono text-xs text-hex-bronze">
+            {playerName(player.id)}
           </span>
-          <span className="font-mono text-lg font-bold text-hex-gold">
+          <span className="shrink-0 font-mono text-lg font-bold text-hex-gold">
             {formatAmount(player.current_price)}
             <span className="ml-1 text-xs text-hex-bronze">P / share</span>
           </span>
@@ -201,7 +195,7 @@ export default function TradeTerminal({
                   <span className="font-mono text-xs uppercase tracking-wider text-hex-bronze">
                     Price After
                   </span>
-                  <span className="font-mono text-xs text-hex-bronze">
+                  <span className="min-w-0 break-all font-mono text-xs text-hex-bronze">
                     {formatAmount(priceAfterTrade)}
                     <span className="ml-1">P</span>
                   </span>
@@ -229,20 +223,20 @@ export default function TradeTerminal({
           )}
 
           {isBuy && !hasInitialUpdate && (
-            <p className="font-mono text-xs text-hex-bronze">
+            <p className="min-w-0 break-all font-mono text-xs text-hex-bronze">
               Buying is locked until this stock receives its first market
               update.
             </p>
           )}
 
           {isBuy && isOwnStock && (
-            <p className="font-mono text-xs text-hex-bronze">
+            <p className="min-w-0 break-all font-mono text-xs text-hex-bronze">
               You cannot buy your own stock.
             </p>
           )}
 
           {!isBuy && maxSellQuantity < 1 && (
-            <p className="font-mono text-xs text-hex-bronze">
+            <p className="min-w-0 break-all font-mono text-xs text-hex-bronze">
               You do not currently own any shares of this stock.
             </p>
           )}

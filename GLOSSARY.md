@@ -21,5 +21,5 @@ A temporary demo participant with personal game state in the shared simulated ma
 _Avoid_: Shared demo account
 
 **Streamer alias**:
-A permanently assigned League of Legends character name that replaces a user's identity in Streamer Mode.
+A permanently assigned League of Legends name that replaces a user's identity in Streamer Mode. Champion names form the initial pool; item and ability names extend it. Unlinked tracked players also have a permanent alias.
 _Avoid_: Username, RiotName
