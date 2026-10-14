@@ -88,8 +88,11 @@ export default function AdminPasswordResets() {
           </button>
         </div>
       )}
-      <form onSubmit={submit} className="mt-4 flex flex-wrap items-end gap-3">
-        <div className="min-w-0 flex-1">
+      <form
+        onSubmit={submit}
+        className="mt-4 flex flex-col items-start gap-3 sm:flex-row sm:items-end"
+      >
+        <div className="w-full min-w-0 sm:flex-1">
           <label
             htmlFor="reset-account"
             className="block text-sm font-bold text-hex-white"
