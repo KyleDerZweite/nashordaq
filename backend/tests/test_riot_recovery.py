@@ -34,7 +34,9 @@ async def test_missing_riot_key_explained_without_affecting_local_access(
     assert lookup.status_code == 503
     assert "NASHORDAQ_RIOT_API_KEY" in lookup.json()["detail"]
     assert (await admin_client.get("/api/auth/session")).status_code == 200
-    assert (await admin_client.get("/api/admin/system/status")).status_code == 200
+    admin_status = await admin_client.get("/api/admin/system/status")
+    assert admin_status.status_code == 200
+    assert admin_status.json() == status.json()
 
 
 @pytest.mark.parametrize("upstream_status", [401, 403])

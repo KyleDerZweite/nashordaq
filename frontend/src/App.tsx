@@ -28,7 +28,6 @@ import {
   useBankSummary,
   useAdminOverview,
   useAdminPlayerInsights,
-  useAdminSystemStatus,
   useAdminUsers,
   useUser,
   usePlayers,
@@ -96,7 +95,6 @@ export default function App({
   const { data: systemStatus } = useSystemStatus();
   const { data: adminOverview } = useAdminOverview(isAdmin);
   const { data: adminUsers } = useAdminUsers(isAdmin);
-  const { data: adminSystemStatus } = useAdminSystemStatus(isAdmin);
   const { data: adminPlayerInsights } = useAdminPlayerInsights(
     isAdmin && adminViewMode === "admin",
   );
@@ -164,8 +162,7 @@ export default function App({
     });
   }, [players, tickerSortMode, playerName]);
 
-  const resolvedSystemStatus = isAdmin ? adminSystemStatus : systemStatus;
-  const marketStatusTone = resolvedSystemStatus?.market_status ?? "idle";
+  const marketStatusTone = systemStatus?.market_status ?? "idle";
   const marketStatusLabel =
     marketStatusTone === "healthy"
       ? "Healthy"
@@ -180,15 +177,15 @@ export default function App({
         : "border-hex-border bg-hex-bronze shadow-none";
 
   let marketStatusDetail = "Checking market service...";
-  if (resolvedSystemStatus) {
+  if (systemStatus) {
     if (isDemo) {
-      const cadence = resolvedSystemStatus.expected_update_interval_minutes;
-      marketStatusDetail = resolvedSystemStatus.last_market_update_at
-        ? `Last simulated market refresh ${formatLocalDateTime(resolvedSystemStatus.last_market_update_at)}. Prices change about every ${cadence} min.`
+      const cadence = systemStatus.expected_update_interval_minutes;
+      marketStatusDetail = systemStatus.last_market_update_at
+        ? `Last simulated market refresh ${formatLocalDateTime(systemStatus.last_market_update_at)}. Prices change about every ${cadence} min.`
         : `Demo prices change automatically about every ${cadence} min. Awaiting the first simulated market refresh.`;
-    } else if (resolvedSystemStatus.last_market_update_at) {
-      marketStatusDetail = `Last successful market refresh ${formatLocalDateTime(resolvedSystemStatus.last_market_update_at)}. Expected cadence about every ${resolvedSystemStatus.expected_update_interval_minutes} min.`;
-    } else if (resolvedSystemStatus.tracked_player_count === 0) {
+    } else if (systemStatus.last_market_update_at) {
+      marketStatusDetail = `Last successful market refresh ${formatLocalDateTime(systemStatus.last_market_update_at)}. Expected cadence about every ${systemStatus.expected_update_interval_minutes} min.`;
+    } else if (systemStatus.tracked_player_count === 0) {
       marketStatusDetail =
         "No tracked players yet. Market polling will begin once the first player is onboarded.";
     } else {
@@ -357,7 +354,7 @@ export default function App({
                 <AdminDashboard
                   overview={adminOverview}
                   users={adminUsers ?? []}
-                  systemStatus={adminSystemStatus}
+                  systemStatus={systemStatus}
                   playerInsights={adminPlayerInsights ?? []}
                 />
               </div>

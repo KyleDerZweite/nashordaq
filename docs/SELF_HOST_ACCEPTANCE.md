@@ -118,9 +118,19 @@ Run required frontend checks from `frontend/`:
 corepack pnpm@10.34.7 run lint
 corepack pnpm@10.34.7 run format
 corepack pnpm@10.34.7 run build
-node --test tests/identityPresentation.test.ts
+corepack pnpm@10.34.7 run test
 ```
 
 The production review and targeted runtime refresh are complete at the revisions above. The fixed review base is `e7280b4c79fe056c77407ae576e39446d19b4792`; [the review report](SELF_HOST_REVIEW.md) keeps Standards and Spec separate. Required local checks passed at `8a820a5`, with production equality verified at `39dceae`, and exact-integration CI passed in C. This final evidence edit changes documentation only. Check its working diff, story coverage and links; any later CI result must identify its own commit. A green health endpoint alone does not establish account or game preservation.
+
+## Maintainer follow-up verification
+
+[PR #42](https://github.com/KyleDerZweite/nashordaq/pull/42) adds the existing identity tests to the existing frontend CI job and documents code/test ownership. [PR #43](https://github.com/KyleDerZweite/nashordaq/pull/43) adds the opt-in [local demo browser regression](../frontend/README.md#local-demo-browser-regression), without a browser CI job. Controlled assertion failure, SIGTERM cleanup and rejection of symlinked source directories passed. Native Docker execution of this new runner remains UNEXECUTED because the host's Docker executable is a Podman shim.
+
+[PR #44](https://github.com/KyleDerZweite/nashordaq/pull/44) consolidates status observation and frontend polling. Code `d85b08897a636c30ca42140db58420a78a9e2664` passed 312 backend tests with one optional live Riot skip, Ruff, frontend lint/format/build and three identity tests. Independent review found no actionable findings. Both existing [CI jobs](https://github.com/KyleDerZweite/nashordaq/actions/runs/38543937107) passed for that head through GitHub's merge checkout.
+
+The integration owner built fresh normal and demo instances with Podman 5.8.4 and podman-compose 1.5.0, empty Riot keys and Gamba disabled. Actual normal routes returned equal status observations. Administrator access returned 200/200, member access 200/403, and anonymous or forged-header access 401/401 for the general/administrator routes. The native T3 Chromium browser completed normal login and showed readable administrator status, footer and missing-key guidance at 390 and 1280 pixels. A visible, focused 99.9-second observation recorded one initial general-status request and three successful polls, with successive poll intervals of 30.015 and 30.017 seconds. No administrator-status request occurred. Switching views retained the shared observation.
+
+The opt-in demo browser regression also passed against `d85b088`: two visitors, one purchase, isolated portfolios, reload, logout, revoked-cookie denial and continued access for the other visitor. Both test projects and their temporary data were removed. Original local instances retained their container IDs and health. These are targeted follow-up checks, not a replay of the complete story matrix. Later documentation commits do not extend the runtime claims above.
 
 The public trusted HTTPS/browser journey, live Riot linking/refresh/key replacement, published release-tag installation, released predecessor update/recovery and second physical LAN client remain UNEXECUTED. Their absence limits claims of complete deployment acceptance. The first-release predecessor exception is explicit; it does not waive the next release's update/recovery proof. Touch and assistive-technology behavior were not tested. No owner acceptance, merged delivery or release publication is claimed.

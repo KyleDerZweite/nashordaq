@@ -22,6 +22,8 @@ Scheduler -> Riot client -> existing pricing engine -> SQLite
 - **TailwindCSS:** Utility-first styling.
 - **TanStack Query:** Server state management and caching.
 
+`useSystemStatus` polls the authenticated general status endpoint every thirty seconds. The footer, Riot availability banner, feature flags and administrator dashboard share its cached observation.
+
 ## Backend
 
 - **FastAPI:** Async Python web framework. Hosts all REST endpoints and the scheduler in a single process.
@@ -149,6 +151,8 @@ The market update job runs as a single atomic operation:
 3. **Execute orders:** Process all PENDING orders in FIFO order. Validate balances/holdings at execution time. Create `Transaction` records for executed orders.
 4. **Commit:** All changes are committed in a single database transaction.
 
+`app/system_status.py` observes tracked-player counts, scheduler facts, Riot availability and feature settings through one database session and returns `SystemStatusResponse`. Both status routes delegate to it and retain their own authentication requirements. The module reads existing facts without contacting Riot or starting jobs. The scheduler retains cadence calculation, freshness classification and job execution.
+
 ## Infrastructure
 
 - **Docker Compose and Podman Compose:** Build and manage the frontend and backend through the shared `podman-compose.yaml`.
@@ -174,6 +178,7 @@ backend/
     banking.py                  # Rescue-loan and wealth snapshot helpers
     poro.py                     # Poro scheduling and claim helpers
     scheduler.py                # APScheduler jobs (market, poro, demo)
+    system_status.py            # Shared read-only operational status observation
     routers/
       user.py                   # User profile, onboarding, balance insights
       market.py                 # Market list/detail endpoints

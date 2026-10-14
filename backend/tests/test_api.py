@@ -1,7 +1,9 @@
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, patch
 
-import app.main as main_module
+import pytest
+
+import app.system_status as status_module
 from app.models import (
     PoroSpawn,
     PoroSpawnStatus,
@@ -23,8 +25,8 @@ async def test_health(client):
 
 
 async def test_system_status_is_idle_without_tracked_players(auth_client, monkeypatch):
-    monkeypatch.setattr(main_module, "get_last_market_update_at", lambda: None)
-    monkeypatch.setattr(main_module, "is_scheduler_running", lambda: False)
+    monkeypatch.setattr(status_module, "get_last_market_update_at", lambda: None)
+    monkeypatch.setattr(status_module, "is_scheduler_running", lambda: False)
 
     resp = await auth_client.get("/api/system/status")
 
@@ -58,11 +60,11 @@ async def test_system_status_is_healthy_after_recent_market_refresh(
 
     last_market_update_at = datetime.now(UTC)
     monkeypatch.setattr(
-        main_module,
+        status_module,
         "get_last_market_update_at",
         lambda: last_market_update_at,
     )
-    monkeypatch.setattr(main_module, "is_scheduler_running", lambda: True)
+    monkeypatch.setattr(status_module, "is_scheduler_running", lambda: True)
 
     resp = await auth_client.get("/api/system/status")
 
@@ -96,11 +98,11 @@ async def test_system_status_is_degraded_when_market_refresh_is_stale(
 
     stale_market_update_at = datetime.now(UTC) - timedelta(minutes=5)
     monkeypatch.setattr(
-        main_module,
+        status_module,
         "get_last_market_update_at",
         lambda: stale_market_update_at,
     )
-    monkeypatch.setattr(main_module, "is_scheduler_running", lambda: True)
+    monkeypatch.setattr(status_module, "is_scheduler_running", lambda: True)
 
     resp = await auth_client.get("/api/system/status")
 
@@ -111,6 +113,42 @@ async def test_system_status_is_degraded_when_market_refresh_is_stale(
     assert data["tracked_player_count"] == 2
     assert data["expected_update_interval_minutes"] == 1
     assert data["last_market_update_at"] is not None
+
+
+async def test_status_routes_return_the_same_market_observation(
+    admin_client, seeded_player, monkeypatch
+):
+    del seeded_player
+    refreshed_at = datetime(2026, 10, 14, 12, 0, tzinfo=UTC)
+    monkeypatch.setattr(
+        status_module, "get_last_market_update_at", lambda: refreshed_at
+    )
+    monkeypatch.setattr(status_module, "is_scheduler_running", lambda: True)
+
+    general = await admin_client.get("/api/system/status")
+    administrator = await admin_client.get("/api/admin/system/status")
+
+    assert general.status_code == administrator.status_code == 200
+    assert general.json() == administrator.json()
+    assert general.json()["tracked_player_count"] == 1
+    assert general.json()["scheduler_running"] is True
+    assert general.json()["last_market_update_at"] == "2026-10-14T12:00:00Z"
+
+
+@pytest.mark.parametrize("path", ["/api/system/status", "/api/admin/system/status"])
+async def test_status_routes_require_a_session(client, auth_client, path):
+    del auth_client
+    response = await client.get(path)
+    assert response.status_code == 401
+
+
+@pytest.mark.parametrize(
+    "path, expected_status",
+    [("/api/system/status", 200), ("/api/admin/system/status", 403)],
+)
+async def test_status_routes_preserve_member_access(auth_client, path, expected_status):
+    response = await auth_client.get(path)
+    assert response.status_code == expected_status
 
 
 async def test_quote_requires_auth(auth_client, client):

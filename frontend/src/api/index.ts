@@ -22,7 +22,6 @@ export {
   useSystemStatus,
   useAdminOverview,
   useAdminUsers,
-  useAdminSystemStatus,
   useAdminPlayerInsights,
   useAdminUserPortfolio,
   useBankSummary,
