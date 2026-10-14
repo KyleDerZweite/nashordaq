@@ -18,6 +18,8 @@ export default function Header({
   onEditProfile,
   onOpenSimulation,
   onToggleAdminView,
+  onLogout,
+  isLoggingOut = false,
 }: {
   balance: number;
   netWorth?: number;
@@ -33,6 +35,8 @@ export default function Header({
   onEditProfile?: () => void;
   onOpenSimulation?: () => void;
   onToggleAdminView?: () => void;
+  onLogout: () => void;
+  isLoggingOut?: boolean;
 }) {
   const { isStreamerMode, toggleStreamerMode } = useStreamerMode();
   const initial = displayName ? displayName[0].toUpperCase() : "?";
@@ -85,6 +89,8 @@ export default function Header({
             <button
               type="button"
               onClick={() => setMenuOpen((current) => !current)}
+              aria-label="Account menu"
+              aria-expanded={menuOpen}
               className="h-10 w-10 border-2 border-hex-gold bg-hex-panel text-center font-serif text-lg leading-9 font-bold text-hex-gold transition-colors hover:bg-hex-gold hover:text-hex-bg"
             >
               {initial}
@@ -156,6 +162,14 @@ export default function Header({
                   }`}
                 >
                   Edit Summoner Profile
+                </button>
+                <button
+                  type="button"
+                  onClick={onLogout}
+                  disabled={isLoggingOut}
+                  className="mt-3 w-full border border-hex-gold px-3 py-2 text-left font-mono text-xs font-bold uppercase tracking-wider text-hex-gold transition-colors hover:bg-hex-gold hover:text-hex-bg disabled:cursor-wait disabled:opacity-50"
+                >
+                  {isLoggingOut ? "Signing out..." : "Sign out"}
                 </button>
               </div>
             )}

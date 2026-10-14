@@ -76,7 +76,7 @@ async def _build_admin_user_portfolio_response(
         user_id=user.id,
         email=identity,
         display_name=user.display_name or identity,
-        role=get_user_role(identity),
+        role=get_user_role(user),
         linked_player_id=user.linked_player_id,
         linked_player_name=linked_player_name,
         linked_player_game_name=linked_player_game_name,
@@ -175,7 +175,7 @@ async def get_admin_overview(
         total_debt_outstanding += snapshot.debt_outstanding
         if user.linked_player_id is not None:
             onboarded_users += 1
-        if get_user_role(user.email or user.username) == "admin":
+        if get_user_role(user) == "admin":
             admin_users += 1
 
     tracked_players = await session.scalar(
@@ -221,7 +221,7 @@ async def list_admin_users(
                 id=user.id,
                 email=identity,
                 display_name=user.display_name or identity,
-                role=get_user_role(identity),
+                role=get_user_role(user),
                 linked_player_id=user.linked_player_id,
                 linked_player_name=(
                     linked_player_identities.get(user.linked_player_id, (None, None))[0]

@@ -129,7 +129,7 @@ def _to_user_response(user: User) -> UserResponse:
         id=user.id,
         email=shown_email,
         display_name=display,
-        role=get_user_role(identity),
+        role=get_user_role(user),
         balance=user.balance,
         linked_player_id=user.linked_player_id,
         onboarding_complete=user.is_demo or user.linked_player_id is not None,

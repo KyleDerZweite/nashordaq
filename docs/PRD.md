@@ -14,11 +14,11 @@ A closed, trusted friend group. Public registration and email verification are o
 
 Public registration, a mail-server requirement, OAuth/OIDC, additional administrators and hosted multi-room operation are outside this baseline. The first standalone release starts with fresh data; subsequent standalone releases establish the supported update path.
 
-The flows below describe current behavior. Their proxy authentication is superseded as a product requirement by ADR-0001 and remains implemented only until the standalone work is delivered.
+Local setup and sessions are implemented. Invitation registration, recovery, administrator participation and explicit demo sessions remain later slices of the accepted baseline.
 
 ## Current core user flows
 
-1. **Authentication:** User access is gated by an external Identity-Aware Proxy (e.g., Zitadel/Pangolin). Upon successful proxy authentication, the user is seamlessly passed to the Nashordaq interface. The backend automatically provisions a configured starting balance the first time it detects a new `Remote-Email` header, with `Remote-User` retained as a fallback for legacy setups.
+1. **Authentication:** The operator creates the sole administrator through the one-time setup link in the application log. Users sign in with local username/password credentials. Sessions last seven days and logout immediately revokes the current session. Setup and login work without a Riot key. All game information requires login. See [Architecture](ARCHITECTURE.md#authentication-and-session-trust-boundary) for the security boundary.
 
 2. **Market Overview:** Users can view a dashboard listing all tracked LoL accounts with their current share price and last update time.
 

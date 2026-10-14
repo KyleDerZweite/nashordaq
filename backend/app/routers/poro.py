@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import CurrentOnboardedUser
+from app.auth import SESSION_COOKIE, CurrentOnboardedUser, lookup_session_user
 from app.config import settings
 from app.database import get_session
 from app.poro import (
@@ -134,7 +134,9 @@ async def stream_poro_state(
                     break
 
                 session.expire_all()
-                stream_user = await session.get(type(user), stream_user_id)
+                stream_user = await lookup_session_user(
+                    session, request.cookies.get(SESSION_COOKIE)
+                )
                 if stream_user is None or stream_user.linked_player_id is None:
                     break
 
