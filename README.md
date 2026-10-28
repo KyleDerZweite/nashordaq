@@ -36,11 +36,11 @@ uv run ruff format .
 Frontend commands run from `frontend/` with the version declared in `packageManager`:
 
 ```bash
-corepack pnpm@10.34.7 install --frozen-lockfile
-corepack pnpm@10.34.7 run dev
-corepack pnpm@10.34.7 run lint
-corepack pnpm@10.34.7 run format
-corepack pnpm@10.34.7 run build
+corepack pnpm install --frozen-lockfile
+corepack pnpm run dev
+corepack pnpm run lint
+corepack pnpm run format
+corepack pnpm run build
 ```
 
 Use [GitHub issues](https://github.com/KyleDerZweite/nashordaq/issues) for work and [Discussions](https://github.com/KyleDerZweite/nashordaq/discussions) for ideas. The [roadmap](docs/ROADMAP.md) separates the implemented baseline from possible later work.

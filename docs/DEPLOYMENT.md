@@ -109,7 +109,9 @@ Compose fixes `NASHORDAQ_DATABASE_URL` to `sqlite+aiosqlite:////app/data/nashord
 
 Container restart or recreation preserves accounts, consumed setup, sessions and game state. Use your selected runtime's `restart`, or `up -d --force-recreate`, with the same manifest and working directory. `down` removes containers and the project network while retaining `./data`. Do not delete this directory. Copying an active SQLite main file alone is not a consistent backup because committed data may remain in its WAL. Use the [live backup and fresh restore procedure](#live-backup-and-fresh-restore).
 
-Both Containerfiles pin their base-image tags and immutable manifest digests. The backend copies uv 0.10.12 and installs the committed `uv.lock` with `--frozen`. The frontend uses pnpm 10.34.7, also declared in `packageManager`, and installs the committed `pnpm-lock.yaml` with `--frozen-lockfile`. Dependency updates review these inputs together.
+Both Containerfiles pin their base-image tags and immutable manifest digests. The backend copies the uv version pinned in `backend/Containerfile` and installs the committed `uv.lock` with `--frozen`. Frontend development and container builds use Corepack to select the pnpm version declared in `frontend/package.json` and install the committed `pnpm-lock.yaml` with `--frozen-lockfile`. CI reads the same `packageManager` field. Dependency updates review these inputs together.
+
+[Dependabot configuration](../.github/dependabot.yml) checks backend uv dependencies, frontend pnpm dependencies, GitHub Actions and both Containerfiles weekly. The frontend entry uses GitHub's `npm` ecosystem identifier for pnpm, without introducing npm commands or a second lockfile. Version-update PRs remain separate and bounded per ecosystem. Container updates retain the Python 3.12, Node 22 and Nginx 1.28 runtime lines; changing those lines requires a coordinated update of the Containerfiles, CI and this procedure. Repository security settings and the existing merge workflow are unchanged. Review lockfile resolution, frozen installs and affected checks before accepting updates. This automation does not complete the outstanding operator acceptance checks or select exploratory architecture proposals.
 
 ## Live backup and fresh restore
 
@@ -232,6 +234,6 @@ The previous proxy version is incompatible with standalone account storage. Befo
 
 ## Local development
 
-From `backend/`, create `data/`, run `uv sync --locked --dev`, then run `NASHORDAQ_PUBLIC_URL=http://localhost:5173 uv run uvicorn app.main:app --reload`. The development SQLite path is backend-relative unless explicitly overridden. From `frontend/`, run `corepack pnpm@10.34.7 install --frozen-lockfile`, then `corepack pnpm@10.34.7 run dev`. Vite proxies `/api` to the backend and preserves Host. Open the setup link printed by the backend. No header-injection extension is required.
+From `backend/`, create `data/`, run `uv sync --locked --dev`, then run `NASHORDAQ_PUBLIC_URL=http://localhost:5173 uv run uvicorn app.main:app --reload`. The development SQLite path is backend-relative unless explicitly overridden. From `frontend/`, run `corepack pnpm install --frozen-lockfile`, then `corepack pnpm run dev`. Vite proxies `/api` to the backend and preserves Host. Open the setup link printed by the backend. No header-injection extension is required.
 
 Tracked players enter through Riot onboarding rather than editing deployment seed files. A new player cannot be traded until its first successful market update. The scheduler wakes every 30 seconds and fetches Riot only when the dynamic interval is due. The [Architecture](ARCHITECTURE.md) owns that calculation and [Economy mechanics](ECONOMY_MECHANICS.md) owns pricing formulas.
