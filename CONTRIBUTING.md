@@ -41,10 +41,10 @@ Frontend identity tests check the shared name renderer. The opt-in [local demo b
   cd backend && uv run ruff check . && uv run ruff format . && uv run pytest -v
 
   # Frontend
-  cd ../frontend && corepack pnpm@10.34.7 run lint
-  corepack pnpm@10.34.7 run format
-  corepack pnpm@10.34.7 run test
-  corepack pnpm@10.34.7 run build
+  cd ../frontend && corepack pnpm run lint
+  corepack pnpm run format
+  corepack pnpm run test
+  corepack pnpm run build
   ```
 - Write a clear description of what the PR does and why.
 

@@ -7,12 +7,12 @@ Follow the [root development guide](../README.md#development) and [local account
 Use the pnpm version declared in `package.json`. From this directory, run:
 
 ```bash
-corepack pnpm@10.34.7 install --frozen-lockfile
-corepack pnpm@10.34.7 run dev
-corepack pnpm@10.34.7 run lint
-corepack pnpm@10.34.7 run format
-corepack pnpm@10.34.7 run build
-corepack pnpm@10.34.7 run test
+corepack pnpm install --frozen-lockfile
+corepack pnpm run dev
+corepack pnpm run lint
+corepack pnpm run format
+corepack pnpm run build
+corepack pnpm run test
 ```
 
 `pnpm run test` runs the three existing identity presentation tests with Node's built-in test runner. CI runs them on Node 22 alongside lint, format checks and the build.
@@ -26,11 +26,11 @@ The opt-in browser check builds a fresh demo through the shared Compose manifest
 Use a Git checkout on Linux with Node 22 or 24, this project's pnpm dependencies, and either native Docker Engine with Docker Compose or Podman with `podman-compose`. Install the package-matched browser into your user cache, then select the runtime explicitly:
 
 ```bash
-corepack pnpm@10.34.7 install --frozen-lockfile
-corepack pnpm@10.34.7 exec playwright install chromium
-corepack pnpm@10.34.7 run test:browser -- --runtime podman
+corepack pnpm install --frozen-lockfile
+corepack pnpm exec playwright install chromium
+corepack pnpm run test:browser -- --runtime podman
 # Or, with native Docker Engine:
-corepack pnpm@10.34.7 run test:browser -- --runtime docker
+corepack pnpm run test:browser -- --runtime docker
 ```
 
 The runner checks the browser before building containers. It does not install host libraries or global packages. If Chromium reports missing host libraries, resolve those through your existing system setup before retrying. A `docker` command that emulates Podman is rejected as Docker evidence. On unsupported Linux distributions, Playwright may use a fallback browser build; a successful launch proves only the tested host.
@@ -41,4 +41,4 @@ The runner tears down its own Compose project after success, failure, SIGINT or 
 
 Each run keeps a status report in ignored `browser-results/<project>/`. Browser assertion failures also keep screenshots for both visitors. Traces, videos, saved cookies, database copies and raw request logs are disabled. These files are local verification evidence, not owner acceptance or deployment evidence. A cold run downloads images and builds both services; later runs can reuse the engine cache.
 
-The ordinary format script covers application sources. When editing this test tooling, also run `corepack pnpm@10.34.7 exec prettier --write browser-tests eslint.config.js`.
+The ordinary format script covers application sources. When editing this test tooling, also run `corepack pnpm exec prettier --write browser-tests eslint.config.js`.
